@@ -18,11 +18,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,9 +56,9 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Favorites
@@ -188,10 +190,28 @@ fun PlaylistDetailScreen(
         is SecondaryRoute.TopChartsSquare -> "官方排行榜"
     }
 
+    val lazyListState = rememberLazyListState()
+
+    val scrollProgress by remember {
+        derivedStateOf {
+            if (playlist == null) {
+                1f
+            } else if (lazyListState.firstVisibleItemIndex > 0) {
+                1f
+            } else {
+                (lazyListState.firstVisibleItemScrollOffset / 200f).coerceIn(0f, 1f)
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = screenTitle,
+            SmallTopAppBar(
+                title = if (scrollProgress > 0.35f) screenTitle else "",
+                color = MiuixTheme.colorScheme.surface.copy(alpha = scrollProgress),
+                titleColor = MiuixTheme.colorScheme.onSurface.copy(
+                    alpha = if (scrollProgress > 0.35f) ((scrollProgress - 0.35f) / 0.65f).coerceIn(0f, 1f) else 0f
+                ),
                 navigationIcon = {
                     IconButton(
                         onClick = onBack,
@@ -286,6 +306,7 @@ fun PlaylistDetailScreen(
                 }
             } else {
                 LazyColumn(
+                    state = lazyListState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = 100.dp)
                 ) {
