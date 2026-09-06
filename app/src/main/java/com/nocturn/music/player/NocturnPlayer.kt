@@ -122,6 +122,7 @@ object NocturnPlayer {
         _errorMessage.value = null
         _isBuffering.value = true
         _currentPositionMs.value = 0L
+        PlaybackService.start(NocturnApp.appContext, song, true)
 
         playJob?.cancel()
         playJob = scope.launch {
@@ -213,6 +214,7 @@ object NocturnPlayer {
         val target = positionMs.coerceIn(0L, _durationMs.value)
         player.seekTo(target.toInt())
         _currentPositionMs.value = target
+        PlaybackService.syncSeekPosition(target)
     }
 
     fun togglePlayMode(): PlayMode {

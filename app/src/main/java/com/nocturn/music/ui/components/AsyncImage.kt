@@ -30,16 +30,54 @@ import okhttp3.Request
 import top.yukonga.miuix.kmp.basic.Text
 import java.util.concurrent.TimeUnit
 
-private val imageCache = object : LruCache<String, Bitmap>(50 * 1024 * 1024) {
-    override fun sizeOf(key: String, value: Bitmap): Int {
-        return value.byteCount
+object ImageLoader {
+    private val imageCache = object : LruCache<String, Bitmap>(50 * 1024 * 1024) {
+        override fun sizeOf(key: String, value: Bitmap): Int {
+            return value.byteCount
+        }
+    }
+
+    private val imageClient = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .build()
+
+    fun getCached(url: String?): Bitmap? {
+        if (url.isNullOrBlank()) return null
+        return imageCache.get(url)
+    }
+
+    suspend fun loadBitmap(url: String?): Bitmap? = withContext(Dispatchers.IO) {
+        if (url.isNullOrBlank()) return@withContext null
+        val cached = imageCache.get(url)
+        if (cached != null) return@withContext cached
+
+        try {
+            val fetchUrl = if (url.contains("music.126.net") && !url.contains("?param=")) {
+                "$url?param=300y300"
+            } else {
+                url
+            }
+            val req = Request.Builder()
+                .url(fetchUrl)
+                .header("User-Agent", "Mozilla/5.0")
+                .build()
+            val loaded = imageClient.newCall(req).execute().use { res ->
+                if (res.isSuccessful) {
+                    res.body.byteStream().use { stream ->
+                        BitmapFactory.decodeStream(stream)
+                    }
+                } else null
+            }
+            if (loaded != null) {
+                imageCache.put(url, loaded)
+            }
+            loaded
+        } catch (e: Exception) {
+            null
+        }
     }
 }
-
-private val imageClient = OkHttpClient.Builder()
-    .connectTimeout(10, TimeUnit.SECONDS)
-    .readTimeout(15, TimeUnit.SECONDS)
-    .build()
 
 @Composable
 fun AsyncImage(
@@ -50,7 +88,7 @@ fun AsyncImage(
     placeholderColor: Color = Color(0xFF2C2C2E)
 ) {
     var bitmap by remember(url) {
-        mutableStateOf(if (!url.isNullOrBlank()) imageCache.get(url) else null)
+        mutableStateOf(ImageLoader.getCached(url))
     }
     var isLoading by remember(url) {
         mutableStateOf(!url.isNullOrBlank() && bitmap == null)
@@ -63,7 +101,7 @@ fun AsyncImage(
             return@LaunchedEffect
         }
 
-        val cached = imageCache.get(url)
+        val cached = ImageLoader.getCached(url)
         if (cached != null) {
             bitmap = cached
             isLoading = false
@@ -71,31 +109,8 @@ fun AsyncImage(
         }
 
         isLoading = true
-        val loaded = withContext(Dispatchers.IO) {
-            try {
-                val fetchUrl = if (url.contains("music.126.net") && !url.contains("?param=")) {
-                    "$url?param=300y300"
-                } else {
-                    url
-                }
-                val req = Request.Builder()
-                    .url(fetchUrl)
-                    .header("User-Agent", "Mozilla/5.0")
-                    .build()
-                imageClient.newCall(req).execute().use { res ->
-                    if (res.isSuccessful) {
-                        res.body.byteStream().use { stream ->
-                            BitmapFactory.decodeStream(stream)
-                        }
-                    } else null
-                }
-            } catch (e: Exception) {
-                null
-            }
-        }
-
+        val loaded = ImageLoader.loadBitmap(url)
         if (loaded != null) {
-            imageCache.put(url, loaded)
             bitmap = loaded
         }
         isLoading = false

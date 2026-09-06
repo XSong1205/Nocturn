@@ -56,15 +56,25 @@ object LyricParser {
                 val lineDurationMs = lineDurStr.toLongOrNull() ?: 0L
 
                 val words = mutableListOf<LyricWord>()
-                val wordMatches = yrcWordRegex.findAll(content)
+                val wordList = yrcWordRegex.findAll(content).toList()
                 val fullTextBuilder = StringBuilder()
 
-                for (wMatch in wordMatches) {
-                    val (wStartStr, wDurStr, wText) = wMatch.destructured
-                    val wStartMs = wStartStr.toLongOrNull() ?: 0L
-                    val wDurMs = wDurStr.toLongOrNull() ?: 0L
-                    words.add(LyricWord(wStartMs, wDurMs, wText))
-                    fullTextBuilder.append(wText)
+                if (wordList.isNotEmpty()) {
+                    for (wMatch in wordList) {
+                        val (wStartStr, wDurStr, wText) = wMatch.destructured
+                        val wStartMs = wStartStr.toLongOrNull() ?: 0L
+                        val wDurMs = wDurStr.toLongOrNull() ?: 0L
+                        // 归一化为绝对时间戳（兼容部分相对时间戳格式）
+                        val actualStartMs = if (wStartMs < lineStartMs) lineStartMs + wStartMs else wStartMs
+                        words.add(LyricWord(actualStartMs, wDurMs, wText))
+                        fullTextBuilder.append(wText)
+                    }
+                } else {
+                    // 若无字级标签但有纯文本内容
+                    val cleanText = content.replace(Regex("""\(.*?\)|\[.*?\]"""), "").trim()
+                    if (cleanText.isNotBlank()) {
+                        fullTextBuilder.append(cleanText)
+                    }
                 }
 
                 val fullText = fullTextBuilder.toString().trim()
@@ -149,8 +159,8 @@ object LyricParser {
                         end = (w.startMs + w.durationMs).toInt()
                     )
                 }
-                val effectiveStart = syllables.firstOrNull()?.start ?: line.timeMs.toInt()
-                val effectiveEnd = syllables.lastOrNull()?.end?.coerceAtLeast(endMs.toInt()) ?: endMs.toInt()
+                val effectiveStart = line.timeMs.toInt()
+                val effectiveEnd = maxOf(syllables.lastOrNull()?.end ?: 0, endMs.toInt())
                 KaraokeLine.MainKaraokeLine(
                     syllables = syllables,
                     translation = line.translation.takeIf { it.isNotBlank() },
@@ -200,7 +210,7 @@ object LyricParser {
         return result
     }
 
-    private fun findClosestText(map: Map<Long, String>, targetTimeMs: Long, toleranceMs: Long = 600L): String {
+    private fun findClosestText(map: Map<Long, String>, targetTimeMs: Long, toleranceMs: Long = 1500L): String {
         if (map.isEmpty()) return ""
         map[targetTimeMs]?.let { return it }
 

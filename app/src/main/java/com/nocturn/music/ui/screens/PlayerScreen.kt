@@ -37,13 +37,16 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -697,7 +700,57 @@ private fun AccompanistLyricsContainer(
         return
     }
 
+    val coroutineScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
+
+    // 核心修复点 1：将传入的 currentPositionMs 包装为 Compose State！
+    // 使得 KaraokeLyricsView 内部无参的 derivedStateOf 闭包能真正注册 State 读取依赖，
+    // 从而在播放时间推移时动态触发 firstIndex 的计算与滚动，同时让逐字高亮 Canvas 在 Draw 阶段持续刷新！
+    val currentPositionState = rememberUpdatedState(currentPositionMs)
+    val currentPositionProvider = remember {
+        { currentPositionState.value.toInt() }
+    }
+
+    // 计算当前处于激活播放状态的歌词索引
+    val activeLineIndex by remember(lines) {
+        derivedStateOf {
+            val time = currentPositionState.value.toInt()
+            val activeIndex = lines.indexOfFirst { line ->
+                time >= line.start && time < line.end
+            }
+            if (activeIndex != -1) {
+                activeIndex
+            } else {
+                val nextIdx = lines.indexOfFirst { it.start > time }
+                if (nextIdx != -1) (nextIdx - 1).coerceAtLeast(0) else lines.lastIndex
+            }
+        }
+    }
+
+    // 核心修复点 2：初次进入或切换歌曲时，无缝直达当前播放行，避免从顶部 0 行慢速滚动的脱节感
+    LaunchedEffect(lyrics) {
+        val initialIdx = activeLineIndex
+        if (initialIdx in lines.indices) {
+            val scrollTarget = (initialIdx - 1).coerceAtLeast(0)
+            listState.scrollToItem(scrollTarget)
+        }
+    }
+
+    // 核心修复点 3：手势与 Apple Music 风格智能自动回弹机制
+    // 用户手动拖拽歌词浏览时暂停自动打扰，停止滑动 3 秒后平滑吸附回正在播放的歌词焦点行
+    var isUserScrolling by remember { mutableStateOf(false) }
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) {
+            isUserScrolling = true
+        } else if (isUserScrolling) {
+            delay(3000)
+            isUserScrolling = false
+            if (activeLineIndex in lines.indices) {
+                val scrollTarget = (activeLineIndex - 1).coerceAtLeast(0)
+                listState.animateScrollToItem(scrollTarget)
+            }
+        }
+    }
 
     Box(
         modifier = modifier
@@ -707,8 +760,17 @@ private fun AccompanistLyricsContainer(
         KaraokeLyricsView(
             listState = listState,
             lyrics = synced ?: SyncedLyrics(emptyList()),
-            currentPosition = { currentPositionMs.toInt() },
-            onLineClicked = { line -> onSeek(line.start.toLong()) },
+            currentPosition = currentPositionProvider,
+            onLineClicked = { line ->
+                onSeek(line.start.toLong())
+                val clickedIdx = lines.indexOf(line)
+                if (clickedIdx != -1) {
+                    coroutineScope.launch {
+                        val scrollTarget = (clickedIdx - 1).coerceAtLeast(0)
+                        listState.animateScrollToItem(scrollTarget)
+                    }
+                }
+            },
             onLinePressed = { /* 可提供单行复制或分享 */ },
             normalLineTextStyle = TextStyle(
                 fontSize = 24.sp,
