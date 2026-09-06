@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Nocturn</string>
+    <string name="discover">发现</string>
+    <string name="search">搜索</string>
+    <string name="my_music">我的</string>
+    <string name="settings">设置</string>
+    <string name="daily_recommend">每日推荐</string>
+    <string name="top_charts">排行榜</string>
+    <string name="playlists">歌单</string>
+    <string name="artists">歌手</string>
+    <string name="play_all">播放全部</string>
+</resources>

@@ -1,0 +1,218 @@
+package com.nocturn.music.ui.navigation
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.nocturn.music.ui.components.MiniPlayerBar
+import com.nocturn.music.ui.screens.HomeScreen
+import com.nocturn.music.ui.screens.MyScreen
+import com.nocturn.music.ui.screens.PlayerScreen
+import com.nocturn.music.ui.screens.PlaylistDetailScreen
+import com.nocturn.music.ui.screens.QueueSheet
+import com.nocturn.music.ui.screens.SearchScreen
+import com.nocturn.music.ui.screens.SettingsScreen
+import com.nocturn.music.ui.screens.TopChartsSquareScreen
+import top.yukonga.miuix.kmp.basic.NavigationBar
+import top.yukonga.miuix.kmp.basic.NavigationBarItem
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Home
+import top.yukonga.miuix.kmp.icon.extended.Music
+import top.yukonga.miuix.kmp.icon.extended.Search
+import top.yukonga.miuix.kmp.icon.extended.Settings
+
+enum class NavigationTab(val label: String) {
+    Discover("发现"),
+    Search("搜索"),
+    My("我的"),
+    Settings("设置")
+}
+
+val NavigationTab.icon: ImageVector
+    get() = when (this) {
+        NavigationTab.Discover -> MiuixIcons.Home
+        NavigationTab.Search -> MiuixIcons.Search
+        NavigationTab.My -> MiuixIcons.Music
+        NavigationTab.Settings -> MiuixIcons.Settings
+    }
+
+@Composable
+fun AppNavigation() {
+    var currentTab by remember { mutableStateOf(NavigationTab.Discover) }
+    val secondaryStack = remember { mutableStateListOf<SecondaryRoute>() }
+    var isPlayerExpanded by remember { mutableStateOf(false) }
+    var isQueueOpen by remember { mutableStateOf(false) }
+
+    val currentSecondary = secondaryStack.lastOrNull()
+
+    BackHandler(enabled = isPlayerExpanded || isQueueOpen || secondaryStack.isNotEmpty()) {
+        when {
+            isQueueOpen -> isQueueOpen = false
+            isPlayerExpanded -> isPlayerExpanded = false
+            secondaryStack.isNotEmpty() -> secondaryStack.removeLast()
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            topBar = {
+                if (currentSecondary == null) {
+                    TopAppBar(
+                        title = when (currentTab) {
+                            NavigationTab.Discover -> "Nocturn 发现"
+                            NavigationTab.Search -> "搜索音乐"
+                            NavigationTab.My -> "我的音乐"
+                            NavigationTab.Settings -> "偏好设置"
+                        }
+                    )
+                }
+            },
+            bottomBar = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    MiniPlayerBar(
+                        onBarClick = { isPlayerExpanded = true },
+                        onQueueClick = { isQueueOpen = true }
+                    )
+
+                    AnimatedVisibility(
+                        visible = currentSecondary == null,
+                        enter = slideInVertically(tween(250, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(180)),
+                        exit = slideOutVertically(tween(250, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(150))
+                    ) {
+                        NavigationBar {
+                            NavigationTab.values().forEach { tab ->
+                                NavigationBarItem(
+                                    selected = currentTab == tab && currentSecondary == null,
+                                    onClick = {
+                                        currentTab = tab
+                                    },
+                                    icon = tab.icon,
+                                    label = tab.label
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        ) { innerPadding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
+                // 主 Tab 内容区
+                AnimatedContent(
+                    targetState = currentTab,
+                    transitionSpec = {
+                        if (targetState.ordinal > initialState.ordinal) {
+                            (slideInHorizontally(tween(320, easing = FastOutSlowInEasing)) { it / 3 } + fadeIn(tween(250)))
+                                .togetherWith(slideOutHorizontally(tween(320, easing = FastOutSlowInEasing)) { -it / 3 } + fadeOut(tween(200)))
+                        } else {
+                            (slideInHorizontally(tween(320, easing = FastOutSlowInEasing)) { -it / 3 } + fadeIn(tween(250)))
+                                .togetherWith(slideOutHorizontally(tween(320, easing = FastOutSlowInEasing)) { it / 3 } + fadeOut(tween(200)))
+                        }
+                    },
+                    label = "tab-transition"
+                ) { tab ->
+                    when (tab) {
+                        NavigationTab.Discover -> HomeScreen(
+                            onOpenRoute = { secondaryStack.add(it) },
+                            onNavigateToSearch = { currentTab = NavigationTab.Search }
+                        )
+                        NavigationTab.Search -> SearchScreen(
+                            onOpenRoute = { secondaryStack.add(it) }
+                        )
+                        NavigationTab.My -> MyScreen(
+                            onNavigateToSettings = { currentTab = NavigationTab.Settings },
+                            onOpenRoute = { secondaryStack.add(it) }
+                        )
+                        NavigationTab.Settings -> SettingsScreen()
+                    }
+                }
+
+                // 二级界面展示层 (包含歌单、专辑、歌手、我喜欢的音乐、排行榜广场等)
+                AnimatedVisibility(
+                    visible = currentSecondary != null,
+                    enter = slideInHorizontally(tween(300, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(200)),
+                    exit = slideOutHorizontally(tween(280, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(180))
+                ) {
+                    AnimatedContent(
+                        targetState = currentSecondary,
+                        transitionSpec = {
+                            (slideInHorizontally(tween(300, easing = FastOutSlowInEasing)) { it / 2 } + fadeIn(tween(200)))
+                                .togetherWith(slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) { -it / 2 } + fadeOut(tween(180)))
+                        },
+                        label = "secondary-stack-transition"
+                    ) { route ->
+                        if (route != null) {
+                            when (route) {
+                                is SecondaryRoute.TopChartsSquare -> {
+                                    TopChartsSquareScreen(
+                                        onBack = { secondaryStack.removeLastOrNull() },
+                                        onChartClick = { id, name, cover ->
+                                            secondaryStack.add(SecondaryRoute.Playlist(id, name, cover))
+                                        }
+                                    )
+                                }
+                                else -> {
+                                    PlaylistDetailScreen(
+                                        route = route,
+                                        onBack = { secondaryStack.removeLastOrNull() },
+                                        onNavigateToRoute = { secondaryStack.add(it) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        AnimatedVisibility(
+            visible = isPlayerExpanded,
+            enter = slideInVertically(tween(360, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(250)),
+            exit = slideOutVertically(tween(360, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(200))
+        ) {
+            PlayerScreen(
+                onDismiss = { isPlayerExpanded = false },
+                onOpenQueue = { isQueueOpen = true }
+            )
+        }
+
+        AnimatedVisibility(
+            visible = isQueueOpen,
+            enter = slideInVertically(tween(300, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(200)),
+            exit = slideOutVertically(tween(300, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(150)),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            QueueSheet(
+                onDismiss = { isQueueOpen = false }
+            )
+        }
+    }
+}

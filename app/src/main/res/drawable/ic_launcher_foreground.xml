@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Stylized Nocturn Music Wave / Note Icon -->
+    <path
+        android:fillColor="#0F6BFF"
+        android:pathData="M54,28 C39.64,28 28,39.64 28,54 C28,68.36 39.64,80 54,80 C68.36,80 80,68.36 80,54 C80,39.64 68.36,28 54,28 Z M54,72 C44.06,72 36,63.94 36,54 C36,44.06 44.06,36 54,36 C63.94,36 72,44.06 72,54 C72,63.94 63.94,72 54,72 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M50,44 L50,60.5 C48.5,59.6 46.5,59 44,59 C39.6,59 36,62.6 36,67 C36,71.4 39.6,75 44,75 C48.4,75 52,71.4 52,67 L52,48 L64,45 L64,41 Z" />
+</vector>
