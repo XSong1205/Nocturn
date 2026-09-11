@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       version_name:
-        description: '自定义版本号 (例如 1.0.2，留空则自动按 v1.0.<run_number> 递增)'
+        description: '自定义版本号 (例如 alpha0.0.1，留空则自动从 alpha0.0.1 开始堆号递增)'
         required: false
         type: string
         default: ''
@@ -45,13 +45,24 @@ jobs:
       - name: Determine Version
         id: versioning
         run: |
+          git fetch --tags --force 2>/dev/null || true
+
           if [ -n "${{ github.event.inputs.version_name }}" ]; then
             VERSION_NAME="${{ github.event.inputs.version_name }}"
+            VERSION_CODE="${{ github.run_number }}"
           else
-            VERSION_NAME="1.0.${{ github.run_number }}"
+            # 获取已发布的最新 alpha0.0.x 标签
+            LATEST_TAG=$(git tag -l "alpha0.0.*" --sort=-v:refname | head -n 1)
+            if [ -z "$LATEST_TAG" ]; then
+              CURRENT_NUM=1
+            else
+              LATEST_NUM=$(echo "$LATEST_TAG" | sed 's/.*alpha0\.0\.//')
+              CURRENT_NUM=$((LATEST_NUM + 1))
+            fi
+            VERSION_NAME="alpha0.0.${CURRENT_NUM}"
+            VERSION_CODE="${CURRENT_NUM}"
           fi
-          VERSION_CODE="${{ github.run_number }}"
-          TAG_NAME="v$VERSION_NAME"
+          TAG_NAME="$VERSION_NAME"
 
           echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
           echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
@@ -68,24 +79,24 @@ jobs:
       - name: Build APK (Release & Debug)
         run: |
           ./gradlew :app:assembleRelease :app:assembleDebug \
-            -PversionCode=${{ env.VERSION_CODE }} \
-            -PversionName=${{ env.VERSION_NAME }} --stacktrace
+            "-PversionCode=${{ env.VERSION_CODE }}" \
+            "-PversionName=${{ env.VERSION_NAME }}" --stacktrace
 
       - name: Prepare Artifacts
         run: |
           mkdir -p release-apks
           # 复制并标准化 APK 命名
           if [ -f app/build/outputs/apk/release/app-release.apk ]; then
-            cp app/build/outputs/apk/release/app-release.apk "release-apks/Nocturn-v${{ env.VERSION_NAME }}-release.apk"
+            cp app/build/outputs/apk/release/app-release.apk "release-apks/Nocturn-${{ env.VERSION_NAME }}-release.apk"
           fi
           if [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
-            cp app/build/outputs/apk/debug/app-debug.apk "release-apks/Nocturn-v${{ env.VERSION_NAME }}-debug.apk"
+            cp app/build/outputs/apk/debug/app-debug.apk "release-apks/Nocturn-${{ env.VERSION_NAME }}-debug.apk"
           fi
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Nocturn-v${{ env.VERSION_NAME }}
+          name: Nocturn-${{ env.VERSION_NAME }}
           path: release-apks/*
           if-no-files-found: error
 
@@ -97,6 +108,6 @@ jobs:
           files: release-apks/*
           generate_release_notes: true
           draft: false
-          prerelease: false
+          prerelease: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

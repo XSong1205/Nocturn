@@ -96,8 +96,13 @@ fun AboutScreen(
                         fontSize = 30.sp
                     )
                     Spacer(modifier = Modifier.height(4.dp))
+                    val formattedVersion = if (BuildConfig.VERSION_NAME.startsWith("v") || BuildConfig.VERSION_NAME.startsWith("alpha")) {
+                        BuildConfig.VERSION_NAME
+                    } else {
+                        "v${BuildConfig.VERSION_NAME}"
+                    }
                     Text(
-                        text = "v${BuildConfig.VERSION_NAME} (HyperOS Edition)",
+                        text = "$formattedVersion (HyperOS Edition)",
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         fontSize = 14.sp
                     )

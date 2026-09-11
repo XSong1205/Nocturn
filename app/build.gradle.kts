@@ -18,7 +18,7 @@ val appVersionCode: Int = providers.gradleProperty("versionCode")
     .get()
 
 val appVersionName: String = providers.gradleProperty("versionName")
-    .orElse("1.0.$appVersionCode")
+    .orElse("alpha0.0.1")
     .get()
 
 android {
