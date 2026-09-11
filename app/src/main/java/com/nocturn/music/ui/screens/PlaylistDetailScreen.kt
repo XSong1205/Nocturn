@@ -307,11 +307,11 @@ fun PlaylistDetailScreen(
                 LazyColumn(
                     state = lazyListState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 100.dp)
+                    contentPadding = PaddingValues(bottom = 24.dp)
                 ) {
                     // 1. 顶部 Header 区域 (封面、信息、简介)
                     item {
-                        Box(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(

@@ -106,7 +106,7 @@ fun TopChartsSquareScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
-                contentPadding = PaddingValues(16.dp, bottom = 100.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
