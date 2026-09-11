@@ -79,6 +79,7 @@ jobs:
       - name: Build APK (Release & Debug)
         run: |
           ./gradlew :app:assembleRelease :app:assembleDebug \
+            "-Dorg.gradle.java.home=$JAVA_HOME" \
             "-PversionCode=${{ env.VERSION_CODE }}" \
             "-PversionName=${{ env.VERSION_NAME }}" --stacktrace
 
