@@ -42,19 +42,29 @@ object ImageLoader {
         .readTimeout(15, TimeUnit.SECONDS)
         .build()
 
-    fun getCached(url: String?): Bitmap? {
+    fun getCacheKey(url: String?, cropParam: String?): String? {
         if (url.isNullOrBlank()) return null
-        return imageCache.get(url)
+        return if (cropParam != null) "$url#$cropParam" else url
     }
 
-    suspend fun loadBitmap(url: String?): Bitmap? = withContext(Dispatchers.IO) {
+    fun getCached(url: String?, cropParam: String? = null): Bitmap? {
+        val key = getCacheKey(url, cropParam) ?: return null
+        return imageCache.get(key)
+    }
+
+    suspend fun loadBitmap(url: String?, cropParam: String? = null): Bitmap? = withContext(Dispatchers.IO) {
         if (url.isNullOrBlank()) return@withContext null
-        val cached = imageCache.get(url)
+        val cacheKey = getCacheKey(url, cropParam) ?: return@withContext null
+        val cached = imageCache.get(cacheKey)
         if (cached != null) return@withContext cached
 
         try {
             val fetchUrl = if (url.contains("music.126.net") && !url.contains("?param=")) {
-                "$url?param=300y300"
+                when {
+                    cropParam == null -> "$url?param=300y300"
+                    cropParam.isBlank() -> url
+                    else -> "$url?param=$cropParam"
+                }
             } else {
                 url
             }
@@ -70,7 +80,7 @@ object ImageLoader {
                 } else null
             }
             if (loaded != null) {
-                imageCache.put(url, loaded)
+                imageCache.put(cacheKey, loaded)
             }
             loaded
         } catch (e: Exception) {
@@ -85,23 +95,24 @@ fun AsyncImage(
     contentDescription: String?,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
-    placeholderColor: Color = Color(0xFF2C2C2E)
+    placeholderColor: Color = Color(0xFF2C2C2E),
+    cropParam: String? = null
 ) {
-    var bitmap by remember(url) {
-        mutableStateOf(ImageLoader.getCached(url))
+    var bitmap by remember(url, cropParam) {
+        mutableStateOf(ImageLoader.getCached(url, cropParam))
     }
-    var isLoading by remember(url) {
+    var isLoading by remember(url, cropParam) {
         mutableStateOf(!url.isNullOrBlank() && bitmap == null)
     }
 
-    LaunchedEffect(url) {
+    LaunchedEffect(url, cropParam) {
         if (url.isNullOrBlank()) {
             bitmap = null
             isLoading = false
             return@LaunchedEffect
         }
 
-        val cached = ImageLoader.getCached(url)
+        val cached = ImageLoader.getCached(url, cropParam)
         if (cached != null) {
             bitmap = cached
             isLoading = false
@@ -109,7 +120,7 @@ fun AsyncImage(
         }
 
         isLoading = true
-        val loaded = ImageLoader.loadBitmap(url)
+        val loaded = ImageLoader.loadBitmap(url, cropParam)
         if (loaded != null) {
             bitmap = loaded
         }
