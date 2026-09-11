@@ -154,18 +154,13 @@ fun AboutScreen(
                     )
                     ArrowPreference(
                         title = "NCMApiEnhanced",
-                        summary = "API · 增强型网易云音乐服务支持与接口扩展",
-                        onClick = { uriHandler.openUri("https://github.com/Catamint/ncm-api-enhanced") }
+                        summary = "API 服务 · 网易云音乐 Node.js API 增强服务",
+                        onClick = { uriHandler.openUri("https://github.com/NeteaseCloudMusicApiEnhanced/api-enhanced") }
                     )
                     ArrowPreference(
                         title = "splayer-android",
                         summary = "内置 API 思路 · 原生逆向与官方接口鉴权设计参考",
                         onClick = { uriHandler.openUri("https://github.com/SPlayer-Dev/SPlayer-for-Android") }
-                    )
-                    ArrowPreference(
-                        title = "NeteaseCloudMusicApi",
-                        summary = "API 协议 · 网易云音乐 Node.js 核心协议生态规范",
-                        onClick = { uriHandler.openUri("https://github.com/Binaryify/NeteaseCloudMusicApi") }
                     )
                     ArrowPreference(
                         title = "OkHttp",
