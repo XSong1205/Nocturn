@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.nocturn.music.ui.components.MiniPlayerBar
+import com.nocturn.music.ui.screens.AboutScreen
 import com.nocturn.music.ui.screens.HomeScreen
 import com.nocturn.music.ui.screens.MyScreen
 import com.nocturn.music.ui.screens.PlayerScreen
@@ -120,71 +121,88 @@ fun AppNavigation() {
             },
             modifier = Modifier.fillMaxSize()
         ) { innerPadding ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-            ) {
-                // 主 Tab 内容区
-                AnimatedContent(
-                    targetState = currentTab,
-                    transitionSpec = {
-                        if (targetState.ordinal > initialState.ordinal) {
-                            (slideInHorizontally(tween(320, easing = FastOutSlowInEasing)) { it / 3 } + fadeIn(tween(250)))
-                                .togetherWith(slideOutHorizontally(tween(320, easing = FastOutSlowInEasing)) { -it / 3 } + fadeOut(tween(200)))
-                        } else {
-                            (slideInHorizontally(tween(320, easing = FastOutSlowInEasing)) { -it / 3 } + fadeIn(tween(250)))
-                                .togetherWith(slideOutHorizontally(tween(320, easing = FastOutSlowInEasing)) { it / 3 } + fadeOut(tween(200)))
+            Box(modifier = Modifier.fillMaxSize()) {
+                // 主 Tab 内容区 (需要 innerPadding: 包含顶部 TopAppBar 与底部 NavigationBar/MiniPlayerBar)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                ) {
+                    AnimatedContent(
+                        targetState = currentTab,
+                        transitionSpec = {
+                            if (targetState.ordinal > initialState.ordinal) {
+                                (slideInHorizontally(tween(320, easing = FastOutSlowInEasing)) { it / 3 } + fadeIn(tween(250)))
+                                    .togetherWith(slideOutHorizontally(tween(320, easing = FastOutSlowInEasing)) { -it / 3 } + fadeOut(tween(200)))
+                            } else {
+                                (slideInHorizontally(tween(320, easing = FastOutSlowInEasing)) { -it / 3 } + fadeIn(tween(250)))
+                                    .togetherWith(slideOutHorizontally(tween(320, easing = FastOutSlowInEasing)) { it / 3 } + fadeOut(tween(200)))
+                            }
+                        },
+                        label = "tab-transition"
+                    ) { tab ->
+                        when (tab) {
+                            NavigationTab.Discover -> HomeScreen(
+                                onOpenRoute = { secondaryStack.add(it) },
+                                onNavigateToSearch = { currentTab = NavigationTab.Search }
+                            )
+                            NavigationTab.Search -> SearchScreen(
+                                onOpenRoute = { secondaryStack.add(it) }
+                            )
+                            NavigationTab.My -> MyScreen(
+                                onNavigateToSettings = { currentTab = NavigationTab.Settings },
+                                onOpenRoute = { secondaryStack.add(it) }
+                            )
+                            NavigationTab.Settings -> SettingsScreen(
+                                onOpenRoute = { secondaryStack.add(it) }
+                            )
                         }
-                    },
-                    label = "tab-transition"
-                ) { tab ->
-                    when (tab) {
-                        NavigationTab.Discover -> HomeScreen(
-                            onOpenRoute = { secondaryStack.add(it) },
-                            onNavigateToSearch = { currentTab = NavigationTab.Search }
-                        )
-                        NavigationTab.Search -> SearchScreen(
-                            onOpenRoute = { secondaryStack.add(it) }
-                        )
-                        NavigationTab.My -> MyScreen(
-                            onNavigateToSettings = { currentTab = NavigationTab.Settings },
-                            onOpenRoute = { secondaryStack.add(it) }
-                        )
-                        NavigationTab.Settings -> SettingsScreen()
                     }
                 }
 
-                // 二级界面展示层 (包含歌单、专辑、歌手、我喜欢的音乐、排行榜广场等)
+                // 二级界面展示层 (包含歌单、专辑、歌手、我喜欢的音乐、排行榜广场、关于等)
+                // 二级页面均带有自适配状态栏的 SmallTopAppBar，顶层不可使用 innerPadding.calculateTopPadding()，否则会导致标题栏双重下移；
+                // 仅需保留底部 padding 为 MiniPlayerBar 留出空间。
                 AnimatedVisibility(
                     visible = currentSecondary != null,
                     enter = slideInHorizontally(tween(300, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(200)),
                     exit = slideOutHorizontally(tween(280, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(180))
                 ) {
-                    AnimatedContent(
-                        targetState = currentSecondary,
-                        transitionSpec = {
-                            (slideInHorizontally(tween(300, easing = FastOutSlowInEasing)) { it / 2 } + fadeIn(tween(200)))
-                                .togetherWith(slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) { -it / 2 } + fadeOut(tween(180)))
-                        },
-                        label = "secondary-stack-transition"
-                    ) { route ->
-                        if (route != null) {
-                            when (route) {
-                                is SecondaryRoute.TopChartsSquare -> {
-                                    TopChartsSquareScreen(
-                                        onBack = { secondaryStack.removeLastOrNull() },
-                                        onChartClick = { id, name, cover ->
-                                            secondaryStack.add(SecondaryRoute.Playlist(id, name, cover))
-                                        }
-                                    )
-                                }
-                                else -> {
-                                    PlaylistDetailScreen(
-                                        route = route,
-                                        onBack = { secondaryStack.removeLastOrNull() },
-                                        onNavigateToRoute = { secondaryStack.add(it) }
-                                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = innerPadding.calculateBottomPadding())
+                    ) {
+                        AnimatedContent(
+                            targetState = currentSecondary,
+                            transitionSpec = {
+                                (slideInHorizontally(tween(300, easing = FastOutSlowInEasing)) { it / 2 } + fadeIn(tween(200)))
+                                    .togetherWith(slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) { -it / 2 } + fadeOut(tween(180)))
+                            },
+                            label = "secondary-stack-transition"
+                        ) { route ->
+                            if (route != null) {
+                                when (route) {
+                                    is SecondaryRoute.TopChartsSquare -> {
+                                        TopChartsSquareScreen(
+                                            onBack = { secondaryStack.removeLastOrNull() },
+                                            onChartClick = { id, name, cover ->
+                                                secondaryStack.add(SecondaryRoute.Playlist(id, name, cover))
+                                            }
+                                        )
+                                    }
+                                    is SecondaryRoute.About -> {
+                                        AboutScreen(
+                                            onBack = { secondaryStack.removeLastOrNull() }
+                                        )
+                                    }
+                                    else -> {
+                                        PlaylistDetailScreen(
+                                            route = route,
+                                            onBack = { secondaryStack.removeLastOrNull() },
+                                            onNavigateToRoute = { secondaryStack.add(it) }
+                                        )
+                                    }
                                 }
                             }
                         }

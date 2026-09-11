@@ -24,4 +24,6 @@ sealed interface SecondaryRoute {
     data object DailyRecommend : SecondaryRoute
 
     data object TopChartsSquare : SecondaryRoute
+
+    data object About : SecondaryRoute
 }

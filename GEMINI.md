@@ -58,7 +58,7 @@
 - **播放引擎层 (Player Engine)**：`NocturnPlayer` 管理 `MediaPlayer` 状态机与播放队列；`PlaybackService` 提供前台保活与跨进程媒体控制。
 - **数据源层 (Data Source)**：
   - `EmbeddedNcmEngine`：原生逆向加解密（纯 Kotlin 实现 AES-CBC, AES-ECB, RSA, MD5），直连网易云官方服务端。
-  - `EmbeddedHttpServer`：本地 127.0.0.1:1145 桥接服务器，兼容标准 SPlayer API 格式。
+  - `EmbeddedHttpServer`：本地 127.0.0.1:1145 桥接服务器，提供标准 RESTful API 接口。
   - `NcmApiClient`：远程网易云 Node.js 增强 API 客户端，自适应 Cookie 注入。
 
 ---

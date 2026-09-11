@@ -124,7 +124,7 @@ object EmbeddedHttpServer {
                 JSONObject().apply {
                     put("code", 200)
                     put("data", JSONObject().apply {
-                        put("version", "splayer-embedded-1.0")
+                        put("version", "nocturn-embedded-1.0")
                     })
                 }.toString()
             }

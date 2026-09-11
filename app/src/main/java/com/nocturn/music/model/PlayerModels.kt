@@ -50,7 +50,7 @@ data class SongLyric(
 }
 
 enum class ApiMode(val label: String) {
-    EMBEDDED("SPlayer 内置 API (离线/自包含)"),
+    EMBEDDED("内置原生 API (直连网易云)"),
     CUSTOM("自定义远程 API")
 }
 

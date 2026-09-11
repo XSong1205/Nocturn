@@ -9,7 +9,7 @@
 
 - 🎨 **HyperOS 美学设计**：采用 MIUIX 组件库打造连续平滑超椭圆（Squircle）卡片、优雅平滑模糊（Blur）与自适应深色/浅色主题。
 - 🎤 **YRC 逐字逐句歌词**：支持网易云新版逐字动效歌词（YRC）、双语翻译及罗马音注音，提供 Apple Music 式智能自动回弹与点击歌词跳转播放。
-- 🚀 **双引擎架构 (SPlayer 规范)**：
+- 🚀 **双引擎 API 架构**：
   - **内嵌原生 API (默认推荐)**：采用纯 Kotlin 实现的网易云原生加密算法（EAPI / WEAPI），直连官方服务，无需部署任何外部 Node.js 镜像。
   - **自建增强 API**：无缝兼容标准 NeteaseCloudMusicApi 实例，支持在线测速、自定义服务器与 Cookie 透传。
 - 💎 **VIP 会员音源与高保真音质**：
@@ -64,6 +64,6 @@ sdk.dir=C\:\\Users\\<用户名>\\AppData\\Local\\Android\\Sdk
 
 ## 📄 开源许可与致谢
 
-- 灵感与 API 架构设计参考：[SPlayer-for-Android](https://github.com/SPlayer-Dev/SPlayer-for-Android)
 - 设计语言与组件：[MIUIX KMP](https://github.com/miuix-kmp/miuix)
+- 逐字歌词渲染组件：[accompanist-lyrics](https://github.com/mocharealm/accompanist)
 - 本项目仅供学习、交流与开源技术研究使用，音乐版权均归网易云音乐所有。

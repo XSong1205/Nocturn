@@ -81,7 +81,7 @@ object NcmApiClient {
         }
     }
 
-    // 1. 轮播图 /banner?type=2 (SPlayer / 移动端规范)
+    // 1. 轮播图 /banner?type=2 (移动端标准接口)
     suspend fun getBanners(): List<BannerItem> {
         return try {
             val jsonStr = executeGet("/banner?type=2")
@@ -220,7 +220,7 @@ object NcmApiClient {
         }
     }
 
-    // 5. 获取歌单所有歌曲 /playlist/track/all?id=... (SPlayer 规范)
+    // 5. 获取歌单所有歌曲 /playlist/track/all?id=... (网易云全量曲目接口)
     suspend fun getPlaylistAllTracks(id: Long, limit: Int = 100, offset: Int = 0): List<Song> {
         return try {
             val jsonStr = executeGet("/playlist/track/all?id=$id&limit=$limit&offset=$offset&timestamp=${System.currentTimeMillis()}")
@@ -236,7 +236,7 @@ object NcmApiClient {
         }
     }
 
-    // 6. 热搜榜 /search/hot/detail (SPlayer 规范)
+    // 6. 热搜榜 /search/hot/detail (热搜榜单接口)
     suspend fun getHotSearchKeywords(): List<String> {
         return try {
             val jsonStr = executeGet("/search/hot/detail")
@@ -456,7 +456,7 @@ object NcmApiClient {
         }
     }
 
-    // 8. 获取歌词 /lyric/new?id=... (YRC 逐字歌词 + 翻译 + 罗马音，SPlayer 核心实现)
+    // 8. 获取歌词 /lyric/new?id=... (YRC 逐字歌词 + 翻译 + 罗马音)
     suspend fun getSongLyric(songId: Long): SongLyric {
         return try {
             val jsonStr = executeGet("/lyric/new?id=$songId")
@@ -489,7 +489,7 @@ object NcmApiClient {
         }
     }
 
-    // 9. 获取歌曲真实播放 URL /song/url/v1 (SPlayer 音质分级与回退逻辑，已强化 VIP 鉴权防试听)
+    // 9. 获取歌曲真实播放 URL /song/url/v1 (音质分级与回退逻辑，已强化 VIP 鉴权防试听)
     suspend fun getSongPlayUrl(songId: Long, level: String = "exhigh"): String {
         val userCookie = SettingsRepository.userProfile.value.cookie
         try {

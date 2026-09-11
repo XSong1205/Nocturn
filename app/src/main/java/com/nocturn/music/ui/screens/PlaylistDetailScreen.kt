@@ -148,6 +148,7 @@ fun PlaylistDetailScreen(
                     is SecondaryRoute.DailyRecommend -> MusicRepository.getDailyRecommendPlaylist()
                     is SecondaryRoute.Favorites -> null
                     is SecondaryRoute.TopChartsSquare -> null
+                    is SecondaryRoute.About -> null
                 }
                 if (fetched != null) {
                     remotePlaylist = fetched
@@ -188,6 +189,7 @@ fun PlaylistDetailScreen(
         is SecondaryRoute.Favorites -> "我喜欢的音乐"
         is SecondaryRoute.DailyRecommend -> playlist?.name ?: "每日推荐"
         is SecondaryRoute.TopChartsSquare -> "官方排行榜"
+        is SecondaryRoute.About -> "关于应用"
     }
 
     val lazyListState = rememberLazyListState()
@@ -207,11 +209,8 @@ fun PlaylistDetailScreen(
     Scaffold(
         topBar = {
             SmallTopAppBar(
-                title = if (scrollProgress > 0.35f) screenTitle else "",
-                color = MiuixTheme.colorScheme.surface.copy(alpha = scrollProgress),
-                titleColor = MiuixTheme.colorScheme.onSurface.copy(
-                    alpha = if (scrollProgress > 0.35f) ((scrollProgress - 0.35f) / 0.65f).coerceIn(0f, 1f) else 0f
-                ),
+                title = screenTitle,
+                color = if (scrollProgress > 0.05f) MiuixTheme.colorScheme.surface else MiuixTheme.colorScheme.surface.copy(alpha = 0.95f),
                 navigationIcon = {
                     IconButton(
                         onClick = onBack,
