@@ -50,6 +50,22 @@ object SettingsRepository {
     private val _searchHistory = MutableStateFlow(loadSearchHistory())
     val searchHistory = _searchHistory.asStateFlow()
 
+    private val _isOobeCompleted = MutableStateFlow(prefs.getBoolean("oobe_completed", false))
+    val isOobeCompleted = _isOobeCompleted.asStateFlow()
+
+    fun setOobeCompleted(completed: Boolean) {
+        _isOobeCompleted.value = completed
+        prefs.edit().putBoolean("oobe_completed", completed).apply()
+    }
+
+    private val _lyriconEnabled = MutableStateFlow(prefs.getBoolean("lyricon_enabled", true))
+    val lyriconEnabled: kotlinx.coroutines.flow.StateFlow<Boolean> = _lyriconEnabled.asStateFlow()
+
+    fun setLyriconEnabled(enabled: Boolean) {
+        _lyriconEnabled.value = enabled
+        prefs.edit().putBoolean("lyricon_enabled", enabled).apply()
+    }
+
     fun setThemeMode(mode: Int) {
         _themeMode.value = mode
         prefs.edit().putInt("theme_mode", mode).apply()

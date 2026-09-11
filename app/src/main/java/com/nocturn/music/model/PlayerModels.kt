@@ -70,7 +70,12 @@ enum class AudioQuality(val label: String, val level: String, val bitrate: Strin
     STANDARD("标准音质", "standard", "128Kbps"),
     HIGH("极高音质", "exhigh", "320Kbps"),
     LOSSLESS("无损音质", "lossless", "FLAC / 990Kbps"),
-    HI_RES("Hi-Res 高解析", "hires", "24bit / 192KHz")
+    HI_RES("Hi-Res 高解析", "hires", "24bit / 192KHz");
+
+    companion object {
+        val EXHIGH: AudioQuality get() = HIGH
+        val HIRES: AudioQuality get() = HI_RES
+    }
 }
 
 @Immutable

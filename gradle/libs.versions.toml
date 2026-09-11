@@ -26,6 +26,9 @@ miuix-squircle = { group = "top.yukonga.miuix.kmp", name = "miuix-squircle", ver
 accompanist-lyrics-ui = { group = "com.mocharealm.accompanist", name = "lyrics-ui", version = "1.0.19" }
 accompanist-lyrics-core = { group = "com.mocharealm.accompanist", name = "lyrics-core", version = "0.4.7" }
 
+# Lyricon Provider
+lyricon-provider = { group = "io.github.proify.lyricon", name = "provider", version = "0.1.70" }
+
 # Networking
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 

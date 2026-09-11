@@ -91,6 +91,7 @@ dependencies {
     implementation(libs.miuix.squircle)
     implementation(libs.accompanist.lyrics.ui)
     implementation(libs.accompanist.lyrics.core)
+    implementation(libs.lyricon.provider)
 
     // Networking & Serialization
     implementation(libs.okhttp)

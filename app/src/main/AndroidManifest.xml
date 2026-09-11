@@ -21,6 +21,11 @@
         android:theme="@style/Theme.Nocturn"
         android:usesCleartextTraffic="true">
 
+        <!-- Lyricon 词幕提供端模块声明 -->
+        <meta-data android:name="lyricon_module" android:value="true" />
+        <meta-data android:name="lyricon_module_author" android:value="XSong" />
+        <meta-data android:name="lyricon_module_description" android:value="Nocturn 音乐播放器" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

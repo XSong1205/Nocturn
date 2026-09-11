@@ -64,6 +64,7 @@ class PlaybackService : Service() {
 
         fun syncSeekPosition(positionMs: Long) {
             instance?.updateSeekPosition(positionMs)
+            LyriconBridge.onSeek(positionMs)
         }
     }
 
@@ -80,6 +81,7 @@ class PlaybackService : Service() {
         createNotificationChannel()
         initMediaSession()
         observePlayer()
+        LyriconBridge.init(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -273,6 +275,8 @@ class PlaybackService : Service() {
             .build()
 
         mediaSession.setPlaybackState(playbackState)
+        LyriconBridge.onPlaybackStateChanged(isPlaying)
+        LyriconBridge.onPositionUpdate(positionMs)
     }
 
     private fun updateMetadata(song: Song?, durationMs: Long, coverBitmap: Bitmap?) {
@@ -436,6 +440,7 @@ class PlaybackService : Service() {
             mediaSession.release()
         }
         stopForegroundInternal()
+        LyriconBridge.release()
         super.onDestroy()
     }
 }

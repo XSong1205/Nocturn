@@ -166,6 +166,11 @@ fun SettingsScreen(
                     summary = "版本 $formattedVersion / 开源鸣谢与项目信息",
                     onClick = { onOpenRoute(SecondaryRoute.About) }
                 )
+                ArrowPreference(
+                    title = "开机向导 (OOBE)",
+                    summary = "重新体验 HyperOS 风格初始化引导",
+                    onClick = { SettingsRepository.setOobeCompleted(false) }
+                )
             }
             Spacer(modifier = Modifier.height(28.dp))
         }

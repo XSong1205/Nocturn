@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -29,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.nocturn.music.data.repository.SettingsRepository
 import com.nocturn.music.ui.components.MiniPlayerBar
 import com.nocturn.music.ui.screens.AboutScreen
 import com.nocturn.music.ui.screens.HomeScreen
@@ -39,6 +41,7 @@ import com.nocturn.music.ui.screens.QueueSheet
 import com.nocturn.music.ui.screens.SearchScreen
 import com.nocturn.music.ui.screens.SettingsScreen
 import com.nocturn.music.ui.screens.TopChartsSquareScreen
+import com.nocturn.music.ui.screens.oobe.OobeScreen
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -81,6 +84,7 @@ val NavigationTab.icon: ImageVector
 
 @Composable
 fun AppNavigation() {
+    val isOobeCompleted by SettingsRepository.isOobeCompleted.collectAsState()
     var currentTab by remember { mutableStateOf(NavigationTab.Discover) }
     val secondaryStack = remember { mutableStateListOf<SecondaryRoute>() }
     var isPlayerExpanded by remember { mutableStateOf(false) }
@@ -292,5 +296,17 @@ fun AppNavigation() {
             show = isQueueOpen,
             onDismissRequest = { isQueueOpen = false }
         )
+
+        AnimatedVisibility(
+            visible = !isOobeCompleted,
+            enter = fadeIn(tween(260)),
+            exit = fadeOut(tween(300)) + scaleOut(targetScale = 1.05f, animationSpec = tween(300, easing = FastOutSlowInEasing))
+        ) {
+            OobeScreen(
+                onComplete = {
+                    SettingsRepository.setOobeCompleted(true)
+                }
+            )
+        }
     }
 }
