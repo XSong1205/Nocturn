@@ -54,6 +54,7 @@ fun SettingsScreen(
     val audioQuality by SettingsRepository.audioQuality.collectAsState()
     val apiMode by SettingsRepository.apiMode.collectAsState()
     val customApiUrl by SettingsRepository.customApiUrl.collectAsState()
+    val lyriconEnabled by SettingsRepository.lyriconEnabled.collectAsState()
 
     var showApiDialog by remember { mutableStateOf(false) }
     var apiUrlInput by remember { mutableStateOf(customApiUrl) }
@@ -146,6 +147,22 @@ fun SettingsScreen(
                     summary = cacheClearedMessage ?: "释放内存与临时数据",
                     onClick = {
                         cacheClearedMessage = "缓存已清理完毕"
+                    }
+                )
+            }
+            Spacer(modifier = Modifier.height(18.dp))
+        }
+
+        item {
+            SmallTitle(text = "扩展与歌词联动")
+
+            Card(modifier = Modifier.fillMaxWidth()) {
+                SwitchPreference(
+                    title = "词幕 (Lyricon) 歌词联动",
+                    summary = if (lyriconEnabled) "已启用状态栏/悬浮窗歌词与播放状态实时同步" else "未启用",
+                    checked = lyriconEnabled,
+                    onCheckedChange = { checked ->
+                        SettingsRepository.setLyriconEnabled(checked)
                     }
                 )
             }
