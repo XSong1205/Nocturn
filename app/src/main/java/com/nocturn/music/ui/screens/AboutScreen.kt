@@ -153,6 +153,11 @@ fun AboutScreen(
                         onClick = { uriHandler.openUri("https://github.com/MochaRealm/accompanist-lyrics") }
                     )
                     ArrowPreference(
+                        title = "Lyricon (词幕)",
+                        summary = "状态栏歌词 · 现代 Android 状态栏与悬浮窗逐字歌词框架",
+                        onClick = { uriHandler.openUri("https://github.com/tomakino/lyricon") }
+                    )
+                    ArrowPreference(
                         title = "NCMApiEnhanced",
                         summary = "API 服务 · 网易云音乐 Node.js API 增强服务",
                         onClick = { uriHandler.openUri("https://github.com/NeteaseCloudMusicApiEnhanced/api-enhanced") }
