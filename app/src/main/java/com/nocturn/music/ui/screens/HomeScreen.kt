@@ -43,8 +43,14 @@ import com.nocturn.music.ui.components.BannerCarousel
 import com.nocturn.music.ui.components.PlaylistCard
 import com.nocturn.music.ui.components.SongListItem
 import com.nocturn.music.ui.theme.HyperBlue
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.nocturn.music.ui.theme.AppIcons
 import com.nocturn.music.ui.theme.squircleCard
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
+import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -59,41 +65,82 @@ fun HomeScreen(
     onNavigateToSearch: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var banners by remember { mutableStateOf<List<BannerItem>>(emptyList()) }
-    var recommendedPlaylists by remember { mutableStateOf<List<Playlist>>(emptyList()) }
-    var toplists by remember { mutableStateOf<List<Playlist>>(emptyList()) }
-    var hotSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
+    val cachedBanners = remember { MusicRepository.getCachedBanners() ?: emptyList() }
+    val cachedPlaylists = remember { MusicRepository.getCachedRecommendedPlaylists() ?: emptyList() }
+    val cachedToplists = remember { MusicRepository.getCachedToplists() ?: emptyList() }
+    val cachedHotSongs = remember { MusicRepository.getCachedHotSongs() ?: emptyList() }
+    val hasCache = cachedBanners.isNotEmpty() || cachedPlaylists.isNotEmpty()
+
+    var banners by remember { mutableStateOf(cachedBanners) }
+    var recommendedPlaylists by remember { mutableStateOf(cachedPlaylists) }
+    var toplists by remember { mutableStateOf(cachedToplists) }
+    var hotSongs by remember { mutableStateOf(cachedHotSongs) }
+    var isLoading by remember { mutableStateOf(!hasCache) }
 
     val currentPlayingSong by NocturnPlayer.currentSong.collectAsState()
     val isPlaying by NocturnPlayer.isPlaying.collectAsState()
 
     LaunchedEffect(Unit) {
-        isLoading = true
-        coroutineScope {
-            val bannersDeferred = async { MusicRepository.getBanners() }
-            val playlistsDeferred = async { MusicRepository.getRecommendedPlaylists() }
-            val toplistsDeferred = async { MusicRepository.getToplists() }
-
-            banners = bannersDeferred.await()
-            recommendedPlaylists = playlistsDeferred.await()
-            val allToplists = toplistsDeferred.await()
-            toplists = allToplists.take(6)
-
-            if (allToplists.isNotEmpty()) {
-                val firstChart = MusicRepository.getPlaylistDetail(allToplists.first().id)
-                hotSongs = firstChart?.tracks?.take(10) ?: emptyList()
-            }
+        if (!hasCache) {
+            isLoading = true
         }
-        isLoading = false
+        try {
+            coroutineScope {
+                val bannersDeferred = async { MusicRepository.getBanners(forceRefresh = !hasCache) }
+                val playlistsDeferred = async { MusicRepository.getRecommendedPlaylists(forceRefresh = !hasCache) }
+                val toplistsDeferred = async { MusicRepository.getToplists(forceRefresh = !hasCache) }
+
+                val newBanners = bannersDeferred.await()
+                val newPlaylists = playlistsDeferred.await()
+                val allToplists = toplistsDeferred.await()
+
+                if (newBanners.isNotEmpty()) banners = newBanners
+                if (newPlaylists.isNotEmpty()) recommendedPlaylists = newPlaylists
+                if (allToplists.isNotEmpty()) toplists = allToplists.take(6)
+
+                val songs = MusicRepository.getHotSongs(forceRefresh = !hasCache)
+                if (songs.isNotEmpty()) hotSongs = songs
+            }
+        } catch (_: Exception) {
+        } finally {
+            isLoading = false
+        }
     }
 
     val bottomBarPadding = com.nocturn.music.ui.navigation.LocalBottomBarPadding.current
 
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = maxOf(bottomBarPadding + 16.dp, 100.dp))
-    ) {
+    Crossfade(
+        targetState = isLoading && banners.isEmpty(),
+        animationSpec = tween(350),
+        label = "HomeLoadingCrossfade"
+    ) { showLoading ->
+        if (showLoading) {
+            Box(
+                modifier = modifier
+                    .fillMaxSize()
+                    .padding(bottom = bottomBarPadding),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    InfiniteProgressIndicator(
+                        color = MiuixTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "正在发现好音乐...",
+                        color = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.7f),
+                        fontSize = 13.sp
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = maxOf(bottomBarPadding + 16.dp, 100.dp))
+            ) {
         // 1. Featured Banners
         item {
             Spacer(modifier = Modifier.height(10.dp))
@@ -194,6 +241,8 @@ fun HomeScreen(
         }
     }
 }
+}
+}
 
 @Composable
 private fun SectionHeader(
@@ -245,16 +294,16 @@ private fun QuickActionsBar(
             .padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.SpaceAround
     ) {
-        QuickActionButton(iconText = "★", label = "每日推荐", color = Color(0xFFFF5252), onClick = onDailyRecommend)
-        QuickActionButton(iconText = "📊", label = "排行榜", color = Color(0xFFFF9800), onClick = onTopCharts)
-        QuickActionButton(iconText = "♫", label = "歌单广场", color = MiuixTheme.colorScheme.primary, onClick = onSearch)
-        QuickActionButton(iconText = "🔍", label = "全网搜索", color = Color(0xFF4CAF50), onClick = onSearch)
+        QuickActionButton(icon = AppIcons.FavoritesFill, label = "每日推荐", color = Color(0xFFFF5252), onClick = onDailyRecommend)
+        QuickActionButton(icon = AppIcons.Sort, label = "排行榜", color = Color(0xFFFF9800), onClick = onTopCharts)
+        QuickActionButton(icon = AppIcons.Playlist, label = "歌单广场", color = MiuixTheme.colorScheme.primary, onClick = onSearch)
+        QuickActionButton(icon = AppIcons.Search, label = "全网搜索", color = Color(0xFF4CAF50), onClick = onSearch)
     }
 }
 
 @Composable
 private fun QuickActionButton(
-    iconText: String,
+    icon: ImageVector,
     label: String,
     color: Color,
     onClick: () -> Unit
@@ -273,11 +322,11 @@ private fun QuickActionButton(
                 .background(color.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = iconText,
-                color = color,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = color,
+                modifier = Modifier.size(22.dp)
             )
         }
         Spacer(modifier = Modifier.height(6.dp))

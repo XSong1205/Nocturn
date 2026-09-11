@@ -82,7 +82,8 @@ import androidx.compose.ui.text.font.FontFamily
 import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
 import com.mocharealm.accompanist.lyrics.ui.composable.lyrics.KaraokeLyricsView
 import top.yukonga.miuix.kmp.squircle.squircleClip
-
+import com.nocturn.music.ui.theme.AppIcons
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -389,11 +390,11 @@ fun PlayerScreen(
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = if (isFavorite) "♥" else "♡",
-                        color = if (isFavorite) HyperRed else Color.White.copy(alpha = 0.9f),
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold
+                    Icon(
+                        imageVector = if (isFavorite) AppIcons.FavoritesFill else AppIcons.Favorites,
+                        contentDescription = if (isFavorite) "取消喜欢" else "喜欢",
+                        tint = if (isFavorite) HyperRed else Color.White.copy(alpha = 0.9f),
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
@@ -477,12 +478,17 @@ fun PlayerScreen(
                         .clickable { NocturnPlayer.togglePlayMode() },
                     contentAlignment = Alignment.Center
                 ) {
-                    val modeIcon = when (playMode) {
-                        PlayMode.LIST_LOOP -> "🔁"
-                        PlayMode.SINGLE_LOOP -> "🔂"
-                        PlayMode.RANDOM -> "🔀"
+                    val (modeIcon, modeDesc) = when (playMode) {
+                        PlayMode.LIST_LOOP -> AppIcons.Repeat to "列表循环"
+                        PlayMode.SINGLE_LOOP -> AppIcons.RepeatOne to "单曲循环"
+                        PlayMode.RANDOM -> AppIcons.Shuffle to "随机播放"
                     }
-                    Text(text = modeIcon, fontSize = 20.sp)
+                    Icon(
+                        imageVector = modeIcon,
+                        contentDescription = modeDesc,
+                        tint = Color.White.copy(alpha = 0.9f),
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
 
                 // 上一曲
@@ -494,7 +500,12 @@ fun PlayerScreen(
                         .clickable { NocturnPlayer.playPrevious() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "⏮", color = Color.White, fontSize = 24.sp)
+                    Icon(
+                        imageVector = AppIcons.SkipPrevious,
+                        contentDescription = "上一曲",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
 
                 // 主播放/暂停键 (HyperOS 澎湃大圆角大按键，带柔光投射)
@@ -510,12 +521,11 @@ fun PlayerScreen(
                     if (isBuffering) {
                         Text(text = "...", color = Color.Black, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
                     } else {
-                        Text(
-                            text = if (isPlaying) "❚❚" else "▶",
-                            color = Color.Black,
-                            fontSize = 26.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(start = if (isPlaying) 0.dp else 4.dp)
+                        Icon(
+                            imageVector = if (isPlaying) AppIcons.Pause else AppIcons.Play,
+                            contentDescription = if (isPlaying) "暂停" else "播放",
+                            tint = Color.Black,
+                            modifier = Modifier.size(30.dp)
                         )
                     }
                 }
@@ -529,7 +539,12 @@ fun PlayerScreen(
                         .clickable { NocturnPlayer.playNext() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "⏭", color = Color.White, fontSize = 24.sp)
+                    Icon(
+                        imageVector = AppIcons.SkipNext,
+                        contentDescription = "下一曲",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
 
                 // 黑胶 / 封面模式切换小胶囊
@@ -546,7 +561,12 @@ fun PlayerScreen(
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "💿", fontSize = 18.sp)
+                    Icon(
+                        imageVector = AppIcons.Album,
+                        contentDescription = "唱片模式",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
 
@@ -577,9 +597,11 @@ fun PlayerScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "💬",
-                            fontSize = 14.sp
+                        Icon(
+                            imageVector = AppIcons.Messages,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
@@ -601,7 +623,12 @@ fun PlayerScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "☰", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Icon(
+                            imageVector = AppIcons.Playlist,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(text = "播放列表", color = Color.White.copy(alpha = 0.9f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     }
@@ -680,11 +707,11 @@ private fun AccompanistLyricsContainer(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Text(
-                    text = "♪",
-                    color = Color.White.copy(alpha = 0.4f),
-                    fontSize = 36.sp,
-                    fontWeight = FontWeight.Light
+                Icon(
+                    imageVector = AppIcons.Music,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.4f),
+                    modifier = Modifier.size(36.dp)
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(

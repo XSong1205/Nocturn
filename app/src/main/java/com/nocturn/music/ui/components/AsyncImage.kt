@@ -25,8 +25,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.nocturn.music.ui.theme.AppIcons
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import java.util.concurrent.TimeUnit
 
@@ -154,9 +156,11 @@ fun AsyncImage(
                                 .background(Color.White.copy(alpha = 0.2f))
                         )
                     } else {
-                        Text(
-                            text = "♪",
-                            color = Color.White.copy(alpha = 0.4f)
+                        Icon(
+                            imageVector = AppIcons.Music,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.4f),
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }

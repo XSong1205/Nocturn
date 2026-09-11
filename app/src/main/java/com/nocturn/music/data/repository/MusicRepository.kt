@@ -15,38 +15,95 @@ import com.nocturn.music.model.UserProfile
 object MusicRepository {
     private val lyricCache = mutableMapOf<Long, SongLyric>()
     private val playlistCache = mutableMapOf<Long, Playlist>()
+    private val userPlaylistsCache = mutableMapOf<Long, List<Playlist>>()
+    private var cachedBanners: List<BannerItem>? = null
+    private var cachedToplists: List<Playlist>? = null
+    private var cachedRecommendedPlaylists: List<Playlist>? = null
+    private var cachedHotSongs: List<Song>? = null
+
+    fun getCachedBanners(): List<BannerItem>? = cachedBanners
+    fun getCachedToplists(): List<Playlist>? = cachedToplists
+    fun getCachedRecommendedPlaylists(): List<Playlist>? = cachedRecommendedPlaylists
+    fun getCachedHotSongs(): List<Song>? = cachedHotSongs
+    fun getCachedUserPlaylists(uid: Long): List<Playlist>? = userPlaylistsCache[uid]
+    fun hasHomeCache(): Boolean = !cachedBanners.isNullOrEmpty() || !cachedRecommendedPlaylists.isNullOrEmpty()
+
+    fun clearHomeCache() {
+        cachedBanners = null
+        cachedToplists = null
+        cachedRecommendedPlaylists = null
+        cachedHotSongs = null
+        userPlaylistsCache.clear()
+    }
 
     private val isEmbedded: Boolean
         get() = SettingsRepository.apiMode.value == ApiMode.EMBEDDED
 
-    suspend fun getBanners(): List<BannerItem> {
-        return if (isEmbedded) {
-            val res = EmbeddedNcmEngine.getBanners()
-            if (res.isNotEmpty()) res else NcmApiClient.getBanners()
-        } else {
-            val res = NcmApiClient.getBanners()
-            if (res.isNotEmpty()) res else EmbeddedNcmEngine.getBanners()
+    suspend fun getBanners(forceRefresh: Boolean = false): List<BannerItem> {
+        if (!forceRefresh && !cachedBanners.isNullOrEmpty()) {
+            return cachedBanners!!
         }
+        val res = if (isEmbedded) {
+            val r = EmbeddedNcmEngine.getBanners()
+            if (r.isNotEmpty()) r else NcmApiClient.getBanners()
+        } else {
+            val r = NcmApiClient.getBanners()
+            if (r.isNotEmpty()) r else EmbeddedNcmEngine.getBanners()
+        }
+        if (res.isNotEmpty()) {
+            cachedBanners = res
+        }
+        return if (res.isNotEmpty()) res else cachedBanners ?: emptyList()
     }
 
-    suspend fun getToplists(): List<Playlist> {
-        return if (isEmbedded) {
-            val res = EmbeddedNcmEngine.getToplists()
-            if (res.isNotEmpty()) res else NcmApiClient.getToplists()
-        } else {
-            val res = NcmApiClient.getToplists()
-            if (res.isNotEmpty()) res else EmbeddedNcmEngine.getToplists()
+    suspend fun getToplists(forceRefresh: Boolean = false): List<Playlist> {
+        if (!forceRefresh && !cachedToplists.isNullOrEmpty()) {
+            return cachedToplists!!
         }
+        val res = if (isEmbedded) {
+            val r = EmbeddedNcmEngine.getToplists()
+            if (r.isNotEmpty()) r else NcmApiClient.getToplists()
+        } else {
+            val r = NcmApiClient.getToplists()
+            if (r.isNotEmpty()) r else EmbeddedNcmEngine.getToplists()
+        }
+        if (res.isNotEmpty()) {
+            cachedToplists = res
+        }
+        return if (res.isNotEmpty()) res else cachedToplists ?: emptyList()
     }
 
-    suspend fun getRecommendedPlaylists(limit: Int = 18): List<Playlist> {
-        return if (isEmbedded) {
-            val res = EmbeddedNcmEngine.getPersonalizedPlaylists(limit)
-            if (res.isNotEmpty()) res else NcmApiClient.getPersonalizedPlaylists(limit)
-        } else {
-            val res = NcmApiClient.getPersonalizedPlaylists(limit)
-            if (res.isNotEmpty()) res else EmbeddedNcmEngine.getPersonalizedPlaylists(limit)
+    suspend fun getRecommendedPlaylists(limit: Int = 18, forceRefresh: Boolean = false): List<Playlist> {
+        if (!forceRefresh && !cachedRecommendedPlaylists.isNullOrEmpty()) {
+            return cachedRecommendedPlaylists!!
         }
+        val res = if (isEmbedded) {
+            val r = EmbeddedNcmEngine.getPersonalizedPlaylists(limit)
+            if (r.isNotEmpty()) r else NcmApiClient.getPersonalizedPlaylists(limit)
+        } else {
+            val r = NcmApiClient.getPersonalizedPlaylists(limit)
+            if (r.isNotEmpty()) r else EmbeddedNcmEngine.getPersonalizedPlaylists(limit)
+        }
+        if (res.isNotEmpty()) {
+            cachedRecommendedPlaylists = res
+        }
+        return if (res.isNotEmpty()) res else cachedRecommendedPlaylists ?: emptyList()
+    }
+
+    suspend fun getHotSongs(forceRefresh: Boolean = false): List<Song> {
+        if (!forceRefresh && !cachedHotSongs.isNullOrEmpty()) {
+            return cachedHotSongs!!
+        }
+        val lists = getToplists(forceRefresh)
+        if (lists.isNotEmpty()) {
+            val firstChart = getPlaylistDetail(lists.first().id, forceRefresh)
+            val songs = firstChart?.tracks?.take(10) ?: emptyList()
+            if (songs.isNotEmpty()) {
+                cachedHotSongs = songs
+            }
+            return songs
+        }
+        return cachedHotSongs ?: emptyList()
     }
 
     suspend fun getPlaylistDetail(id: Long, forceRefresh: Boolean = false): Playlist? {
@@ -192,15 +249,22 @@ object MusicRepository {
         }
     }
 
-    suspend fun getUserPlaylists(uid: Long): List<Playlist> {
-        val cookie = SettingsRepository.userProfile.value.cookie
-        return if (isEmbedded) {
-            val res = EmbeddedNcmEngine.getUserPlaylists(uid, cookie)
-            if (res.isNotEmpty()) res else NcmApiClient.getUserPlaylists(uid, cookie)
-        } else {
-            val res = NcmApiClient.getUserPlaylists(uid, cookie)
-            if (res.isNotEmpty()) res else EmbeddedNcmEngine.getUserPlaylists(uid, cookie)
+    suspend fun getUserPlaylists(uid: Long, forceRefresh: Boolean = false): List<Playlist> {
+        if (!forceRefresh) {
+            userPlaylistsCache[uid]?.let { return it }
         }
+        val cookie = SettingsRepository.userProfile.value.cookie
+        val res = if (isEmbedded) {
+            val r = EmbeddedNcmEngine.getUserPlaylists(uid, cookie)
+            if (r.isNotEmpty()) r else NcmApiClient.getUserPlaylists(uid, cookie)
+        } else {
+            val r = NcmApiClient.getUserPlaylists(uid, cookie)
+            if (r.isNotEmpty()) r else EmbeddedNcmEngine.getUserPlaylists(uid, cookie)
+        }
+        if (res.isNotEmpty()) {
+            userPlaylistsCache[uid] = res
+        }
+        return if (res.isNotEmpty()) res else userPlaylistsCache[uid] ?: emptyList()
     }
 
     suspend fun likeSong(songId: Long, like: Boolean): Boolean {

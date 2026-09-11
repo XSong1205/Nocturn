@@ -43,10 +43,12 @@ import com.nocturn.music.data.repository.MusicRepository
 import com.nocturn.music.data.repository.SettingsRepository
 import com.nocturn.music.model.Playlist
 import com.nocturn.music.model.Song
+import androidx.compose.ui.graphics.vector.ImageVector
 import com.nocturn.music.player.NocturnPlayer
 import com.nocturn.music.ui.components.AsyncImage
 import com.nocturn.music.ui.components.SongListItem
 import com.nocturn.music.ui.navigation.SecondaryRoute
+import com.nocturn.music.ui.theme.AppIcons
 import com.nocturn.music.ui.theme.HyperBlue
 import com.nocturn.music.ui.theme.HyperRed
 import com.nocturn.music.ui.theme.squircleCard
@@ -61,8 +63,6 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
-import top.yukonga.miuix.kmp.icon.extended.Favorites
-import top.yukonga.miuix.kmp.icon.extended.FavoritesFill
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.icon.extended.Search
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -283,9 +283,11 @@ fun PlaylistDetailScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.padding(24.dp)
                     ) {
-                        Text(
-                            text = "⚠️",
-                            fontSize = 36.sp
+                        Icon(
+                            imageVector = AppIcons.Close,
+                            contentDescription = null,
+                            tint = MiuixTheme.colorScheme.onSurfaceSecondary,
+                            modifier = Modifier.size(36.dp)
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
@@ -346,7 +348,12 @@ fun PlaylistDetailScreen(
                                                 ),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Text(text = "♥", color = Color.White, fontSize = 42.sp)
+                                            Icon(
+                                                imageVector = AppIcons.FavoritesFill,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(52.dp)
+                                            )
                                         }
                                     } else {
                                         AsyncImage(
@@ -463,7 +470,7 @@ fun PlaylistDetailScreen(
                                     )
                                     if (pl.description.length > 50) {
                                         Text(
-                                            text = if (isDescriptionExpanded) "收起 ▴" else "展开详情 ▾",
+                                            text = if (isDescriptionExpanded) "收起" else "展开详情",
                                             color = HyperBlue,
                                             fontSize = 11.sp,
                                             modifier = Modifier.padding(top = 2.dp)
@@ -497,7 +504,12 @@ fun PlaylistDetailScreen(
                                             .clickable { searchQuery = "" }
                                             .padding(6.dp)
                                     ) {
-                                        Text(text = "✕", color = MiuixTheme.colorScheme.onSurfaceSecondary, fontSize = 16.sp)
+                                        Icon(
+                                            imageVector = AppIcons.Close,
+                                            contentDescription = "清除",
+                                            tint = MiuixTheme.colorScheme.onSurfaceSecondary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
                                     }
                                 }
                             }
@@ -526,7 +538,12 @@ fun PlaylistDetailScreen(
                                     .padding(horizontal = 16.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(text = "▶", color = Color.White, fontSize = 13.sp)
+                                Icon(
+                                    imageVector = AppIcons.Play,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(14.dp)
+                                )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = "播放全部",
@@ -554,7 +571,12 @@ fun PlaylistDetailScreen(
                                     .padding(horizontal = 14.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(text = "🔀", fontSize = 13.sp)
+                                Icon(
+                                    imageVector = AppIcons.Shuffle,
+                                    contentDescription = null,
+                                    tint = MiuixTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(14.dp)
+                                )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = "随机播放",
@@ -663,7 +685,7 @@ fun PlaylistDetailScreen(
                             val isFav = SettingsRepository.isFavorite(menuSong.id)
 
                             SongMenuActionItem(
-                                iconText = "▶",
+                                icon = AppIcons.Play,
                                 title = "立即播放",
                                 onClick = {
                                     NocturnPlayer.playSong(menuSong)
@@ -672,7 +694,7 @@ fun PlaylistDetailScreen(
                             )
 
                             SongMenuActionItem(
-                                iconText = "⏭",
+                                icon = AppIcons.SkipNext,
                                 title = "下一首播放",
                                 onClick = {
                                     NocturnPlayer.playNextInQueue(menuSong)
@@ -681,7 +703,7 @@ fun PlaylistDetailScreen(
                             )
 
                             SongMenuActionItem(
-                                iconText = "➕",
+                                icon = AppIcons.Playlist,
                                 title = "添加到播放列表",
                                 onClick = {
                                     NocturnPlayer.addToQueue(menuSong)
@@ -690,7 +712,8 @@ fun PlaylistDetailScreen(
                             )
 
                             SongMenuActionItem(
-                                iconText = if (isFav) "💔" else "♥",
+                                icon = if (isFav) AppIcons.FavoritesFill else AppIcons.Favorites,
+                                iconTint = if (isFav) HyperRed else MiuixTheme.colorScheme.onSurface,
                                 title = if (isFav) "从「我喜欢的音乐」中移除" else "收藏到「我喜欢的音乐」",
                                 onClick = {
                                     SettingsRepository.toggleFavorite(menuSong)
@@ -700,7 +723,7 @@ fun PlaylistDetailScreen(
 
                             if (menuSong.artist.isNotBlank() && menuSong.artist != "未知歌手") {
                                 SongMenuActionItem(
-                                    iconText = "👤",
+                                    icon = AppIcons.Contacts,
                                     title = "查看歌手: ${menuSong.artist}",
                                     onClick = {
                                         val firstArtist = menuSong.artist.split("/", "&", ",").first().trim()
@@ -712,7 +735,7 @@ fun PlaylistDetailScreen(
 
                             if (menuSong.album.isNotBlank()) {
                                 SongMenuActionItem(
-                                    iconText = "💿",
+                                    icon = AppIcons.Album,
                                     title = "查看专辑: ${menuSong.album}",
                                     onClick = {
                                         selectedSongForMenu = null
@@ -730,10 +753,11 @@ fun PlaylistDetailScreen(
 
 @Composable
 private fun SongMenuActionItem(
-    iconText: String,
+    icon: ImageVector,
     title: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    iconTint: Color = MiuixTheme.colorScheme.onSurface
 ) {
     Row(
         modifier = modifier
@@ -743,12 +767,12 @@ private fun SongMenuActionItem(
             .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier.size(24.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(text = iconText, fontSize = 16.sp)
-        }
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = iconTint,
+            modifier = Modifier.size(20.dp)
+        )
         Spacer(modifier = Modifier.width(14.dp))
         Text(
             text = title,

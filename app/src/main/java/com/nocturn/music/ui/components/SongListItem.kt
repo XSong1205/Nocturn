@@ -21,9 +21,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nocturn.music.model.Song
+import com.nocturn.music.ui.theme.AppIcons
 import com.nocturn.music.ui.theme.HyperBlue
 import com.nocturn.music.ui.theme.HyperRed
 import com.nocturn.music.ui.theme.squircleCard
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -50,11 +52,11 @@ fun SongListItem(
                 contentAlignment = Alignment.Center
             ) {
                 if (isPlaying) {
-                    Text(
-                        text = "▶",
-                        color = HyperBlue,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
+                    Icon(
+                        imageVector = AppIcons.Play,
+                        contentDescription = "正在播放",
+                        tint = HyperBlue,
+                        modifier = Modifier.size(14.dp)
                     )
                 } else {
                     Text(
@@ -83,7 +85,12 @@ fun SongListItem(
                             .background(Color.Black.copy(alpha = 0.4f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "▶", color = Color.White, fontSize = 16.sp)
+                        Icon(
+                            imageVector = AppIcons.Play,
+                            contentDescription = "正在播放",
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
                 }
             }
@@ -145,10 +152,11 @@ fun SongListItem(
                     .padding(8.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "⋮",
-                    color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                    fontSize = 18.sp
+                Icon(
+                    imageVector = AppIcons.More,
+                    contentDescription = "更多",
+                    tint = MiuixTheme.colorScheme.onSurfaceSecondary,
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }

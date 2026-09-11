@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nocturn.music.model.PlayMode
 import com.nocturn.music.player.NocturnPlayer
+import com.nocturn.music.ui.theme.AppIcons
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
@@ -80,16 +82,25 @@ fun QueueSheet(
                             .clickable { NocturnPlayer.togglePlayMode() }
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        val modeText = when (playMode) {
-                            PlayMode.LIST_LOOP -> "🔁 列表循环"
-                            PlayMode.SINGLE_LOOP -> "🔂 单曲循环"
-                            PlayMode.RANDOM -> "🔀 随机播放"
+                        val (modeIcon, modeText) = when (playMode) {
+                            PlayMode.LIST_LOOP -> AppIcons.Repeat to "列表循环"
+                            PlayMode.SINGLE_LOOP -> AppIcons.RepeatOne to "单曲循环"
+                            PlayMode.RANDOM -> AppIcons.Shuffle to "随机播放"
                         }
-                        Text(
-                            text = modeText,
-                            color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                            fontSize = 12.sp
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = modeIcon,
+                                contentDescription = null,
+                                tint = MiuixTheme.colorScheme.onSurfaceSecondary,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = modeText,
+                                color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                                fontSize = 12.sp
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.width(8.dp))
@@ -147,13 +158,17 @@ fun QueueSheet(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             if (isCurrent) {
-                                Text(
-                                    text = if (isPlaying) "▶" else "❚❚",
-                                    color = MiuixTheme.colorScheme.primary,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.width(24.dp)
-                                )
+                                Box(
+                                    modifier = Modifier.width(24.dp),
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+                                    Icon(
+                                        imageVector = if (isPlaying) AppIcons.Play else AppIcons.Pause,
+                                        contentDescription = null,
+                                        tint = MiuixTheme.colorScheme.primary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
                             } else {
                                 Text(
                                     text = "${index + 1}",
@@ -191,10 +206,11 @@ fun QueueSheet(
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = "✕",
-                                    color = MiuixTheme.colorScheme.onSurfaceVariantActions,
-                                    fontSize = 12.sp
+                                Icon(
+                                    imageVector = AppIcons.Close,
+                                    contentDescription = "移除",
+                                    tint = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                                    modifier = Modifier.size(14.dp)
                                 )
                             }
                         }

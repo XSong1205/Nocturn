@@ -35,8 +35,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nocturn.music.data.repository.SettingsRepository
 import com.nocturn.music.player.NocturnPlayer
+import com.nocturn.music.ui.theme.AppIcons
 import com.nocturn.music.ui.theme.HyperBlue
 import com.nocturn.music.ui.theme.squircleCard
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
 import top.yukonga.miuix.kmp.blur.BlurDefaults
@@ -178,11 +180,11 @@ fun MiniPlayerBar(
                     .clickable { NocturnPlayer.togglePlayPause() },
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = if (isPlaying) "❚❚" else "▶",
-                    color = HyperBlue,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
+                Icon(
+                    imageVector = if (isPlaying) AppIcons.Pause else AppIcons.Play,
+                    contentDescription = if (isPlaying) "暂停" else "播放",
+                    tint = HyperBlue,
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
@@ -195,10 +197,11 @@ fun MiniPlayerBar(
                     .clickable { NocturnPlayer.playNext() },
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "⏭",
-                    color = MiuixTheme.colorScheme.onSurface,
-                    fontSize = 16.sp
+                Icon(
+                    imageVector = AppIcons.SkipNext,
+                    contentDescription = "下一曲",
+                    tint = MiuixTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
@@ -211,10 +214,11 @@ fun MiniPlayerBar(
                     .clickable(onClick = onQueueClick),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "☰",
-                    color = MiuixTheme.colorScheme.onSurface,
-                    fontSize = 18.sp
+                Icon(
+                    imageVector = AppIcons.Playlist,
+                    contentDescription = "播放列表",
+                    tint = MiuixTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }

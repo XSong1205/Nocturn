@@ -48,12 +48,14 @@ import com.nocturn.music.player.NocturnPlayer
 import com.nocturn.music.ui.components.AsyncImage
 import com.nocturn.music.ui.components.PlaylistCard
 import com.nocturn.music.ui.components.SongListItem
+import com.nocturn.music.ui.theme.AppIcons
 import com.nocturn.music.ui.theme.HyperBlue
 import com.nocturn.music.ui.theme.squircleCard
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.InputField
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.TabRow
@@ -265,8 +267,15 @@ fun SearchScreen(
                                         .padding(horizontal = 16.dp, vertical = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
+                                    Icon(
+                                        imageVector = AppIcons.Play,
+                                        contentDescription = null,
+                                        tint = HyperBlue,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = "▶ 播放全部 (${songResults.size}首)",
+                                        text = "播放全部 (${songResults.size}首)",
                                         color = HyperBlue,
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.SemiBold

@@ -48,7 +48,9 @@ import com.nocturn.music.model.Playlist
 import com.nocturn.music.model.UserProfile
 import com.nocturn.music.player.NocturnPlayer
 import com.nocturn.music.ui.components.AsyncImage
+import com.nocturn.music.ui.components.PlaylistCard
 import com.nocturn.music.ui.components.SongListItem
+import com.nocturn.music.ui.theme.AppIcons
 import com.nocturn.music.ui.theme.HyperBlue
 import com.nocturn.music.ui.theme.HyperRed
 import com.nocturn.music.ui.theme.squircleCard
@@ -59,6 +61,7 @@ import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.TabRow
 import top.yukonga.miuix.kmp.basic.Text
@@ -103,7 +106,13 @@ fun MyScreen(
     var cookieStatusMessage by remember { mutableStateOf<String?>(null) }
 
     // 用户歌单
-    var userPlaylists by remember { mutableStateOf<List<Playlist>>(emptyList()) }
+    var userPlaylists by remember {
+        mutableStateOf(
+            if (userProfile.isLogin && userProfile.userId > 0) {
+                MusicRepository.getCachedUserPlaylists(userProfile.userId) ?: emptyList()
+            } else emptyList()
+        )
+    }
 
     val scope = rememberCoroutineScope()
 
@@ -112,7 +121,12 @@ fun MyScreen(
     // 加载用户歌单与自动同步云端红心歌曲
     LaunchedEffect(userProfile.userId, userProfile.isLogin) {
         if (userProfile.isLogin && userProfile.userId > 0) {
-            userPlaylists = MusicRepository.getUserPlaylists(userProfile.userId)
+            val cached = MusicRepository.getCachedUserPlaylists(userProfile.userId)
+            if (cached != null) {
+                userPlaylists = cached
+            }
+            val lists = MusicRepository.getUserPlaylists(userProfile.userId, forceRefresh = cached == null)
+            userPlaylists = lists
             // 自动同步云端红心歌单
             MusicRepository.syncCloudFavorites()
         } else {
@@ -184,12 +198,13 @@ fun MyScreen(
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = maxOf(bottomBarPadding + 16.dp, 100.dp))
+        contentPadding = PaddingValues(top = 16.dp, bottom = maxOf(bottomBarPadding + 16.dp, 100.dp))
     ) {
         item {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
                     .clickable {
                         if (!userProfile.isLogin) {
                             showLoginDialog = true
@@ -218,7 +233,12 @@ fun MyScreen(
                                 modifier = Modifier.fillMaxSize()
                             )
                         } else {
-                            Text(text = "👤", fontSize = 26.sp)
+                            Icon(
+                                imageVector = AppIcons.Contacts,
+                                contentDescription = null,
+                                tint = MiuixTheme.colorScheme.onSurfaceSecondary,
+                                modifier = Modifier.size(28.dp)
+                            )
                         }
                     }
 
@@ -295,6 +315,7 @@ fun MyScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
                     .height(100.dp)
                     .squircleCard(20.dp)
                     .background(
@@ -327,7 +348,12 @@ fun MyScreen(
                                 .background(Color.White.copy(alpha = 0.2f)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = "♥", color = Color.White, fontSize = 24.sp)
+                            Icon(
+                                imageVector = AppIcons.FavoritesFill,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(26.dp)
+                            )
                         }
 
                         Spacer(modifier = Modifier.width(14.dp))
@@ -366,12 +392,23 @@ fun MyScreen(
                                             }
                                             .padding(horizontal = 6.dp, vertical = 2.dp)
                                     ) {
-                                        Text(
-                                            text = if (isSyncingFavorites) "同步中..." else "⟳ 同步云端",
-                                            color = Color.White,
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Medium
-                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            if (!isSyncingFavorites) {
+                                                Icon(
+                                                    imageVector = AppIcons.Refresh,
+                                                    contentDescription = null,
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(11.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(3.dp))
+                                            }
+                                            Text(
+                                                text = if (isSyncingFavorites) "同步中..." else "同步云端",
+                                                color = Color.White,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -399,7 +436,12 @@ fun MyScreen(
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "▶", color = Color(0xFFE53935), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Icon(
+                            imageVector = AppIcons.Play,
+                            contentDescription = "播放全部",
+                            tint = Color(0xFFE53935),
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
             }
@@ -411,49 +453,18 @@ fun MyScreen(
             item {
                 SmallTitle(
                     text = "我的歌单",
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp)
                 )
 
                 LazyRow(
-                    contentPadding = PaddingValues(0.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     items(userPlaylists) { playlist ->
-                        Card(
-                            modifier = Modifier
-                                .width(130.dp)
-                                .clickable { onOpenRoute(SecondaryRoute.Playlist(playlist.id, playlist.name, playlist.coverUrl)) }
-                        ) {
-                            Column(modifier = Modifier.padding(8.dp)) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(114.dp)
-                                        .squircleCard(12.dp)
-                                ) {
-                                    AsyncImage(
-                                        url = playlist.coverUrl,
-                                        contentDescription = playlist.name,
-                                        modifier = Modifier.fillMaxSize()
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = playlist.name,
-                                    color = MiuixTheme.colorScheme.onSurface,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = "${playlist.trackCount} 首",
-                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                    fontSize = 10.sp,
-                                    modifier = Modifier.padding(top = 2.dp)
-                                )
-                            }
-                        }
+                        PlaylistCard(
+                            playlist = playlist,
+                            onClick = { onOpenRoute(SecondaryRoute.Playlist(playlist.id, playlist.name, playlist.coverUrl)) }
+                        )
                     }
                 }
                 Spacer(modifier = Modifier.height(20.dp))
@@ -462,7 +473,9 @@ fun MyScreen(
 
         item {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -494,7 +507,7 @@ fun MyScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 36.dp),
+                        .padding(horizontal = 16.dp, vertical = 36.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -847,7 +860,12 @@ fun MyScreen(
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    Text(text = "👤", fontSize = 32.sp)
+                    Icon(
+                        imageVector = AppIcons.Contacts,
+                        contentDescription = null,
+                        tint = MiuixTheme.colorScheme.onSurfaceSecondary,
+                        modifier = Modifier.size(34.dp)
+                    )
                 }
             }
 
