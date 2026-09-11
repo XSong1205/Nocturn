@@ -1,0 +1,102 @@
+name: Build & Release
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: '自定义版本号 (例如 1.0.2，留空则自动按 v1.0.<run_number> 递增)'
+        required: false
+        type: string
+        default: ''
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & Publish APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Determine Version
+        id: versioning
+        run: |
+          if [ -n "${{ github.event.inputs.version_name }}" ]; then
+            VERSION_NAME="${{ github.event.inputs.version_name }}"
+          else
+            VERSION_NAME="1.0.${{ github.run_number }}"
+          fi
+          VERSION_CODE="${{ github.run_number }}"
+          TAG_NAME="v$VERSION_NAME"
+
+          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
+          echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+
+          echo "====================================="
+          echo "🚀 Target Version: $VERSION_NAME (Code: $VERSION_CODE)"
+          echo "🏷️ Git Tag: $TAG_NAME"
+          echo "====================================="
+
+      - name: Grant Execute Permission to Gradlew
+        run: chmod +x gradlew
+
+      - name: Build APK (Release & Debug)
+        run: |
+          ./gradlew :app:assembleRelease :app:assembleDebug \
+            -PversionCode=${{ env.VERSION_CODE }} \
+            -PversionName=${{ env.VERSION_NAME }} --stacktrace
+
+      - name: Prepare Artifacts
+        run: |
+          mkdir -p release-apks
+          # 复制并标准化 APK 命名
+          if [ -f app/build/outputs/apk/release/app-release.apk ]; then
+            cp app/build/outputs/apk/release/app-release.apk "release-apks/Nocturn-v${{ env.VERSION_NAME }}-release.apk"
+          fi
+          if [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
+            cp app/build/outputs/apk/debug/app-debug.apk "release-apks/Nocturn-v${{ env.VERSION_NAME }}-debug.apk"
+          fi
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nocturn-v${{ env.VERSION_NAME }}
+          path: release-apks/*
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: "Nocturn ${{ env.TAG_NAME }}"
+          files: release-apks/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

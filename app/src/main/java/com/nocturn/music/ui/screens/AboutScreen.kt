@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nocturn.music.BuildConfig
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -96,7 +97,7 @@ fun AboutScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "v1.0.0 (HyperOS Edition)",
+                        text = "v${BuildConfig.VERSION_NAME} (HyperOS Edition)",
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         fontSize = 14.sp
                     )

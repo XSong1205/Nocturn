@@ -7,6 +7,20 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+val appVersionCode: Int = providers.gradleProperty("versionCode")
+    .map { it.toInt() }
+    .orElse(
+        providers.exec {
+            commandLine("git", "rev-list", "--count", "HEAD")
+        }.standardOutput.asText.map { it.trim().toInt() }
+    )
+    .orElse(1)
+    .get()
+
+val appVersionName: String = providers.gradleProperty("versionName")
+    .orElse("1.0.$appVersionCode")
+    .get()
+
 android {
     namespace = "com.nocturn.music"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -15,16 +29,21 @@ android {
         applicationId = "com.nocturn.music"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
