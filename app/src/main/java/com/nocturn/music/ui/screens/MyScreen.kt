@@ -180,9 +180,11 @@ fun MyScreen(
         }
     }
 
+    val bottomBarPadding = com.nocturn.music.ui.navigation.LocalBottomBarPadding.current
+
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp, bottom = 100.dp)
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = maxOf(bottomBarPadding + 16.dp, 100.dp))
     ) {
         item {
             Card(

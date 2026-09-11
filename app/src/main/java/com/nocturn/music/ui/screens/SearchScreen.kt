@@ -89,6 +89,9 @@ fun SearchScreen(
     val isPlaying by NocturnPlayer.isPlaying.collectAsState()
     val scope = rememberCoroutineScope()
 
+    val bottomBarPadding = com.nocturn.music.ui.navigation.LocalBottomBarPadding.current
+    val bottomListPadding = maxOf(bottomBarPadding + 16.dp, 100.dp)
+
     var hotKeywordsList by remember { mutableStateOf(hotKeywords) }
     androidx.compose.runtime.LaunchedEffect(Unit) {
         val remote = MusicRepository.getHotSearchKeywords()
@@ -138,8 +141,8 @@ fun SearchScreen(
             Spacer(modifier = Modifier.width(8.dp))
 
             Button(
-                colors = ButtonDefaults.buttonColorsPrimary(),
-                onClick = { performSearch(query) }
+                onClick = { performSearch(query) },
+                modifier = Modifier.height(40.dp)
             ) {
                 Text(text = "搜索")
             }
@@ -251,7 +254,7 @@ fun SearchScreen(
                 0 -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 90.dp)
+                        contentPadding = PaddingValues(bottom = bottomListPadding)
                     ) {
                         item {
                             if (songResults.isNotEmpty()) {
@@ -284,7 +287,7 @@ fun SearchScreen(
                 1 -> {
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(minSize = 140.dp),
-                        contentPadding = PaddingValues(16.dp, bottom = 90.dp),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = bottomListPadding),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
@@ -299,7 +302,7 @@ fun SearchScreen(
                 2 -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 90.dp)
+                        contentPadding = PaddingValues(bottom = bottomListPadding)
                     ) {
                         items(artistResults) { artist ->
                             Row(
@@ -313,6 +316,7 @@ fun SearchScreen(
                                     modifier = Modifier
                                         .size(52.dp)
                                         .clip(CircleShape)
+                                        .background(Color(0xFF222222))
                                 ) {
                                     AsyncImage(
                                         url = artist.avatarUrl,
@@ -344,7 +348,7 @@ fun SearchScreen(
                 3 -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 90.dp)
+                        contentPadding = PaddingValues(bottom = bottomListPadding)
                     ) {
                         items(albumResults) { album ->
                             Row(

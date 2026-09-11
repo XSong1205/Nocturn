@@ -88,9 +88,11 @@ fun HomeScreen(
         isLoading = false
     }
 
+    val bottomBarPadding = com.nocturn.music.ui.navigation.LocalBottomBarPadding.current
+
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 90.dp)
+        contentPadding = PaddingValues(bottom = maxOf(bottomBarPadding + 16.dp, 100.dp))
     ) {
         // 1. Featured Banners
         item {

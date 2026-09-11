@@ -12,6 +12,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -46,6 +47,21 @@ import top.yukonga.miuix.kmp.icon.extended.Music
 import top.yukonga.miuix.kmp.icon.extended.Search
 import top.yukonga.miuix.kmp.icon.extended.Settings
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.unit.dp
+import top.yukonga.miuix.kmp.blur.BlendColorEntry
+import top.yukonga.miuix.kmp.blur.BlurDefaults
+import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
+import top.yukonga.miuix.kmp.blur.textureBlur
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+
+val LocalBottomBarPadding = compositionLocalOf { 0.dp }
+
 enum class NavigationTab(val label: String) {
     Discover("发现"),
     Search("搜索"),
@@ -69,6 +85,13 @@ fun AppNavigation() {
     var isQueueOpen by remember { mutableStateOf(false) }
 
     val currentSecondary = secondaryStack.lastOrNull()
+
+    val surfaceColor = MiuixTheme.colorScheme.surface
+    val backdrop = rememberLayerBackdrop {
+        drawRect(surfaceColor)
+        drawContent()
+    }
+    val blurActive = isRuntimeShaderSupported()
 
     BackHandler(enabled = isPlayerExpanded || isQueueOpen || secondaryStack.isNotEmpty()) {
         when {
@@ -96,7 +119,8 @@ fun AppNavigation() {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     MiniPlayerBar(
                         onBarClick = { isPlayerExpanded = true },
-                        onQueueClick = { isQueueOpen = true }
+                        onQueueClick = { isQueueOpen = true },
+                        backdrop = backdrop
                     )
 
                     AnimatedVisibility(
@@ -104,16 +128,40 @@ fun AppNavigation() {
                         enter = slideInVertically(tween(250, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(180)),
                         exit = slideOutVertically(tween(250, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(150))
                     ) {
-                        NavigationBar {
-                            NavigationTab.values().forEach { tab ->
-                                NavigationBarItem(
-                                    selected = currentTab == tab && currentSecondary == null,
-                                    onClick = {
-                                        currentTab = tab
-                                    },
-                                    icon = tab.icon,
-                                    label = tab.label
+                        val navBarColor = if (blurActive) Color.Transparent else surfaceColor
+                        Box(
+                            modifier = Modifier
+                                .then(
+                                    if (blurActive) {
+                                        Modifier.textureBlur(
+                                            backdrop = backdrop,
+                                            shape = RectangleShape,
+                                            blurRadius = 25f,
+                                            colors = BlurDefaults.blurColors(
+                                                blendColors = listOf(
+                                                    BlendColorEntry(color = surfaceColor.copy(alpha = 0.8f))
+                                                )
+                                            )
+                                        )
+                                    } else {
+                                        Modifier
+                                    }
                                 )
+                                .background(navBarColor)
+                        ) {
+                            NavigationBar(
+                                color = navBarColor
+                            ) {
+                                NavigationTab.values().forEach { tab ->
+                                    NavigationBarItem(
+                                        selected = currentTab == tab && currentSecondary == null,
+                                        onClick = {
+                                            currentTab = tab
+                                        },
+                                        icon = tab.icon,
+                                        label = tab.label
+                                    )
+                                }
                             }
                         }
                     }
@@ -121,58 +169,68 @@ fun AppNavigation() {
             },
             modifier = Modifier.fillMaxSize()
         ) { innerPadding ->
-            Box(modifier = Modifier.fillMaxSize()) {
-                // 主 Tab 内容区 (需要 innerPadding: 包含顶部 TopAppBar 与底部 NavigationBar/MiniPlayerBar)
+            val bottomBarPadding = innerPadding.calculateBottomPadding()
+
+            CompositionLocalProvider(LocalBottomBarPadding provides bottomBarPadding) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(innerPadding)
+                        .layerBackdrop(backdrop)
                 ) {
-                    AnimatedContent(
-                        targetState = currentTab,
-                        transitionSpec = {
-                            if (targetState.ordinal > initialState.ordinal) {
-                                (slideInHorizontally(tween(320, easing = FastOutSlowInEasing)) { it / 3 } + fadeIn(tween(250)))
-                                    .togetherWith(slideOutHorizontally(tween(320, easing = FastOutSlowInEasing)) { -it / 3 } + fadeOut(tween(200)))
-                            } else {
-                                (slideInHorizontally(tween(320, easing = FastOutSlowInEasing)) { -it / 3 } + fadeIn(tween(250)))
-                                    .togetherWith(slideOutHorizontally(tween(320, easing = FastOutSlowInEasing)) { it / 3 } + fadeOut(tween(200)))
-                            }
-                        },
-                        label = "tab-transition"
-                    ) { tab ->
-                        when (tab) {
-                            NavigationTab.Discover -> HomeScreen(
-                                onOpenRoute = { secondaryStack.add(it) },
-                                onNavigateToSearch = { currentTab = NavigationTab.Search }
-                            )
-                            NavigationTab.Search -> SearchScreen(
-                                onOpenRoute = { secondaryStack.add(it) }
-                            )
-                            NavigationTab.My -> MyScreen(
-                                onNavigateToSettings = { currentTab = NavigationTab.Settings },
-                                onOpenRoute = { secondaryStack.add(it) }
-                            )
-                            NavigationTab.Settings -> SettingsScreen(
-                                onOpenRoute = { secondaryStack.add(it) }
-                            )
-                        }
-                    }
-                }
-
-                // 二级界面展示层 (包含歌单、专辑、歌手、我喜欢的音乐、排行榜广场、关于等)
-                // 二级页面均带有自适配状态栏的 SmallTopAppBar，顶层不可使用 innerPadding.calculateTopPadding()，否则会导致标题栏双重下移；
-                // 仅需保留底部 padding 为 MiniPlayerBar 留出空间。
-                AnimatedVisibility(
-                    visible = currentSecondary != null,
-                    enter = slideInHorizontally(tween(300, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(200)),
-                    exit = slideOutHorizontally(tween(280, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(180))
-                ) {
+                    // 主 Tab 内容区 (需要 innerPadding.calculateTopPadding() 避让顶部 TopAppBar；底部当 blurActive 时延伸到底栏下方实现毛玻璃透视)
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(bottom = innerPadding.calculateBottomPadding())
+                            .padding(
+                                top = innerPadding.calculateTopPadding(),
+                                bottom = if (blurActive) 0.dp else bottomBarPadding
+                            )
                     ) {
+                        AnimatedContent(
+                            targetState = currentTab,
+                            transitionSpec = {
+                                if (targetState.ordinal > initialState.ordinal) {
+                                    (slideInHorizontally(tween(320, easing = FastOutSlowInEasing)) { it / 3 } + fadeIn(tween(250)))
+                                        .togetherWith(slideOutHorizontally(tween(320, easing = FastOutSlowInEasing)) { -it / 3 } + fadeOut(tween(200)))
+                                } else {
+                                    (slideInHorizontally(tween(320, easing = FastOutSlowInEasing)) { -it / 3 } + fadeIn(tween(250)))
+                                        .togetherWith(slideOutHorizontally(tween(320, easing = FastOutSlowInEasing)) { it / 3 } + fadeOut(tween(200)))
+                                }
+                            },
+                            label = "tab-transition"
+                        ) { tab ->
+                            when (tab) {
+                                NavigationTab.Discover -> HomeScreen(
+                                    onOpenRoute = { secondaryStack.add(it) },
+                                    onNavigateToSearch = { currentTab = NavigationTab.Search }
+                                )
+                                NavigationTab.Search -> SearchScreen(
+                                    onOpenRoute = { secondaryStack.add(it) }
+                                )
+                                NavigationTab.My -> MyScreen(
+                                    onNavigateToSettings = { currentTab = NavigationTab.Settings },
+                                    onOpenRoute = { secondaryStack.add(it) }
+                                )
+                                NavigationTab.Settings -> SettingsScreen(
+                                    onOpenRoute = { secondaryStack.add(it) }
+                                )
+                            }
+                        }
+                    }
+
+                    // 二级界面展示层 (包含歌单、专辑、歌手、我喜欢的音乐、排行榜广场、关于等)
+                    // 二级页面均带有自适配状态栏的 SmallTopAppBar，顶层不可使用 innerPadding.calculateTopPadding()，否则会导致标题栏双重下移；
+                    // 仅需保留底部 padding 为 MiniPlayerBar 留出空间 (开启毛玻璃时同样延展到底部)。
+                    AnimatedVisibility(
+                        visible = currentSecondary != null,
+                        enter = slideInHorizontally(tween(300, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(200)),
+                        exit = slideOutHorizontally(tween(280, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(180))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(bottom = if (blurActive) 0.dp else bottomBarPadding)
+                        ) {
                         AnimatedContent(
                             targetState = currentSecondary,
                             transitionSpec = {
@@ -210,8 +268,9 @@ fun AppNavigation() {
                 }
             }
         }
+    }
 
-        AnimatedVisibility(
+    AnimatedVisibility(
             visible = isPlayerExpanded,
             enter = slideInVertically(tween(360, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(250)),
             exit = slideOutVertically(tween(360, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(200))

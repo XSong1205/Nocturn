@@ -8,6 +8,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,22 +33,43 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nocturn.music.data.repository.SettingsRepository
 import com.nocturn.music.player.NocturnPlayer
 import com.nocturn.music.ui.theme.HyperBlue
 import com.nocturn.music.ui.theme.squircleCard
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.blur.BlendColorEntry
+import top.yukonga.miuix.kmp.blur.BlurDefaults
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
+import top.yukonga.miuix.kmp.blur.highlight.Highlight
+import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
+import top.yukonga.miuix.kmp.blur.textureBlur
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 fun MiniPlayerBar(
     onBarClick: () -> Unit,
     onQueueClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    backdrop: LayerBackdrop? = null
 ) {
     val currentSong by NocturnPlayer.currentSong.collectAsState()
     val isPlaying by NocturnPlayer.isPlaying.collectAsState()
 
     if (currentSong == null) return
+
+    val themeMode by SettingsRepository.themeMode.collectAsState()
+    val isDark = when (themeMode) {
+        1 -> false
+        2 -> true
+        else -> isSystemInDarkTheme()
+    }
+
+    val blurActive = isRuntimeShaderSupported() && backdrop != null
+    val cardShape = remember { RoundedCornerShape(18.dp) }
+    val floatingHighlight = remember(isDark) {
+        if (isDark) Highlight.GlassStrokeMiddleDark else Highlight.GlassStrokeMiddleLight
+    }
 
     val infiniteTransition = rememberInfiniteTransition(label = "vinyl-rotation")
     val rotationAngle by infiniteTransition.animateFloat(
@@ -59,13 +82,44 @@ fun MiniPlayerBar(
         label = "rotation"
     )
 
+    val surfaceContainerColor = MiuixTheme.colorScheme.surfaceContainerHighest
+
     Box(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp)
-            .shadow(12.dp, RoundedCornerShape(18.dp), ambientColor = Color.Black.copy(alpha = 0.15f))
-            .squircleCard(18.dp)
-            .background(MiuixTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.95f))
+            .shadow(
+                elevation = 12.dp,
+                shape = cardShape,
+                ambientColor = Color.Black.copy(alpha = if (isDark) 0.35f else 0.12f),
+                spotColor = Color.Black.copy(alpha = if (isDark) 0.45f else 0.18f)
+            )
+            .then(
+                if (blurActive) {
+                    Modifier.textureBlur(
+                        backdrop = backdrop,
+                        shape = cardShape,
+                        blurRadius = 25f,
+                        colors = BlurDefaults.blurColors(
+                            blendColors = listOf(
+                                BlendColorEntry(
+                                    color = if (isDark) {
+                                        surfaceContainerColor.copy(alpha = 0.55f)
+                                    } else {
+                                        surfaceContainerColor.copy(alpha = 0.65f)
+                                    }
+                                )
+                            )
+                        ),
+                        highlight = floatingHighlight
+                    )
+                } else {
+                    Modifier
+                        .squircleCard(18.dp)
+                        .background(surfaceContainerColor.copy(alpha = 0.95f))
+                }
+            )
+            .clip(cardShape)
             .clickable(onClick = onBarClick)
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {

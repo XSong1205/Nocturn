@@ -51,6 +51,7 @@ import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.nocturn.music.ui.navigation.LocalBottomBarPadding
 
 @Composable
 fun SettingsScreen(
@@ -69,9 +70,16 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
 
+    val bottomBarPadding = LocalBottomBarPadding.current
+
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            end = 16.dp,
+            top = 12.dp,
+            bottom = maxOf(bottomBarPadding + 16.dp, 100.dp)
+        )
     ) {
         item {
             SmallTitle(text = "外观与显示")

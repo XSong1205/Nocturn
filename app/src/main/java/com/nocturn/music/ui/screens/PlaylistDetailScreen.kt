@@ -304,10 +304,11 @@ fun PlaylistDetailScreen(
                     }
                 }
             } else {
+                val bottomBarPadding = com.nocturn.music.ui.navigation.LocalBottomBarPadding.current
                 LazyColumn(
                     state = lazyListState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 24.dp)
+                    contentPadding = PaddingValues(bottom = maxOf(bottomBarPadding + 16.dp, 24.dp))
                 ) {
                     // 1. 顶部 Header 区域 (封面、信息、简介)
                     item {
