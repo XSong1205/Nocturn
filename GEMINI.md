@@ -32,7 +32,7 @@
 
 ### 1.2 代码风格与开发准则
 - **Compose 纯声明式规范**：状态提升（State Hoisting），全局单一状态源（SSOT）。UI 层禁止直接触发耗时阻塞 IO 操作，所有网络请求与媒体解析必须交由 `Repository` 在 `Dispatchers.IO` 执行。
-- **MIUIX 设计语言**：统一使用 HyperOS 风格组件（连续平滑超椭圆 Squircle 卡片、流畅阻尼动效、标准深色/浅色自适应表面）。
+- **MIUIX 设计语言**：统一使用 HyperOS 风格组件（连续平滑超椭圆 Squircle 卡片、流畅阻尼动效、标准深色/浅色自适应表面）。已接入项目级技能规范 [miuix-skill](file:///.agents/skills/miuix/SKILL.md)（基于 [limczhh/miuix-skill](https://github.com/limczhh/miuix-skill)），UI 开发与审查需遵循其组件选型、语义色彩 Token (`MiuixTheme.colorScheme`)、主题控制器与无障碍规范。
 - **容灾与鲁棒性**：任何网络交互与音频解析必须提供健全的 try-catch 与多级备用链路，防止客户端 Crash 或抛出未经捕获的协程异常。
 
 ---
