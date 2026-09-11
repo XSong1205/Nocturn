@@ -52,7 +52,11 @@ import com.nocturn.music.ui.theme.HyperBlue
 import com.nocturn.music.ui.theme.squircleCard
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.InputField
+import top.yukonga.miuix.kmp.basic.SmallTitle
+import top.yukonga.miuix.kmp.basic.TabRow
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -99,7 +103,6 @@ fun SearchScreen(
         query = keyword
         SettingsRepository.addSearchHistory(keyword)
         isSearching = true
-
         scope.launch {
             when (selectedTab) {
                 0 -> songResults = MusicRepository.searchSongs(keyword)
@@ -122,9 +125,12 @@ fun SearchScreen(
                 .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextField(
-                value = query,
-                onValueChange = { query = it },
+            InputField(
+                query = query,
+                onQueryChange = { query = it },
+                onSearch = { performSearch(query) },
+                expanded = false,
+                onExpandedChange = {},
                 label = "搜索歌曲、歌单、歌手、专辑",
                 modifier = Modifier.weight(1f)
             )
@@ -132,50 +138,34 @@ fun SearchScreen(
             Spacer(modifier = Modifier.width(8.dp))
 
             Button(
-                onClick = { performSearch(query) },
-                modifier = Modifier.height(48.dp)
+                colors = ButtonDefaults.buttonColorsPrimary(),
+                onClick = { performSearch(query) }
             ) {
                 Text(text = "搜索")
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        Row(
+        val tabs = listOf("单曲", "歌单", "歌手", "专辑")
+        TabRow(
+            tabs = tabs,
+            selectedTabIndex = selectedTab,
+            onTabSelected = { index ->
+                selectedTab = index
+                if (query.isNotBlank()) performSearch(query)
+            },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.SpaceAround
-        ) {
-            val tabs = listOf("单曲", "歌单", "歌手", "专辑")
-            tabs.forEachIndexed { index, tabTitle ->
-                val isSelected = selectedTab == index
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (isSelected) HyperBlue.copy(alpha = 0.12f) else Color.Transparent)
-                        .clickable {
-                            selectedTab = index
-                            if (query.isNotBlank()) performSearch(query)
-                        }
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                ) {
-                    Text(
-                        text = tabTitle,
-                        color = if (isSelected) HyperBlue else MiuixTheme.colorScheme.onSurfaceSecondary,
-                        fontSize = 14.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                    )
-                }
-            }
-        }
+                .padding(horizontal = 16.dp)
+        )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         if (query.isBlank() && songResults.isEmpty() && playlistResults.isEmpty()) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp, bottom = 90.dp)
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 if (searchHistory.isNotEmpty()) {
                     item {
@@ -184,23 +174,21 @@ fun SearchScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
+                            SmallTitle(
                                 text = "历史搜索",
-                                color = MiuixTheme.colorScheme.onSurface,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold
+                                modifier = Modifier.padding(vertical = 4.dp)
                             )
                             Text(
                                 text = "清除",
-                                color = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.6f),
+                                color = MiuixTheme.colorScheme.onSurfaceVariantActions,
                                 fontSize = 12.sp,
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
                                     .clickable { SettingsRepository.clearSearchHistory() }
-                                    .padding(4.dp)
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -221,16 +209,14 @@ fun SearchScreen(
                                 }
                             }
                         }
-                        Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(18.dp))
                     }
                 }
 
                 item {
-                    Text(
-                        text = "热搜推荐",
-                        color = MiuixTheme.colorScheme.onSurface,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold
+                    SmallTitle(
+                        text = "热门推荐",
+                        modifier = Modifier.padding(vertical = 4.dp)
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     FlowRow(

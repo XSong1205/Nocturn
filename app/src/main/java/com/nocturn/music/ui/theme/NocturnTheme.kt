@@ -4,15 +4,16 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.nocturn.music.data.repository.SettingsRepository
 import top.yukonga.miuix.kmp.squircle.squircleClip
+import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.theme.darkColorScheme
-import top.yukonga.miuix.kmp.theme.lightColorScheme
+import top.yukonga.miuix.kmp.theme.ThemeController
 
 val NocturnCornerRadius: Dp = 20.dp
 val NocturnLargeRadius: Dp = 28.dp
@@ -32,17 +33,18 @@ fun NocturnTheme(
     content: @Composable () -> Unit
 ) {
     val themeMode by SettingsRepository.themeMode.collectAsState()
-    val isSystemDark = isSystemInDarkTheme()
 
-    val isDark = when (themeMode) {
-        1 -> false // Light
-        2 -> true  // Dark
-        else -> isSystemDark
+    val colorSchemeMode = when (themeMode) {
+        1 -> ColorSchemeMode.Light
+        2 -> ColorSchemeMode.Dark
+        else -> ColorSchemeMode.System
     }
 
-    val colorScheme = if (isDark) darkColorScheme() else lightColorScheme()
+    val controller = remember(colorSchemeMode) {
+        ThemeController(colorSchemeMode)
+    }
 
-    MiuixTheme(colors = colorScheme) {
+    MiuixTheme(controller = controller) {
         content()
     }
 }

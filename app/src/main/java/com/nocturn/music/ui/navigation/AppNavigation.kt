@@ -204,15 +204,9 @@ fun AppNavigation() {
             )
         }
 
-        AnimatedVisibility(
-            visible = isQueueOpen,
-            enter = slideInVertically(tween(300, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(200)),
-            exit = slideOutVertically(tween(300, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(150)),
-            modifier = Modifier.align(Alignment.BottomCenter)
-        ) {
-            QueueSheet(
-                onDismiss = { isQueueOpen = false }
-            )
-        }
+        QueueSheet(
+            show = isQueueOpen,
+            onDismissRequest = { isQueueOpen = false }
+        )
     }
 }

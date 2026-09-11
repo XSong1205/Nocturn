@@ -2,6 +2,7 @@ package com.nocturn.music.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -30,13 +31,16 @@ import com.nocturn.music.data.api.NcmApiClient
 import com.nocturn.music.data.repository.SettingsRepository
 import com.nocturn.music.model.ApiMode
 import com.nocturn.music.model.AudioQuality
-import com.nocturn.music.ui.theme.HyperBlue
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -52,20 +56,14 @@ fun SettingsScreen(
     var apiUrlInput by remember { mutableStateOf(customApiUrl) }
     var pingStatus by remember { mutableStateOf<String?>(null) }
     var cacheClearedMessage by remember { mutableStateOf<String?>(null) }
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val scope = rememberCoroutineScope()
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp, bottom = 100.dp)
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
     ) {
         item {
-            Text(
-                text = "外观与显示",
-                color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
-            )
+            SmallTitle(text = "外观与显示")
 
             Card(modifier = Modifier.fillMaxWidth()) {
                 val themeLabel = when (themeMode) {
@@ -83,17 +81,11 @@ fun SettingsScreen(
                     }
                 )
             }
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(14.dp))
         }
 
         item {
-            Text(
-                text = "播放与音质",
-                color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
-            )
+            SmallTitle(text = "播放与音质")
 
             Card(modifier = Modifier.fillMaxWidth()) {
                 ArrowPreference(
@@ -106,29 +98,19 @@ fun SettingsScreen(
                     }
                 )
             }
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(14.dp))
         }
 
         item {
-            Text(
-                text = "API 引擎架构 (SPlayer 规范)",
-                color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
-            )
+            SmallTitle(text = "API 引擎架构 (SPlayer 规范)")
 
             Card(modifier = Modifier.fillMaxWidth()) {
-                ArrowPreference(
-                    title = "API 运行模式",
-                    summary = apiMode.label,
-                    onClick = {
-                        val next = if (apiMode == com.nocturn.music.model.ApiMode.EMBEDDED) {
-                            com.nocturn.music.model.ApiMode.CUSTOM
-                        } else {
-                            com.nocturn.music.model.ApiMode.EMBEDDED
-                        }
-                        SettingsRepository.setApiMode(next)
+                SwitchPreference(
+                    title = "内置原生引擎 (推荐)",
+                    summary = if (apiMode == ApiMode.EMBEDDED) "已启用内嵌直连官方网关，无需外部服务器" else "已切换为自定义远程 API 代理",
+                    checked = apiMode == ApiMode.EMBEDDED,
+                    onCheckedChange = { checked ->
+                        SettingsRepository.setApiMode(if (checked) ApiMode.EMBEDDED else ApiMode.CUSTOM)
                     }
                 )
                 ArrowPreference(
@@ -142,10 +124,10 @@ fun SettingsScreen(
                 )
                 ArrowPreference(
                     title = "内置服务器状态 (127.0.0.1:1145)",
-                    summary = if (com.nocturn.music.data.api.EmbeddedHttpServer.isRunning) "已启动 (嵌入式端口 1145)" else "就绪",
+                    summary = if (EmbeddedHttpServer.isRunning) "已启动 (嵌入式端口 1145)" else "就绪",
                     onClick = {
-                        if (!com.nocturn.music.data.api.EmbeddedHttpServer.isRunning) {
-                            com.nocturn.music.data.api.EmbeddedHttpServer.start()
+                        if (!EmbeddedHttpServer.isRunning) {
+                            EmbeddedHttpServer.start()
                         }
                     }
                 )
@@ -157,17 +139,11 @@ fun SettingsScreen(
                     }
                 )
             }
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(14.dp))
         }
 
         item {
-            Text(
-                text = "关于应用",
-                color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
-            )
+            SmallTitle(text = "关于应用")
 
             Card(modifier = Modifier.fillMaxWidth()) {
                 ArrowPreference(
@@ -176,108 +152,98 @@ fun SettingsScreen(
                 )
                 ArrowPreference(
                     title = "UI 框架",
-                    summary = "Jetpack Compose + MIUIX UI (0x-Yukonga)"
+                    summary = "Jetpack Compose + MIUIX UI (HyperOS)"
                 )
                 ArrowPreference(
                     title = "逐字歌词技术",
                     summary = "YRC 毫秒级逐字高亮渲染"
                 )
             }
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 
-    if (showApiDialog) {
-        Box(
+    OverlayDialog(
+        show = showApiDialog,
+        onDismissRequest = { showApiDialog = false },
+        title = "自定义网易云 API 地址",
+        summary = "支持全部 SPlayer 接口规范与增强代理"
+    ) {
+        Column(
             modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.5f))
-                .clickable { showApiDialog = false },
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 10.dp)
         ) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth(0.9f)
-                    .clickable(enabled = false) {}
-                    .padding(16.dp)
+            TextField(
+                value = apiUrlInput,
+                onValueChange = { apiUrlInput = it },
+                label = "API 服务 URL",
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            if (pingStatus != null) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = pingStatus ?: "",
+                    color = MiuixTheme.colorScheme.primary,
+                    fontSize = 12.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    Text(
-                        text = "自定义网易云 API 地址",
-                        color = MiuixTheme.colorScheme.onSurface,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "默认推荐使用您的专属 API: https://ncmapi.rpixel.online，支持全部 SPlayer 接口特性：",
-                        color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                        fontSize = 12.sp
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    TextField(
-                        value = apiUrlInput,
-                        onValueChange = { apiUrlInput = it },
-                        label = "API 服务 URL",
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    if (pingStatus != null) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = pingStatus ?: "",
-                            color = HyperBlue,
-                            fontSize = 12.sp
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Button(
-                            onClick = {
-                                scope.launch {
-                                    pingStatus = "正在测试连接..."
-                                    val (ok, latency) = NcmApiClient.ping(apiUrlInput)
-                                    pingStatus = if (ok) "✓ 连接成功 (耗时 ${latency}ms)" else "✗ 连接超时或失败"
-                                }
-                            },
-                            modifier = Modifier.padding(end = 6.dp)
-                        ) {
-                            Text(text = "测速")
+                Button(
+                    onClick = {
+                        scope.launch {
+                            pingStatus = "正在测试连接..."
+                            val (ok, latency) = NcmApiClient.ping(apiUrlInput)
+                            pingStatus = if (ok) "✓ 连接成功 (耗时 ${latency}ms)" else "✗ 连接超时或失败"
                         }
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(text = "测速")
+                }
 
-                        Button(
-                            onClick = {
-                                apiUrlInput = "https://ncmapi.rpixel.online"
-                                SettingsRepository.setCustomApiUrl("https://ncmapi.rpixel.online")
-                            },
-                            modifier = Modifier.padding(end = 8.dp)
-                        ) {
-                            Text(text = "恢复默认")
-                        }
+                Button(
+                    onClick = {
+                        apiUrlInput = "https://ncmapi.rpixel.online"
+                        SettingsRepository.setCustomApiUrl("https://ncmapi.rpixel.online")
+                    },
+                    modifier = Modifier.weight(1.3f)
+                ) {
+                    Text(text = "恢复默认")
+                }
+            }
 
-                        Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(8.dp))
 
-                        Button(
-                            onClick = { showApiDialog = false },
-                            modifier = Modifier.padding(end = 8.dp)
-                        ) {
-                            Text(text = "取消")
-                        }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = { showApiDialog = false },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(text = "取消")
+                }
 
-                        Button(
-                            onClick = {
-                                SettingsRepository.setCustomApiUrl(apiUrlInput)
-                                showApiDialog = false
-                            }
-                        ) {
-                            Text(text = "保存")
-                        }
-                    }
+                Button(
+                    colors = ButtonDefaults.buttonColorsPrimary(),
+                    onClick = {
+                        SettingsRepository.setCustomApiUrl(apiUrlInput)
+                        showApiDialog = false
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(text = "保存")
                 }
             }
         }

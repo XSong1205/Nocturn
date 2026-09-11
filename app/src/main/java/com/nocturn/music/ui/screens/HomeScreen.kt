@@ -45,9 +45,12 @@ import com.nocturn.music.ui.components.SongListItem
 import com.nocturn.music.ui.theme.HyperBlue
 import com.nocturn.music.ui.theme.squircleCard
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.nocturn.music.ui.navigation.SecondaryRoute
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 
 @JvmName("HomeScreenWithPlaylistClick")
 @Composable
@@ -67,14 +70,20 @@ fun HomeScreen(
 
     LaunchedEffect(Unit) {
         isLoading = true
-        banners = MusicRepository.getBanners()
-        recommendedPlaylists = MusicRepository.getRecommendedPlaylists()
-        val allToplists = MusicRepository.getToplists()
-        toplists = allToplists.take(6)
+        coroutineScope {
+            val bannersDeferred = async { MusicRepository.getBanners() }
+            val playlistsDeferred = async { MusicRepository.getRecommendedPlaylists() }
+            val toplistsDeferred = async { MusicRepository.getToplists() }
 
-        if (allToplists.isNotEmpty()) {
-            val firstChart = MusicRepository.getPlaylistDetail(allToplists.first().id)
-            hotSongs = firstChart?.tracks?.take(10) ?: emptyList()
+            banners = bannersDeferred.await()
+            recommendedPlaylists = playlistsDeferred.await()
+            val allToplists = toplistsDeferred.await()
+            toplists = allToplists.take(6)
+
+            if (allToplists.isNotEmpty()) {
+                val firstChart = MusicRepository.getPlaylistDetail(allToplists.first().id)
+                hotSongs = firstChart?.tracks?.take(10) ?: emptyList()
+            }
         }
         isLoading = false
     }
@@ -198,23 +207,21 @@ private fun SectionHeader(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
+        SmallTitle(
             text = title,
-            color = MiuixTheme.colorScheme.onSurface,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold
+            modifier = Modifier.padding(vertical = 4.dp)
         )
 
         if (actionText != null && onAction != null) {
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(8.dp))
                     .clickable(onClick = onAction)
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 Text(
                     text = actionText,
-                    color = HyperBlue,
+                    color = MiuixTheme.colorScheme.primary,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -238,7 +245,7 @@ private fun QuickActionsBar(
     ) {
         QuickActionButton(iconText = "★", label = "每日推荐", color = Color(0xFFFF5252), onClick = onDailyRecommend)
         QuickActionButton(iconText = "📊", label = "排行榜", color = Color(0xFFFF9800), onClick = onTopCharts)
-        QuickActionButton(iconText = "♫", label = "歌单广场", color = HyperBlue, onClick = onSearch)
+        QuickActionButton(iconText = "♫", label = "歌单广场", color = MiuixTheme.colorScheme.primary, onClick = onSearch)
         QuickActionButton(iconText = "🔍", label = "全网搜索", color = Color(0xFF4CAF50), onClick = onSearch)
     }
 }
@@ -316,7 +323,7 @@ private fun TopChartCard(
             if (chart.description.isNotBlank()) {
                 Text(
                     text = chart.description,
-                    color = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.7f),
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     fontSize = 11.sp,
                     maxLines = 1,
                     modifier = Modifier.padding(top = 2.dp)

@@ -1,6 +1,5 @@
 package com.nocturn.music.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,9 +7,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,40 +29,30 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nocturn.music.model.PlayMode
 import com.nocturn.music.player.NocturnPlayer
-import com.nocturn.music.ui.theme.HyperBlue
-import com.nocturn.music.ui.theme.squircleCard
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 @Composable
 fun QueueSheet(
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
+    show: Boolean,
+    onDismissRequest: () -> Unit
 ) {
     val playQueue by NocturnPlayer.playQueue.collectAsState()
     val queueIndex by NocturnPlayer.queueIndex.collectAsState()
     val playMode by NocturnPlayer.playMode.collectAsState()
     val isPlaying by NocturnPlayer.isPlaying.collectAsState()
 
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .fillMaxHeight(0.65f)
-            .squircleCard(24.dp)
-            .background(MiuixTheme.colorScheme.surfaceContainer)
-            .padding(16.dp)
+    WindowBottomSheet(
+        show = show,
+        onDismissRequest = onDismissRequest
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Box(
-                modifier = Modifier
-                    .width(36.dp)
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.3f))
-                    .align(Alignment.CenterHorizontally)
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 520.dp)
+                .padding(horizontal = 20.dp, vertical = 12.dp)
+        ) {
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -110,13 +99,13 @@ fun QueueSheet(
                             .clip(RoundedCornerShape(8.dp))
                             .clickable {
                                 NocturnPlayer.clearQueue()
-                                onDismiss()
+                                onDismissRequest()
                             }
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Text(
                             text = "清空",
-                            color = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.7f),
+                            color = MiuixTheme.colorScheme.onSurfaceVariantActions,
                             fontSize = 12.sp
                         )
                     }
@@ -134,7 +123,7 @@ fun QueueSheet(
                 ) {
                     Text(
                         text = "播放队列为空",
-                        color = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.5f),
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         fontSize = 14.sp
                     )
                 }
@@ -160,7 +149,7 @@ fun QueueSheet(
                             if (isCurrent) {
                                 Text(
                                     text = if (isPlaying) "▶" else "❚❚",
-                                    color = HyperBlue,
+                                    color = MiuixTheme.colorScheme.primary,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.width(24.dp)
@@ -168,7 +157,7 @@ fun QueueSheet(
                             } else {
                                 Text(
                                     text = "${index + 1}",
-                                    color = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.5f),
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.6f),
                                     fontSize = 13.sp,
                                     modifier = Modifier.width(24.dp)
                                 )
@@ -177,7 +166,7 @@ fun QueueSheet(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = song.title,
-                                    color = if (isCurrent) HyperBlue else MiuixTheme.colorScheme.onSurface,
+                                    color = if (isCurrent) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
                                     fontSize = 14.sp,
                                     fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
                                     maxLines = 1,
@@ -185,7 +174,7 @@ fun QueueSheet(
                                 )
                                 Text(
                                     text = song.artist,
-                                    color = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.7f),
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                     fontSize = 11.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
@@ -204,7 +193,7 @@ fun QueueSheet(
                             ) {
                                 Text(
                                     text = "✕",
-                                    color = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.5f),
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantActions,
                                     fontSize = 12.sp
                                 )
                             }

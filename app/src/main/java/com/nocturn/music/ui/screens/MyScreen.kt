@@ -57,9 +57,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.SmallTitle
+import top.yukonga.miuix.kmp.basic.TabRow
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.nocturn.music.ui.navigation.SecondaryRoute
 
@@ -403,12 +407,9 @@ fun MyScreen(
         // 3. 用户创建与收藏的歌单（登录后显示）
         if (userProfile.isLogin && userPlaylists.isNotEmpty()) {
             item {
-                Text(
+                SmallTitle(
                     text = "我的歌单",
-                    color = MiuixTheme.colorScheme.onSurface,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 10.dp)
+                    modifier = Modifier.padding(bottom = 8.dp)
                 )
 
                 LazyRow(
@@ -445,7 +446,7 @@ fun MyScreen(
                                 )
                                 Text(
                                     text = "${playlist.trackCount} 首",
-                                    color = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.7f),
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                     fontSize = 10.sp,
                                     modifier = Modifier.padding(top = 2.dp)
                                 )
@@ -453,7 +454,7 @@ fun MyScreen(
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(22.dp))
+                Spacer(modifier = Modifier.height(20.dp))
             }
         }
 
@@ -463,17 +464,15 @@ fun MyScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
+                SmallTitle(
                     text = "收藏歌曲",
-                    color = MiuixTheme.colorScheme.onSurface,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
+                    modifier = Modifier.padding(vertical = 4.dp)
                 )
 
                 if (favoriteSongs.isNotEmpty()) {
                     Text(
                         text = "播放全部",
-                        color = HyperBlue,
+                        color = MiuixTheme.colorScheme.primary,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier
@@ -485,7 +484,7 @@ fun MyScreen(
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
         }
 
         if (favoriteSongs.isEmpty()) {
@@ -517,92 +516,38 @@ fun MyScreen(
     }
 
     // 登录弹窗 (短信验证码 / 扫码 / Cookie)
-    if (showLoginDialog) {
-        Box(
+    OverlayDialog(
+        show = showLoginDialog,
+        onDismissRequest = {
+            qrPollingJob?.cancel()
+            showLoginDialog = false
+        },
+        title = "登录网易云音乐"
+    ) {
+        Column(
             modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.55f))
-                .clickable {
-                    qrPollingJob?.cancel()
-                    showLoginDialog = false
-                },
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 10.dp)
         ) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth(0.92f)
-                    .clickable(enabled = false) {}
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    // 头部标题与关闭按钮
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "登录网易云音乐",
-                            color = MiuixTheme.colorScheme.onSurface,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "✕",
-                            color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                            fontSize = 16.sp,
-                            modifier = Modifier
-                                .clip(CircleShape)
-                                .clickable {
-                                    qrPollingJob?.cancel()
-                                    showLoginDialog = false
-                                }
-                                .padding(6.dp)
-                        )
+            val loginTabs = listOf("验证码登录", "扫码登录", "Cookie 登录")
+            TabRow(
+                tabs = loginTabs,
+                selectedTabIndex = loginTab,
+                onTabSelected = { idx ->
+                    loginTab = idx
+                    if (idx == 1) {
+                        startQrLogin()
+                    } else {
+                        qrPollingJob?.cancel()
                     }
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
 
-                    Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-                    // 登录模式选择器
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MiuixTheme.colorScheme.surfaceContainerHighest)
-                            .padding(4.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        listOf("验证码登录", "扫码登录", "Cookie 登录").forEachIndexed { idx, title ->
-                            val isSelected = loginTab == idx
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isSelected) HyperBlue else Color.Transparent)
-                                    .clickable {
-                                        loginTab = idx
-                                        if (idx == 1) {
-                                            startQrLogin()
-                                        } else {
-                                            qrPollingJob?.cancel()
-                                        }
-                                    }
-                                    .padding(vertical = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = title,
-                                    color = if (isSelected) Color.White else MiuixTheme.colorScheme.onSurfaceSecondary,
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Tab 0: 短信验证码登录
-                    if (loginTab == 0) {
+            // Tab 0: 短信验证码登录
+            if (loginTab == 0) {
                         Text(
                             text = "输入手机号获取短信验证码，快速安全登录",
                             color = MiuixTheme.colorScheme.onSurfaceSecondary,
@@ -865,104 +810,93 @@ fun MyScreen(
                                     }
                                 }
                             },
+                            colors = ButtonDefaults.buttonColorsPrimary(),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(text = "保存并登录", fontWeight = FontWeight.Bold)
                         }
                     }
-                }
-            }
         }
     }
 
     // 账号详情与注销弹窗
-    if (showAccountDialog) {
-        Box(
+    OverlayDialog(
+        show = showAccountDialog,
+        onDismissRequest = { showAccountDialog = false },
+        title = "账号详情"
+    ) {
+        Column(
             modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.55f))
-                .clickable { showAccountDialog = false },
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Card(
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth(0.85f)
-                    .clickable(enabled = false) {}
+                    .size(70.dp)
+                    .clip(CircleShape)
+                    .background(MiuixTheme.colorScheme.surfaceContainerHighest),
+                contentAlignment = Alignment.Center
             ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                if (userProfile.avatarUrl.isNotBlank()) {
+                    AsyncImage(
+                        url = userProfile.avatarUrl,
+                        contentDescription = userProfile.nickname,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Text(text = "👤", fontSize = 32.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = userProfile.nickname,
+                color = MiuixTheme.colorScheme.onSurface,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = "UID: ${userProfile.userId}",
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                fontSize = 12.sp
+            )
+
+            if (userProfile.signature.isNotBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = userProfile.signature,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Button(
+                    onClick = {
+                        MusicRepository.logout()
+                        showAccountDialog = false
+                    },
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(70.dp)
-                            .clip(CircleShape)
-                            .background(MiuixTheme.colorScheme.surfaceContainerHighest),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (userProfile.avatarUrl.isNotBlank()) {
-                            AsyncImage(
-                                url = userProfile.avatarUrl,
-                                contentDescription = userProfile.nickname,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        } else {
-                            Text(text = "👤", fontSize = 32.sp)
-                        }
-                    }
+                    Text(text = "退出登录", color = MiuixTheme.colorScheme.error)
+                }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Text(
-                        text = userProfile.nickname,
-                        color = MiuixTheme.colorScheme.onSurface,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Text(
-                        text = "UID: ${userProfile.userId}",
-                        color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                        fontSize = 12.sp
-                    )
-
-                    if (userProfile.signature.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = userProfile.signature,
-                            color = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.8f),
-                            fontSize = 12.sp,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Button(
-                            onClick = {
-                                MusicRepository.logout()
-                                showAccountDialog = false
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(text = "退出登录", color = HyperRed)
-                        }
-
-                        Spacer(modifier = Modifier.width(12.dp))
-
-                        Button(
-                            onClick = { showAccountDialog = false },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(text = "关闭")
-                        }
-                    }
+                Button(
+                    onClick = { showAccountDialog = false },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(text = "关闭")
                 }
             }
         }
