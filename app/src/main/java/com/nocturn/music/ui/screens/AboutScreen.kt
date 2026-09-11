@@ -102,7 +102,7 @@ fun AboutScreen(
                         "v${BuildConfig.VERSION_NAME}"
                     }
                     Text(
-                        text = "$formattedVersion (HyperOS Edition)",
+                        text = formattedVersion,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         fontSize = 14.sp
                     )

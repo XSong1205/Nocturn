@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nocturn.music.BuildConfig
 import com.nocturn.music.data.api.EmbeddedHttpServer
 import com.nocturn.music.data.api.NcmApiClient
 import com.nocturn.music.data.repository.SettingsRepository
@@ -182,8 +183,13 @@ fun SettingsScreen(
                     fontSize = 28.sp
                 )
                 Spacer(modifier = Modifier.height(4.dp))
+                val formattedVersion = if (BuildConfig.VERSION_NAME.startsWith("v") || BuildConfig.VERSION_NAME.startsWith("alpha")) {
+                    BuildConfig.VERSION_NAME
+                } else {
+                    "v${BuildConfig.VERSION_NAME}"
+                }
                 Text(
-                    text = "v1.0.0 (HyperOS Edition)",
+                    text = formattedVersion,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     fontSize = 13.sp
                 )
