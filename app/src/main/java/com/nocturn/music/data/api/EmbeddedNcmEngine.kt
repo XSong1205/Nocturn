@@ -7,6 +7,7 @@ import com.nocturn.music.model.BannerItem
 import com.nocturn.music.model.Playlist
 import com.nocturn.music.model.Song
 import com.nocturn.music.model.SongLyric
+import com.nocturn.music.model.SongWiki
 import com.nocturn.music.model.UserProfile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -870,6 +871,89 @@ object EmbeddedNcmEngine {
             json.optInt("code") == 200
         } catch (e: Exception) {
             false
+        }
+    }
+
+    // 20. 添加歌曲到歌单
+    suspend fun addToPlaylist(playlistId: Long, songId: Long, customCookie: String = ""): Boolean {
+        return try {
+            val data = JSONObject().apply {
+                put("op", "add")
+                put("pid", playlistId)
+                put("trackIds", "[$songId]")
+                put("tracks", "$songId")
+            }
+            val jsonStr = requestWeapi("playlist/manipulate/tracks", data, customCookie)
+            val json = JSONObject(jsonStr)
+            val code = json.optInt("code", 0)
+            code == 200 || code == 502
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    // 21. 获取歌曲音乐百科
+    suspend fun getSongWiki(songId: Long, customCookie: String = ""): SongWiki? {
+        return try {
+            val data = JSONObject().apply {
+                put("songId", songId)
+            }
+            val jsonStr = requestEapi("song/play/about/block/page", data, customCookie)
+            val json = JSONObject(jsonStr)
+            val dataObj = json.optJSONObject("data") ?: return null
+            val blocks = dataObj.optJSONArray("blocks") ?: JSONArray()
+
+            val styles = mutableListOf<String>()
+            var desc = ""
+            val credits = mutableListOf<Pair<String, String>>()
+            var language = ""
+
+            for (i in 0 until blocks.length()) {
+                val block = blocks.getJSONObject(i)
+                val code = block.optString("code")
+                when (code) {
+                    "SONG_PLAY_ABOUT_CREATIVE_TEAM" -> {
+                        val creatives = block.optJSONArray("creatives") ?: JSONArray()
+                        for (c in 0 until creatives.length()) {
+                            val cr = creatives.getJSONObject(c)
+                            val userType = cr.optString("userType")
+                            val userArr = cr.optJSONArray("users") ?: JSONArray()
+                            val names = mutableListOf<String>()
+                            for (u in 0 until userArr.length()) {
+                                names.add(userArr.getJSONObject(u).optString("name"))
+                            }
+                            if (userType.isNotBlank() && names.isNotEmpty()) {
+                                credits.add(userType to names.joinToString(" / "))
+                            }
+                        }
+                    }
+                    "SONG_PLAY_ABOUT_SONG_TAG" -> {
+                        val tags = block.optJSONArray("tags") ?: JSONArray()
+                        for (t in 0 until tags.length()) {
+                            val tag = tags.getJSONObject(t).optString("name")
+                            if (tag.isNotBlank()) styles.add(tag)
+                        }
+                    }
+                    "SONG_PLAY_ABOUT_INTRODUCTION" -> {
+                        desc = block.optString("content", block.optString("text", ""))
+                    }
+                    "SONG_PLAY_ABOUT_BASIC_INFO" -> {
+                        language = block.optString("language", "")
+                    }
+                }
+            }
+
+            SongWiki(
+                songId = songId,
+                styles = styles,
+                description = desc,
+                credits = credits,
+                language = language
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
         }
     }
 

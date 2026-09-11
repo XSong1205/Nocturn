@@ -32,13 +32,18 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import com.nocturn.music.data.repository.MusicRepository
 import com.nocturn.music.data.repository.SettingsRepository
 import com.nocturn.music.model.Playlist
@@ -196,9 +201,7 @@ fun PlaylistDetailScreen(
 
     val scrollProgress by remember {
         derivedStateOf {
-            if (playlist == null) {
-                1f
-            } else if (lazyListState.firstVisibleItemIndex > 0) {
+            if (lazyListState.firstVisibleItemIndex > 0) {
                 1f
             } else {
                 (lazyListState.firstVisibleItemScrollOffset / 200f).coerceIn(0f, 1f)
@@ -260,13 +263,66 @@ fun PlaylistDetailScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            val initialCover = when (route) {
+                is SecondaryRoute.Playlist -> route.initialCoverUrl
+                is SecondaryRoute.Album -> route.initialCoverUrl
+                is SecondaryRoute.Artist -> route.avatarUrl
+                else -> null
+            }
+            val initialName = when (route) {
+                is SecondaryRoute.Playlist -> route.initialName
+                is SecondaryRoute.Album -> route.initialName
+                is SecondaryRoute.Artist -> route.name
+                else -> null
+            }
             val pl = playlist
-            if (pl == null && isLoading) {
+            val displayCover = pl?.coverUrl ?: initialCover ?: ""
+            val displayName = pl?.name ?: initialName ?: screenTitle
+
+            // HyperOS 澎湃OS 歌单流光毛玻璃流体背景 (一镜到底环境光)
+            if (displayCover.isNotBlank() && !isFavoriteMode) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(280.dp)
+                        .graphicsLayer { alpha = 0.38f }
+                ) {
+                    AsyncImage(
+                        url = displayCover,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .scale(1.4f)
+                            .blur(50.dp)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        MiuixTheme.colorScheme.surface.copy(alpha = 0.70f),
+                                        MiuixTheme.colorScheme.surface
+                                    )
+                                )
+                            )
+                    )
+                }
+            }
+
+            if (pl == null && isLoading && displayCover.isBlank() && displayName.isBlank()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        InfiniteProgressIndicator(
+                            color = HyperBlue,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             text = "正在获取曲目信息...",
                             color = MiuixTheme.colorScheme.onSurfaceSecondary,
@@ -274,7 +330,7 @@ fun PlaylistDetailScreen(
                         )
                     }
                 }
-            } else if (pl == null || loadError != null) {
+            } else if (pl == null && !isLoading && loadError != null && displayCover.isBlank()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -320,7 +376,7 @@ fun PlaylistDetailScreen(
                                 .background(
                                     Brush.verticalGradient(
                                         colors = listOf(
-                                            MiuixTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
+                                            MiuixTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.35f),
                                             Color.Transparent
                                         )
                                     )
@@ -357,8 +413,8 @@ fun PlaylistDetailScreen(
                                         }
                                     } else {
                                         AsyncImage(
-                                            url = pl.coverUrl,
-                                            contentDescription = pl.name,
+                                            url = displayCover,
+                                            contentDescription = displayName,
                                             modifier = Modifier.fillMaxSize()
                                         )
                                     }
@@ -368,7 +424,7 @@ fun PlaylistDetailScreen(
 
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = pl.name,
+                                        text = displayName,
                                         color = MiuixTheme.colorScheme.onSurface,
                                         fontSize = 18.sp,
                                         fontWeight = FontWeight.Bold,
@@ -376,17 +432,18 @@ fun PlaylistDetailScreen(
                                         overflow = TextOverflow.Ellipsis
                                     )
 
-                                    if (pl.creatorName.isNotBlank()) {
+                                    val creator = pl?.creatorName ?: ""
+                                    if (creator.isNotBlank()) {
                                         Spacer(modifier = Modifier.height(8.dp))
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
                                             modifier = Modifier.clickable {
                                                 if (route !is SecondaryRoute.Artist) {
-                                                    onNavigateToRoute(SecondaryRoute.Artist(0L, pl.creatorName))
+                                                    onNavigateToRoute(SecondaryRoute.Artist(0L, creator))
                                                 }
                                             }
                                         ) {
-                                            if (pl.creatorAvatarUrl.isNotBlank()) {
+                                            if (!pl?.creatorAvatarUrl.isNullOrBlank()) {
                                                 Box(
                                                     modifier = Modifier
                                                         .size(22.dp)
@@ -394,14 +451,14 @@ fun PlaylistDetailScreen(
                                                 ) {
                                                     AsyncImage(
                                                         url = pl.creatorAvatarUrl,
-                                                        contentDescription = pl.creatorName,
+                                                        contentDescription = creator,
                                                         modifier = Modifier.fillMaxSize()
                                                     )
                                                 }
                                                 Spacer(modifier = Modifier.width(6.dp))
                                             }
                                             Text(
-                                                text = pl.creatorName,
+                                                text = creator,
                                                 color = MiuixTheme.colorScheme.onSurfaceSecondary,
                                                 fontSize = 13.sp,
                                                 maxLines = 1,
@@ -412,21 +469,21 @@ fun PlaylistDetailScreen(
 
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        if (pl.playCount > 0) {
+                                        if ((pl?.playCount ?: 0) > 0) {
                                             Text(
-                                                text = "${pl.playCountFormatted} 播放 · ",
+                                                text = "${pl?.playCountFormatted} 播放 · ",
                                                 color = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.7f),
                                                 fontSize = 12.sp
                                             )
                                         }
                                         Text(
-                                            text = "共 ${pl.tracks.size} 首歌曲",
+                                            text = "共 ${pl?.tracks?.size ?: 0} 首歌曲",
                                             color = MiuixTheme.colorScheme.onSurfaceSecondary.copy(alpha = 0.7f),
                                             fontSize = 12.sp
                                         )
                                     }
 
-                                    if (pl.tags.isNotEmpty()) {
+                                    if (!pl?.tags.isNullOrEmpty()) {
                                         Spacer(modifier = Modifier.height(6.dp))
                                         FlowRow(
                                             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -451,7 +508,7 @@ fun PlaylistDetailScreen(
                                 }
                             }
 
-                            if (pl.description.isNotBlank()) {
+                            if (!pl?.description.isNullOrBlank()) {
                                 Spacer(modifier = Modifier.height(10.dp))
                                 Column(
                                     modifier = Modifier
@@ -481,6 +538,51 @@ fun PlaylistDetailScreen(
                         }
                     }
 
+                    // 如果处于异步加载曲目中，展示平滑过渡加载提示
+                    if (pl == null && isLoading) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 44.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    InfiniteProgressIndicator(
+                                        color = HyperBlue,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text(
+                                        text = "正在同步曲目列表...",
+                                        color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                                        fontSize = 13.sp
+                                    )
+                                }
+                            }
+                        }
+                    } else if (pl == null && !isLoading && loadError != null) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 40.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = loadError ?: "曲目列表加载失败",
+                                        color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                                        fontSize = 14.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Button(onClick = { loadData(force = true) }) {
+                                        Text(text = "重新加载")
+                                    }
+                                }
+                            }
+                        }
+                    } else {
                     // 2. 歌单内搜索条 (展开时可见)
                     if (isSearchActive) {
                         item {
@@ -749,6 +851,7 @@ fun PlaylistDetailScreen(
             }
         }
     }
+}
 }
 
 @Composable

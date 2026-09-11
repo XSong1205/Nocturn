@@ -86,6 +86,11 @@ import com.nocturn.music.ui.theme.AppIcons
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.mutableLongStateOf
+import com.nocturn.music.ui.navigation.SecondaryRoute
 
 enum class CenterDisplayMode {
     COVER,
@@ -97,6 +102,7 @@ enum class CenterDisplayMode {
 fun PlayerScreen(
     onDismiss: () -> Unit,
     onOpenQueue: () -> Unit,
+    onNavigateToRoute: (SecondaryRoute) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val currentSong by NocturnPlayer.currentSong.collectAsState()
@@ -112,6 +118,18 @@ fun PlayerScreen(
     var lyrics by remember { mutableStateOf(SongLyric()) }
     var isDraggingSlider by remember { mutableStateOf(false) }
     var sliderValue by remember { mutableFloatStateOf(0f) }
+    var showMoreSheet by remember { mutableStateOf(false) }
+
+    // 下拉拖拽关闭手势状态
+    var dragOffsetY by remember { mutableFloatStateOf(0f) }
+    val animatedDragOffsetY by animateFloatAsState(
+        targetValue = dragOffsetY,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioLowBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "playerDragOffset"
+    )
 
     val song = currentSong ?: return
     val isFavorite = favoriteSongs.any { it.id == song.id }
@@ -159,6 +177,12 @@ fun PlayerScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
+            .graphicsLayer {
+                translationY = animatedDragOffsetY
+                val progress = (animatedDragOffsetY / 1200f).coerceIn(0f, 0.25f)
+                scaleX = 1f - progress * 0.4f
+                scaleY = 1f - progress * 0.4f
+            }
             .background(Color(0xFF0C0C0E))
     ) {
         // =========================================================================
@@ -212,16 +236,68 @@ fun PlayerScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 22.dp, vertical = 12.dp),
+                .padding(horizontal = 22.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // ---------------------------------------------------------------------
-            // 顶部导航与歌曲信息栏 (小米澎湃胶囊设计)
+            // 类 Apple Music 顶部胶囊指示小横条 (支持向下滑动退出)
+            // ---------------------------------------------------------------------
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp, bottom = 6.dp)
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures(
+                            onVerticalDrag = { _, dragAmount ->
+                                if (dragAmount > 0 || dragOffsetY > 0) {
+                                dragOffsetY = (dragOffsetY + dragAmount).coerceAtLeast(0f)
+                            }
+                            },
+                            onDragEnd = {
+                                if (dragOffsetY > 260f) {
+                                    onDismiss()
+                                }
+                                dragOffsetY = 0f
+                            },
+                            onDragCancel = {
+                                dragOffsetY = 0f
+                            }
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 38.dp, height = 4.5.dp)
+                        .background(Color.White.copy(alpha = 0.35f), CircleShape)
+                )
+            }
+
+            // ---------------------------------------------------------------------
+            // 顶部导航与歌曲信息栏 (优化顶栏：去掉“正在播放”，优化图标，添加更多操作)
             // ---------------------------------------------------------------------
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 18.dp, bottom = 8.dp),
+                    .padding(top = 4.dp, bottom = 8.dp)
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures(
+                            onVerticalDrag = { _, dragAmount ->
+                                if (dragAmount > 0 || dragOffsetY > 0) {
+                                    dragOffsetY = (dragOffsetY + dragAmount).coerceAtLeast(0f)
+                                }
+                            },
+                            onDragEnd = {
+                                if (dragOffsetY > 260f) {
+                                    onDismiss()
+                                }
+                                dragOffsetY = 0f
+                            },
+                            onDragCancel = {
+                                dragOffsetY = 0f
+                            }
+                        )
+                    },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -238,70 +314,122 @@ fun PlayerScreen(
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "⌄",
-                        color = Color.White,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 4.dp)
+                    Icon(
+                        imageVector = AppIcons.ArrowDown,
+                        contentDescription = "收起",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
 
-                // 顶部曲目摘要
+                // 顶部曲目摘要 (已根据需求去除“正在播放”，直接展示精致歌名与歌手)
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
                         .weight(1f)
-                        .padding(horizontal = 14.dp)
+                        .padding(horizontal = 12.dp)
                 ) {
-                    Text(
-                        text = "正在播放",
-                        color = Color.White.copy(alpha = 0.5f),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium
-                    )
                     Text(
                         text = song.title,
                         color = Color.White,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = song.artist,
+                        color = Color.White.copy(alpha = 0.65f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Normal,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = 1.dp)
                     )
                 }
 
-                // 音质胶囊角标 (HyperOS 拟态磨砂微标)
-                Box(
-                    modifier = Modifier
-                        .squircleClip(12.dp)
-                        .background(Color.White.copy(alpha = 0.14f))
-                        .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(12.dp))
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                // 右侧功能区：音质微标 + 更多操作按钮 (三个点图标)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = when (audioQuality.level) {
-                            "hires" -> "Hi-Res"
-                            "lossless" -> "无损"
-                            else -> "SQ"
-                        },
-                        color = Color.White,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 0.5.sp
-                    )
+                    // 音质胶囊角标 (HyperOS 拟态磨砂微标)
+                    Box(
+                        modifier = Modifier
+                            .squircleClip(12.dp)
+                            .background(Color.White.copy(alpha = 0.14f))
+                            .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(12.dp))
+                            .clickable { showMoreSheet = true }
+                            .padding(horizontal = 9.dp, vertical = 5.dp)
+                    ) {
+                        Text(
+                            text = when (audioQuality.level) {
+                                "hires" -> "Hi-Res"
+                                "lossless" -> "无损"
+                                else -> "SQ"
+                            },
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+
+                    // 更多选项按钮 (MIUIX 更多操作抽屉入口)
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .squircleClip(14.dp)
+                            .background(Color.White.copy(alpha = 0.12f))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = { showMoreSheet = true }
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = AppIcons.More,
+                            contentDescription = "更多选项",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             // ---------------------------------------------------------------------
             // 中央展示区：Apple Music 封面卡片 / Accompanist Lyrics UI / 黑胶转盘
+            // (非歌词浏览模式下，空白处支持随心向下滑动退出播放页)
             // ---------------------------------------------------------------------
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .then(
+                        if (displayMode != CenterDisplayMode.LYRICS) {
+                            Modifier.pointerInput(Unit) {
+                                detectVerticalDragGestures(
+                                    onVerticalDrag = { _, dragAmount ->
+                                        if (dragAmount > 0 || dragOffsetY > 0) {
+                                            dragOffsetY = (dragOffsetY + dragAmount).coerceAtLeast(0f)
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        if (dragOffsetY > 260f) {
+                                            onDismiss()
+                                        }
+                                        dragOffsetY = 0f
+                                    },
+                                    onDragCancel = {
+                                        dragOffsetY = 0f
+                                    }
+                                )
+                            }
+                        } else Modifier
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 AnimatedContent(
@@ -341,300 +469,336 @@ fun PlayerScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // ---------------------------------------------------------------------
-            // 歌曲标题、歌手与收藏 (Apple Music 风格大标题 + 小米澎湃红心交互)
+            // 底部控制操作区容器 (空白处支持向下滑动退出播放页)
             // ---------------------------------------------------------------------
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = song.title,
-                        color = Color.White,
-                        fontSize = 21.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = song.artist,
-                        color = Color.White.copy(alpha = 0.65f),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 3.dp)
-                    )
-                }
-
-                // 收藏红心按钮 (小米澎湃圆角药丸触控)
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .squircleClip(16.dp)
-                        .background(Color.White.copy(alpha = if (isFavorite) 0.18f else 0.08f))
-                        .clickable {
-                            val newFav = !isFavorite
-                            SettingsRepository.toggleFavorite(song)
-                            if (SettingsRepository.userProfile.value.isLogin) {
-                                scope.launch {
-                                    MusicRepository.likeSong(song.id, newFav)
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures(
+                            onVerticalDrag = { _, dragAmount ->
+                                if (dragAmount > 0 || dragOffsetY > 0) {
+                                    dragOffsetY = (dragOffsetY + dragAmount).coerceAtLeast(0f)
                                 }
+                            },
+                            onDragEnd = {
+                                if (dragOffsetY > 260f) {
+                                    onDismiss()
+                                }
+                                dragOffsetY = 0f
+                            },
+                            onDragCancel = {
+                                dragOffsetY = 0f
                             }
-                        },
-                    contentAlignment = Alignment.Center
+                        )
+                    }
+            ) {
+                // -----------------------------------------------------------------
+                // 歌曲标题、歌手与收藏 (Apple Music 风格大标题 + 小米澎湃红心交互)
+                // -----------------------------------------------------------------
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Icon(
-                        imageVector = if (isFavorite) AppIcons.FavoritesFill else AppIcons.Favorites,
-                        contentDescription = if (isFavorite) "取消喜欢" else "喜欢",
-                        tint = if (isFavorite) HyperRed else Color.White.copy(alpha = 0.9f),
-                        modifier = Modifier.size(24.dp)
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = song.title,
+                            color = Color.White,
+                            fontSize = 21.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = song.artist,
+                            color = Color.White.copy(alpha = 0.65f),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 3.dp)
+                        )
+                    }
+
+                    // 收藏红心按钮 (小米澎湃圆角药丸触控)
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .squircleClip(16.dp)
+                            .background(Color.White.copy(alpha = if (isFavorite) 0.18f else 0.08f))
+                            .clickable {
+                                val newFav = !isFavorite
+                                SettingsRepository.toggleFavorite(song)
+                                if (SettingsRepository.userProfile.value.isLogin) {
+                                    scope.launch {
+                                        MusicRepository.likeSong(song.id, newFav)
+                                    }
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = if (isFavorite) AppIcons.FavoritesFill else AppIcons.Favorites,
+                            contentDescription = if (isFavorite) "取消喜欢" else "喜欢",
+                            tint = if (isFavorite) HyperRed else Color.White.copy(alpha = 0.9f),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-            // ---------------------------------------------------------------------
-            // Apple Music 风格扁平高灵敏度进度条 (剩余时间显示)
-            // ---------------------------------------------------------------------
-            val progress = if (durationMs > 0) {
-                (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
-            } else 0f
+                // -----------------------------------------------------------------
+                // Apple Music 风格扁平高灵敏度进度条 (剩余时间显示)
+                // -----------------------------------------------------------------
+                val progress = if (durationMs > 0) {
+                    (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+                } else 0f
 
-            val currentDisplayValue = if (isDraggingSlider) sliderValue else progress
+                val currentDisplayValue = if (isDraggingSlider) sliderValue else progress
 
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Slider(
-                    value = currentDisplayValue,
-                    onValueChange = {
-                        isDraggingSlider = true
-                        sliderValue = it
-                    },
-                    onValueChangeFinished = {
-                        isDraggingSlider = false
-                        val targetMs = (sliderValue * durationMs).toLong()
-                        NocturnPlayer.seekTo(targetMs)
-                    },
-                    colors = SliderDefaults.colors(
-                        thumbColor = Color.White,
-                        activeTrackColor = Color.White.copy(alpha = 0.85f),
-                        inactiveTrackColor = Color.White.copy(alpha = 0.18f)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Slider(
+                        value = currentDisplayValue,
+                        onValueChange = {
+                            isDraggingSlider = true
+                            sliderValue = it
+                        },
+                        onValueChangeFinished = {
+                            isDraggingSlider = false
+                            val targetMs = (sliderValue * durationMs).toLong()
+                            NocturnPlayer.seekTo(targetMs)
+                        },
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color.White,
+                            activeTrackColor = Color.White.copy(alpha = 0.85f),
+                            inactiveTrackColor = Color.White.copy(alpha = 0.18f)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
 
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        val currentSec = currentPositionMs / 1000
+                        val totalSec = durationMs / 1000
+                        val remainingSec = (durationMs - currentPositionMs).coerceAtLeast(0L) / 1000
+
+                        Text(
+                            text = "%02d:%02d".format(currentSec / 60, currentSec % 60),
+                            color = Color.White.copy(alpha = 0.55f),
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = if (totalSec > 0) "-%02d:%02d".format(remainingSec / 60, remainingSec % 60) else "--:--",
+                            color = Color.White.copy(alpha = 0.55f),
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // -----------------------------------------------------------------
+                // 核心控制区 (融合 Apple Music 极简大键位与小米澎湃超级椭圆触控感)
+                // -----------------------------------------------------------------
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    val currentSec = currentPositionMs / 1000
-                    val totalSec = durationMs / 1000
-                    val remainingSec = (durationMs - currentPositionMs).coerceAtLeast(0L) / 1000
-
-                    Text(
-                        text = "%02d:%02d".format(currentSec / 60, currentSec % 60),
-                        color = Color.White.copy(alpha = 0.55f),
-                        fontSize = 12.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        text = if (totalSec > 0) "-%02d:%02d".format(remainingSec / 60, remainingSec % 60) else "--:--",
-                        color = Color.White.copy(alpha = 0.55f),
-                        fontSize = 12.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // ---------------------------------------------------------------------
-            // 核心控制区 (融合 Apple Music 极简大键位与小米澎湃超级椭圆触控感)
-            // ---------------------------------------------------------------------
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                // 播放模式
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .squircleClip(14.dp)
-                        .background(Color.White.copy(alpha = 0.08f))
-                        .clickable { NocturnPlayer.togglePlayMode() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    val (modeIcon, modeDesc) = when (playMode) {
-                        PlayMode.LIST_LOOP -> AppIcons.Repeat to "列表循环"
-                        PlayMode.SINGLE_LOOP -> AppIcons.RepeatOne to "单曲循环"
-                        PlayMode.RANDOM -> AppIcons.Shuffle to "随机播放"
-                    }
-                    Icon(
-                        imageVector = modeIcon,
-                        contentDescription = modeDesc,
-                        tint = Color.White.copy(alpha = 0.9f),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                // 上一曲
-                Box(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .squircleClip(18.dp)
-                        .background(Color.White.copy(alpha = 0.1f))
-                        .clickable { NocturnPlayer.playPrevious() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = AppIcons.SkipPrevious,
-                        contentDescription = "上一曲",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-
-                // 主播放/暂停键 (HyperOS 澎湃大圆角大按键，带柔光投射)
-                Box(
-                    modifier = Modifier
-                        .size(72.dp)
-                        .squircleClip(24.dp)
-                        .background(Color.White)
-                        .shadow(16.dp, CircleShape, ambientColor = Color.White.copy(alpha = 0.35f))
-                        .clickable { NocturnPlayer.togglePlayPause() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (isBuffering) {
-                        Text(text = "...", color = Color.Black, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
-                    } else {
-                        Icon(
-                            imageVector = if (isPlaying) AppIcons.Pause else AppIcons.Play,
-                            contentDescription = if (isPlaying) "暂停" else "播放",
-                            tint = Color.Black,
-                            modifier = Modifier.size(30.dp)
-                        )
-                    }
-                }
-
-                // 下一曲
-                Box(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .squircleClip(18.dp)
-                        .background(Color.White.copy(alpha = 0.1f))
-                        .clickable { NocturnPlayer.playNext() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = AppIcons.SkipNext,
-                        contentDescription = "下一曲",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-
-                // 黑胶 / 封面模式切换小胶囊
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .squircleClip(14.dp)
-                        .background(
-                            if (displayMode == CenterDisplayMode.VINYL) HyperBlue.copy(alpha = 0.35f)
-                            else Color.White.copy(alpha = 0.08f)
-                        )
-                        .clickable {
-                            displayMode = if (displayMode == CenterDisplayMode.VINYL) CenterDisplayMode.COVER else CenterDisplayMode.VINYL
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = AppIcons.Album,
-                        contentDescription = "唱片模式",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            // ---------------------------------------------------------------------
-            // 底部辅助栏 (歌词开关与播放队列按键)
-            // ---------------------------------------------------------------------
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // 歌词按钮 (Apple Music 标志性对话框歌词图标)
-                Box(
-                    modifier = Modifier
-                        .squircleClip(16.dp)
-                        .background(
-                            if (displayMode == CenterDisplayMode.LYRICS) Color.White.copy(alpha = 0.28f)
-                            else Color.White.copy(alpha = 0.10f)
-                        )
-                        .clickable {
-                            displayMode = if (displayMode == CenterDisplayMode.LYRICS) CenterDisplayMode.COVER else CenterDisplayMode.LYRICS
+                    // 播放模式
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .squircleClip(14.dp)
+                            .background(Color.White.copy(alpha = 0.08f))
+                            .clickable { NocturnPlayer.togglePlayMode() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        val (modeIcon, modeDesc) = when (playMode) {
+                            PlayMode.LIST_LOOP -> AppIcons.Repeat to "列表循环"
+                            PlayMode.SINGLE_LOOP -> AppIcons.RepeatOne to "单曲循环"
+                            PlayMode.RANDOM -> AppIcons.Shuffle to "随机播放"
                         }
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            imageVector = AppIcons.Messages,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp)
+                            imageVector = modeIcon,
+                            contentDescription = modeDesc,
+                            tint = Color.White.copy(alpha = 0.9f),
+                            modifier = Modifier.size(20.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (displayMode == CenterDisplayMode.LYRICS) "返回封面" else "歌词",
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold
+                    }
+
+                    // 上一曲
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .squircleClip(18.dp)
+                            .background(Color.White.copy(alpha = 0.1f))
+                            .clickable { NocturnPlayer.playPrevious() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = AppIcons.SkipPrevious,
+                            contentDescription = "上一曲",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    // 主播放/暂停键 (HyperOS 澎湃大圆角大按键，带柔光投射)
+                    Box(
+                        modifier = Modifier
+                            .size(72.dp)
+                            .squircleClip(24.dp)
+                            .background(Color.White)
+                            .shadow(16.dp, CircleShape, ambientColor = Color.White.copy(alpha = 0.35f))
+                            .clickable { NocturnPlayer.togglePlayPause() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isBuffering) {
+                            Text(text = "...", color = Color.Black, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+                        } else {
+                            Icon(
+                                imageVector = if (isPlaying) AppIcons.Pause else AppIcons.Play,
+                                contentDescription = if (isPlaying) "暂停" else "播放",
+                                tint = Color.Black,
+                                modifier = Modifier.size(30.dp)
+                            )
+                        }
+                    }
+
+                    // 下一曲
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .squircleClip(18.dp)
+                            .background(Color.White.copy(alpha = 0.1f))
+                            .clickable { NocturnPlayer.playNext() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = AppIcons.SkipNext,
+                            contentDescription = "下一曲",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    // 黑胶 / 封面模式切换小胶囊
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .squircleClip(14.dp)
+                            .background(
+                                if (displayMode == CenterDisplayMode.VINYL) HyperBlue.copy(alpha = 0.35f)
+                                else Color.White.copy(alpha = 0.08f)
+                            )
+                            .clickable {
+                                displayMode = if (displayMode == CenterDisplayMode.VINYL) CenterDisplayMode.COVER else CenterDisplayMode.VINYL
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = AppIcons.Album,
+                            contentDescription = "唱片模式",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
 
-                // 播放列表按钮 (小米澎湃通透卡片)
-                Box(
+                Spacer(modifier = Modifier.height(18.dp))
+
+                // -----------------------------------------------------------------
+                // 底部辅助栏 (歌词开关与播放队列按键)
+                // -----------------------------------------------------------------
+                Row(
                     modifier = Modifier
-                        .squircleClip(16.dp)
-                        .background(Color.White.copy(alpha = 0.10f))
-                        .clickable(onClick = onOpenQueue)
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .padding(start = 8.dp, end = 8.dp, bottom = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = AppIcons.Playlist,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(text = "播放列表", color = Color.White.copy(alpha = 0.9f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    // 歌词按钮 (Apple Music 标志性对话框歌词图标)
+                    Box(
+                        modifier = Modifier
+                            .squircleClip(16.dp)
+                            .background(
+                                if (displayMode == CenterDisplayMode.LYRICS) Color.White.copy(alpha = 0.28f)
+                                else Color.White.copy(alpha = 0.10f)
+                            )
+                            .clickable {
+                                displayMode = if (displayMode == CenterDisplayMode.LYRICS) CenterDisplayMode.COVER else CenterDisplayMode.LYRICS
+                            }
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = AppIcons.Messages,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (displayMode == CenterDisplayMode.LYRICS) "返回封面" else "歌词",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
+                    // 播放列表按钮 (小米澎湃通透卡片)
+                    Box(
+                        modifier = Modifier
+                            .squircleClip(16.dp)
+                            .background(Color.White.copy(alpha = 0.10f))
+                            .clickable(onClick = onOpenQueue)
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = AppIcons.Playlist,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = "播放列表", color = Color.White.copy(alpha = 0.9f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        }
                     }
                 }
             }
         }
+
+        // =========================================================================
+        // 3. MIUIX“更多”操作底部抽屉 (加入歌单、歌曲百科、歌手专辑、音质设置等)
+        // =========================================================================
+        PlayerMoreActionSheet(
+            show = showMoreSheet,
+            song = song,
+            onDismissRequest = { showMoreSheet = false },
+            onNavigateToRoute = onNavigateToRoute
+        )
     }
 }
 
@@ -730,12 +894,21 @@ private fun AccompanistLyricsContainer(
     val coroutineScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
 
-    // 核心修复点 1：将传入的 currentPositionMs 包装为 Compose State！
-    // 使得 KaraokeLyricsView 内部无参的 derivedStateOf 闭包能真正注册 State 读取依赖，
-    // 从而在播放时间推移时动态触发 firstIndex 的计算与滚动，同时让逐字高亮 Canvas 在 Draw 阶段持续刷新！
     val currentPositionState = rememberUpdatedState(currentPositionMs)
-    val currentPositionProvider = remember {
-        { currentPositionState.value.toInt() }
+
+    // 用户手动浏览状态与锁定位置：
+    // 当用户手动滑动列表时，激活浏览状态并锁定当前提供给 KaraokeLyricsView 的时间，
+    // 彻底切断内部 snapshotFlow 频繁触发 scrollBy 导致与用户拖动手势冲突、强行拉回的恶性循环！
+    var isUserBrowsing by remember { mutableStateOf(false) }
+    var lockedPositionMs by remember { mutableLongStateOf(0L) }
+
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) {
+            if (!isUserBrowsing) {
+                lockedPositionMs = currentPositionState.value
+                isUserBrowsing = true
+            }
+        }
     }
 
     // 计算当前处于激活播放状态的歌词索引
@@ -754,28 +927,35 @@ private fun AccompanistLyricsContainer(
         }
     }
 
-    // 核心修复点 2：初次进入或切换歌曲时，无缝直达当前播放行，避免从顶部 0 行慢速滚动的脱节感
-    LaunchedEffect(lyrics) {
-        val initialIdx = activeLineIndex
-        if (initialIdx in lines.indices) {
-            val scrollTarget = (initialIdx - 1).coerceAtLeast(0)
-            listState.scrollToItem(scrollTarget)
-        }
-    }
-
-    // 核心修复点 3：手势与 Apple Music 风格智能自动回弹机制
-    // 用户手动拖拽歌词浏览时暂停自动打扰，停止滑动 3 秒后平滑吸附回正在播放的歌词焦点行
-    var isUserScrolling by remember { mutableStateOf(false) }
-    LaunchedEffect(listState.isScrollInProgress) {
-        if (listState.isScrollInProgress) {
-            isUserScrolling = true
-        } else if (isUserScrolling) {
-            delay(3000)
-            isUserScrolling = false
+    // 闲置 12 秒后平滑恢复焦点行自动追踪
+    LaunchedEffect(isUserBrowsing, listState.isScrollInProgress) {
+        if (isUserBrowsing && !listState.isScrollInProgress) {
+            delay(12000)
+            isUserBrowsing = false
             if (activeLineIndex in lines.indices) {
                 val scrollTarget = (activeLineIndex - 1).coerceAtLeast(0)
                 listState.animateScrollToItem(scrollTarget)
             }
+        }
+    }
+
+    val currentPositionProvider = remember {
+        {
+            if (isUserBrowsing) {
+                lockedPositionMs.toInt()
+            } else {
+                currentPositionState.value.toInt()
+            }
+        }
+    }
+
+    // 初次进入或切换歌曲时，直达焦点行
+    LaunchedEffect(lyrics) {
+        isUserBrowsing = false
+        val initialIdx = activeLineIndex
+        if (initialIdx in lines.indices) {
+            val scrollTarget = (initialIdx - 1).coerceAtLeast(0)
+            listState.scrollToItem(scrollTarget)
         }
     }
 
@@ -790,6 +970,7 @@ private fun AccompanistLyricsContainer(
             currentPosition = currentPositionProvider,
             onLineClicked = { line ->
                 onSeek(line.start.toLong())
+                isUserBrowsing = false
                 val clickedIdx = lines.indexOf(line)
                 if (clickedIdx != -1) {
                     coroutineScope.launch {
@@ -818,6 +999,52 @@ private fun AccompanistLyricsContainer(
             offset = 48.dp,
             modifier = Modifier.fillMaxSize()
         )
+
+        // Apple Music 风格“回到正在播放”悬浮胶囊按钮
+        androidx.compose.animation.AnimatedVisibility(
+            visible = isUserBrowsing,
+            enter = androidx.compose.animation.fadeIn(tween(250)) + androidx.compose.animation.slideInVertically(tween(250)) { it / 2 },
+            exit = androidx.compose.animation.fadeOut(tween(200)) + androidx.compose.animation.slideOutVertically(tween(200)) { it / 2 },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .squircleClip(20.dp)
+                    .background(Color.White.copy(alpha = 0.22f))
+                    .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
+                    .clickable {
+                        isUserBrowsing = false
+                        coroutineScope.launch {
+                            if (activeLineIndex in lines.indices) {
+                                val scrollTarget = (activeLineIndex - 1).coerceAtLeast(0)
+                                listState.animateScrollToItem(scrollTarget)
+                            }
+                        }
+                    }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = AppIcons.Refresh,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Text(
+                        text = "回到正在播放",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
     }
 }
 

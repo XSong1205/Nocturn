@@ -10,6 +10,7 @@ import com.nocturn.music.model.BannerItem
 import com.nocturn.music.model.Playlist
 import com.nocturn.music.model.Song
 import com.nocturn.music.model.SongLyric
+import com.nocturn.music.model.SongWiki
 import com.nocturn.music.model.UserProfile
 
 object MusicRepository {
@@ -274,6 +275,41 @@ object MusicRepository {
         } else {
             NcmApiClient.likeSong(songId, like)
         }
+    }
+
+    suspend fun addToPlaylist(playlistId: Long, songId: Long): Boolean {
+        val cookie = SettingsRepository.userProfile.value.cookie
+        return if (isEmbedded) {
+            val res = EmbeddedNcmEngine.addToPlaylist(playlistId, songId, cookie)
+            if (res) res else NcmApiClient.addToPlaylist(playlistId, songId)
+        } else {
+            val res = NcmApiClient.addToPlaylist(playlistId, songId)
+            if (res) res else EmbeddedNcmEngine.addToPlaylist(playlistId, songId, cookie)
+        }
+    }
+
+    suspend fun getSongWiki(song: Song): SongWiki {
+        val wiki = if (isEmbedded) {
+            EmbeddedNcmEngine.getSongWiki(song.id) ?: NcmApiClient.getSongWiki(song.id)
+        } else {
+            NcmApiClient.getSongWiki(song.id) ?: EmbeddedNcmEngine.getSongWiki(song.id)
+        }
+        return wiki?.copy(
+            title = song.title,
+            artist = song.artist,
+            album = song.album
+        ) ?: SongWiki(
+            songId = song.id,
+            title = song.title,
+            artist = song.artist,
+            album = song.album,
+            styles = listOf("流行", "流行音乐"),
+            description = "歌曲《${song.title}》收录于专辑《${song.album.ifBlank { "单曲" }}》，由 ${song.artist} 演唱。",
+            credits = listOf(
+                "演唱" to song.artist,
+                "专辑" to song.album.ifBlank { "单曲" }
+            )
+        )
     }
 
     // 登录与会话辅助接口 (优先使用用户自建增强 API，确保 key/qr/check 同源无缝闭环)

@@ -21,12 +21,14 @@ import top.yukonga.miuix.kmp.icon.extended.Play
 import top.yukonga.miuix.kmp.icon.extended.Playlist
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.icon.extended.Search
+import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.icon.extended.Sort
 
 object AppIcons {
     val Play: ImageVector get() = MiuixIcons.Play
     val Pause: ImageVector get() = MiuixIcons.Pause
     val Playlist: ImageVector get() = MiuixIcons.Playlist
+    val PlaylistAdd: ImageVector get() = MiuixIcons.Playlist
     val More: ImageVector get() = MiuixIcons.More
     val Favorites: ImageVector get() = MiuixIcons.Favorites
     val FavoritesFill: ImageVector get() = MiuixIcons.FavoritesFill
@@ -37,6 +39,8 @@ object AppIcons {
     val Music: ImageVector get() = MiuixIcons.Music
     val Close: ImageVector get() = MiuixIcons.Close
     val Contacts: ImageVector get() = MiuixIcons.Contacts
+    val Artist: ImageVector get() = MiuixIcons.Contacts
+    val Settings: ImageVector get() = MiuixIcons.Settings
     val Refresh: ImageVector get() = MiuixIcons.Refresh
 
     val SkipNext: ImageVector by lazy {
@@ -182,6 +186,75 @@ object AppIcons {
                 lineTo(21f, 21f)
                 moveTo(4f, 4f)
                 lineTo(9f, 9f)
+            }
+        }.build()
+    }
+
+    val ArrowDown: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "ArrowDown",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).apply {
+            path(
+                stroke = SolidColor(Color.White),
+                strokeLineWidth = 2.4f,
+                strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round
+            ) {
+                moveTo(6f, 9f)
+                lineTo(12f, 15f)
+                lineTo(18f, 9f)
+            }
+        }.build()
+    }
+
+    val Check: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "Check",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).apply {
+            path(
+                stroke = SolidColor(Color.White),
+                strokeLineWidth = 2.4f,
+                strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round
+            ) {
+                moveTo(5f, 12.5f)
+                lineTo(9.5f, 17f)
+                lineTo(19f, 7.5f)
+            }
+        }.build()
+    }
+
+    val Share: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "Share",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).apply {
+            path(
+                stroke = SolidColor(Color.White),
+                strokeLineWidth = 2f,
+                strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round
+            ) {
+                moveTo(8.59f, 13.51f)
+                lineTo(15.42f, 17.49f)
+                moveTo(15.41f, 6.51f)
+                lineTo(8.59f, 10.49f)
+            }
+            path(fill = SolidColor(Color.White)) {
+                moveTo(18f, 5f)
+                moveTo(6f, 12f)
+                moveTo(18f, 19f)
             }
         }.build()
     }

@@ -7,6 +7,8 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
@@ -221,10 +223,11 @@ fun AppNavigation() {
                     // 二级界面展示层 (包含歌单、专辑、歌手、我喜欢的音乐、排行榜广场、关于等)
                     // 二级页面均带有自适配状态栏的 SmallTopAppBar，顶层不可使用 innerPadding.calculateTopPadding()，否则会导致标题栏双重下移；
                     // 仅需保留底部 padding 为 MiniPlayerBar 留出空间 (开启毛玻璃时同样延展到底部)。
+                    // 采用澎湃OS (HyperOS)“一镜到底”视觉动效规范：平滑缩放连贯展开与沉浸渐变
                     AnimatedVisibility(
                         visible = currentSecondary != null,
-                        enter = slideInHorizontally(tween(300, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(200)),
-                        exit = slideOutHorizontally(tween(280, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(180))
+                        enter = scaleIn(initialScale = 0.90f, animationSpec = tween(340, easing = FastOutSlowInEasing)) + fadeIn(tween(260)),
+                        exit = scaleOut(targetScale = 0.92f, animationSpec = tween(280, easing = FastOutSlowInEasing)) + fadeOut(tween(220))
                     ) {
                         Box(
                             modifier = Modifier
@@ -234,8 +237,8 @@ fun AppNavigation() {
                         AnimatedContent(
                             targetState = currentSecondary,
                             transitionSpec = {
-                                (slideInHorizontally(tween(300, easing = FastOutSlowInEasing)) { it / 2 } + fadeIn(tween(200)))
-                                    .togetherWith(slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) { -it / 2 } + fadeOut(tween(180)))
+                                (scaleIn(initialScale = 0.92f, animationSpec = tween(320, easing = FastOutSlowInEasing)) + fadeIn(tween(260)))
+                                    .togetherWith(scaleOut(targetScale = 0.95f, animationSpec = tween(260, easing = FastOutSlowInEasing)) + fadeOut(tween(200)))
                             },
                             label = "secondary-stack-transition"
                         ) { route ->
@@ -277,7 +280,11 @@ fun AppNavigation() {
         ) {
             PlayerScreen(
                 onDismiss = { isPlayerExpanded = false },
-                onOpenQueue = { isQueueOpen = true }
+                onOpenQueue = { isQueueOpen = true },
+                onNavigateToRoute = { route ->
+                    isPlayerExpanded = false
+                    secondaryStack.add(route)
+                }
             )
         }
 
