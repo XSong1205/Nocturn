@@ -3,7 +3,6 @@ package com.nocturn.music.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -17,17 +16,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nocturn.music.BuildConfig
@@ -41,12 +35,10 @@ import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Music
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
@@ -68,7 +60,6 @@ fun SettingsScreen(
     var pingStatus by remember { mutableStateOf<String?>(null) }
     var cacheClearedMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-    val uriHandler = LocalUriHandler.current
 
     val bottomBarPadding = LocalBottomBarPadding.current
 
@@ -161,86 +152,19 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(18.dp))
         }
 
-        // MIUIX 官方 HyperOS 风格关于应用布局
         item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(RoundedCornerShape(22.dp))
-                        .background(MiuixTheme.colorScheme.primaryContainer)
-                ) {
-                    Icon(
-                        imageVector = MiuixIcons.Music,
-                        contentDescription = null,
-                        modifier = Modifier.size(42.dp),
-                        tint = MiuixTheme.colorScheme.onPrimaryContainer
-                    )
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = "Nocturn",
-                    color = MiuixTheme.colorScheme.onBackground,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 28.sp
-                )
-                Spacer(modifier = Modifier.height(4.dp))
+            SmallTitle(text = "关于")
+
+            Card(modifier = Modifier.fillMaxWidth()) {
                 val formattedVersion = if (BuildConfig.VERSION_NAME.startsWith("v") || BuildConfig.VERSION_NAME.startsWith("alpha")) {
                     BuildConfig.VERSION_NAME
                 } else {
                     "v${BuildConfig.VERSION_NAME}"
                 }
-                Text(
-                    text = formattedVersion,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    fontSize = 13.sp
-                )
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-        }
-
-        item {
-            SmallTitle(text = "开源与社区")
-            Card(modifier = Modifier.fillMaxWidth()) {
                 ArrowPreference(
-                    title = "项目开源主页",
-                    summary = "GitHub: XSong1205/Nocturn",
-                    onClick = { uriHandler.openUri("https://github.com/XSong1205/Nocturn") }
-                )
-                ArrowPreference(
-                    title = "开源许可协议",
-                    summary = "Apache License 2.0",
-                    onClick = { uriHandler.openUri("https://www.apache.org/licenses/LICENSE-2.0.txt") }
-                )
-            }
-            Spacer(modifier = Modifier.height(14.dp))
-        }
-
-        item {
-            SmallTitle(text = "技术架构与致谢")
-            Card(modifier = Modifier.fillMaxWidth()) {
-                ArrowPreference(
-                    title = "UI 设计系统",
-                    summary = "MIUIX KMP 0.9.3 (HyperOS 风格)",
-                    onClick = { uriHandler.openUri("https://github.com/compose-miuix-ui/miuix") }
-                )
-                ArrowPreference(
-                    title = "逐字歌词技术",
-                    summary = "YRC 逐字逐句毫秒级动效"
-                )
-                ArrowPreference(
-                    title = "流媒体数据引擎",
-                    summary = "内置原生加解密 (WEAPI / EAPI)"
-                )
-                ArrowPreference(
-                    title = "网络与并发",
-                    summary = "OkHttp 5 · Kotlin Coroutines"
+                    title = "关于 Nocturn",
+                    summary = "版本 $formattedVersion / 开源鸣谢与项目信息",
+                    onClick = { onOpenRoute(SecondaryRoute.About) }
                 )
             }
             Spacer(modifier = Modifier.height(28.dp))

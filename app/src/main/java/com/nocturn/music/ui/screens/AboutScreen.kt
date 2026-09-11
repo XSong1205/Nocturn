@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nocturn.music.BuildConfig
+import com.nocturn.music.ui.navigation.LocalBottomBarPadding
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -40,11 +41,12 @@ fun AboutScreen(
     modifier: Modifier = Modifier
 ) {
     val uriHandler = LocalUriHandler.current
+    val bottomBarPadding = LocalBottomBarPadding.current
 
     Scaffold(
         topBar = {
             SmallTopAppBar(
-                title = "关于应用",
+                title = "关于 Nocturn",
                 navigationIcon = {
                     IconButton(
                         onClick = onBack,
@@ -65,7 +67,12 @@ fun AboutScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = 8.dp,
+                bottom = maxOf(bottomBarPadding + 24.dp, 96.dp)
+            )
         ) {
             item {
                 Column(
@@ -106,15 +113,21 @@ fun AboutScreen(
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         fontSize = 14.sp
                     )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "基于 HyperOS 风格的现代高保真网易云音乐播放器",
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        fontSize = 12.sp
+                    )
                 }
             }
 
             item {
-                SmallTitle(text = "开源与社区")
+                SmallTitle(text = "项目与开源")
                 Card(modifier = Modifier.fillMaxWidth()) {
                     ArrowPreference(
-                        title = "项目开源主页",
-                        summary = "GitHub: XSong1205/Nocturn",
+                        title = "GitHub 开源主页",
+                        summary = "XSong1205/Nocturn",
                         onClick = { uriHandler.openUri("https://github.com/XSong1205/Nocturn") }
                     )
                     ArrowPreference(
@@ -127,24 +140,74 @@ fun AboutScreen(
             }
 
             item {
-                SmallTitle(text = "技术架构与致谢")
+                SmallTitle(text = "开源鸣谢")
                 Card(modifier = Modifier.fillMaxWidth()) {
                     ArrowPreference(
-                        title = "UI 设计系统",
-                        summary = "MIUIX KMP 0.9.3 (HyperOS 风格)",
+                        title = "miuix",
+                        summary = "组件库 · HyperOS 风格跨平台 Compose 组件系统",
                         onClick = { uriHandler.openUri("https://github.com/compose-miuix-ui/miuix") }
                     )
                     ArrowPreference(
-                        title = "逐字歌词技术",
-                        summary = "YRC 逐字逐句毫秒级动效"
+                        title = "accompanist-lyrics-ui",
+                        summary = "歌词显示 · 逐字逐句毫秒级动态歌词渲染引擎",
+                        onClick = { uriHandler.openUri("https://github.com/MochaRealm/accompanist-lyrics") }
                     )
                     ArrowPreference(
-                        title = "流媒体数据引擎",
-                        summary = "内置原生加解密 (WEAPI / EAPI)"
+                        title = "NCMApiEnhanced",
+                        summary = "API · 增强型网易云音乐服务支持与接口扩展",
+                        onClick = { uriHandler.openUri("https://github.com/Catamint/ncm-api-enhanced") }
                     )
                     ArrowPreference(
-                        title = "网络与并发",
-                        summary = "OkHttp 5 · Kotlin Coroutines"
+                        title = "splayer-android",
+                        summary = "内置 API 思路 · 原生逆向与官方接口鉴权设计参考",
+                        onClick = { uriHandler.openUri("https://github.com/SPlayer-Dev/SPlayer-for-Android") }
+                    )
+                    ArrowPreference(
+                        title = "NeteaseCloudMusicApi",
+                        summary = "API 协议 · 网易云音乐 Node.js 核心协议生态规范",
+                        onClick = { uriHandler.openUri("https://github.com/Binaryify/NeteaseCloudMusicApi") }
+                    )
+                    ArrowPreference(
+                        title = "OkHttp",
+                        summary = "网络引擎 · Square 现代 HTTP/2 连接池与网络库",
+                        onClick = { uriHandler.openUri("https://github.com/square/okhttp") }
+                    )
+                    ArrowPreference(
+                        title = "KotlinX",
+                        summary = "并发与序列化 · 官方协程架构与轻量级高效 JSON 编解码",
+                        onClick = { uriHandler.openUri("https://github.com/Kotlin/kotlinx.coroutines") }
+                    )
+                    ArrowPreference(
+                        title = "Compose Multiplatform",
+                        summary = "声明式 UI · JetBrains 现代响应式用户界面框架",
+                        onClick = { uriHandler.openUri("https://github.com/JetBrains/compose-multiplatform") }
+                    )
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+            }
+
+            item {
+                SmallTitle(text = "技术架构与核心特性")
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    ArrowPreference(
+                        title = "UI 设计语言",
+                        summary = "MIUIX KMP 0.9.3 (HyperOS 风格 · 连续平滑超椭圆)"
+                    )
+                    ArrowPreference(
+                        title = "双模 API 引擎",
+                        summary = "内置原生加解密直连官方网关 / 增强型自建 API 双模"
+                    )
+                    ArrowPreference(
+                        title = "VIP 高保真播放",
+                        summary = "原生 EAPI + WEAPI 会员鉴权与防 30 秒试听链路"
+                    )
+                    ArrowPreference(
+                        title = "逐字动效歌词",
+                        summary = "YRC 逐字逐句毫秒级动态平滑高亮与手势交互吸附"
+                    )
+                    ArrowPreference(
+                        title = "系统媒体集成",
+                        summary = "MediaSessionCompat · 锁屏海报与控制中心深度联动"
                     )
                 }
                 Spacer(modifier = Modifier.height(28.dp))
