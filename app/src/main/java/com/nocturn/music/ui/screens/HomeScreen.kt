@@ -108,6 +108,7 @@ fun HomeScreen(
     }
 
     val bottomBarPadding = com.nocturn.music.ui.navigation.LocalBottomBarPadding.current
+    val topBarPadding = com.nocturn.music.ui.navigation.LocalTopBarPadding.current
 
     Crossfade(
         targetState = isLoading && banners.isEmpty(),
@@ -118,7 +119,7 @@ fun HomeScreen(
             Box(
                 modifier = modifier
                     .fillMaxSize()
-                    .padding(bottom = bottomBarPadding),
+                    .padding(top = topBarPadding, bottom = bottomBarPadding),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
@@ -139,7 +140,7 @@ fun HomeScreen(
         } else {
             LazyColumn(
                 modifier = modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = maxOf(bottomBarPadding + 16.dp, 100.dp))
+                contentPadding = PaddingValues(top = topBarPadding, bottom = maxOf(bottomBarPadding + 16.dp, 100.dp))
             ) {
         // 1. Featured Banners
         item {

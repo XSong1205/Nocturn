@@ -71,6 +71,7 @@ import top.yukonga.miuix.kmp.nav.transition.NavTransitions
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 val LocalBottomBarPadding = compositionLocalOf { 0.dp }
+val LocalTopBarPadding = compositionLocalOf { 0.dp }
 
 enum class NavigationTab(val label: String) {
     Discover("发现"),
@@ -227,30 +228,13 @@ fun AppNavigation() {
                                 backdrop = backdrop
                             )
 
-                            val navBarColor = if (blurActive) Color.Transparent else surfaceColor
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .then(
-                                        if (blurActive) {
-                                            Modifier.progressiveTextureBlur(
-                                                backdrop = backdrop,
-                                                shape = RectangleShape,
-                                                blurRadius = 24f,
-                                                gradient = ProgressiveBlur.Bottom,
-                                                colors = BlurDefaults.blurColors(
-                                                    blendColors = listOf(
-                                                        BlendColorEntry(color = surfaceColor.copy(alpha = 0.88f))
-                                                    )
-                                                )
-                                            )
-                                        } else {
-                                            Modifier.background(surfaceColor)
-                                        }
-                                    )
+                                    .background(surfaceColor)
                             ) {
                                 NavigationBar(
-                                    color = navBarColor
+                                    color = surfaceColor
                                 ) {
                                     NavigationTab.values().forEach { tab ->
                                         NavigationBarItem(
@@ -269,8 +253,12 @@ fun AppNavigation() {
                     modifier = Modifier.fillMaxSize()
                 ) { innerPadding ->
                     val bottomBarPadding = innerPadding.calculateBottomPadding()
+                    val topBarPadding = innerPadding.calculateTopPadding()
 
-                    CompositionLocalProvider(LocalBottomBarPadding provides bottomBarPadding) {
+                    CompositionLocalProvider(
+                        LocalBottomBarPadding provides bottomBarPadding,
+                        LocalTopBarPadding provides (if (blurActive) topBarPadding else 0.dp)
+                    ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -280,7 +268,7 @@ fun AppNavigation() {
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .padding(
-                                        top = innerPadding.calculateTopPadding(),
+                                        top = if (blurActive) 0.dp else topBarPadding,
                                         bottom = if (blurActive) 0.dp else bottomBarPadding
                                     )
                             ) {

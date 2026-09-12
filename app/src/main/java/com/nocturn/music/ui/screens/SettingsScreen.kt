@@ -32,6 +32,7 @@ import com.nocturn.music.data.repository.SettingsRepository
 import com.nocturn.music.model.ApiMode
 import com.nocturn.music.model.AudioQuality
 import com.nocturn.music.ui.navigation.LocalBottomBarPadding
+import com.nocturn.music.ui.navigation.LocalTopBarPadding
 import com.nocturn.music.ui.navigation.SecondaryRoute
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -81,13 +82,14 @@ fun SettingsScreen(
     }
 
     val bottomBarPadding = LocalBottomBarPadding.current
+    val topBarPadding = LocalTopBarPadding.current
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(
             start = 16.dp,
             end = 16.dp,
-            top = 12.dp,
+            top = topBarPadding + 12.dp,
             bottom = maxOf(bottomBarPadding + 16.dp, 100.dp)
         )
     ) {

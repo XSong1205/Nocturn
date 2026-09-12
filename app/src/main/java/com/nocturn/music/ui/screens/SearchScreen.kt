@@ -119,10 +119,12 @@ fun SearchScreen(
         }
     }
 
+    val topBarPadding = com.nocturn.music.ui.navigation.LocalTopBarPadding.current
+
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(top = 8.dp)
+            .padding(top = topBarPadding + 8.dp)
     ) {
         Row(
             modifier = Modifier
