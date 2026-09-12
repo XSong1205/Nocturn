@@ -116,18 +116,25 @@ fun PlayerScreen(
     val favoriteSongs by SettingsRepository.favoriteSongs.collectAsState()
     val audioQuality by SettingsRepository.audioQuality.collectAsState()
 
+    val isBlurEnabled by SettingsRepository.isBlurEnabled.collectAsState()
+    val isVinylAnimationEnabled by SettingsRepository.isVinylAnimationEnabled.collectAsState()
+    val lyricOffsetMs by SettingsRepository.lyricOffsetMs.collectAsState()
+    val isYrcHighlightEnabled by SettingsRepository.isYrcHighlightEnabled.collectAsState()
+
+    val effectivePositionMs = (currentPositionMs + lyricOffsetMs).coerceAtLeast(0L)
+
     var displayMode by remember { mutableStateOf(CenterDisplayMode.COVER) }
     var lyrics by remember { mutableStateOf(SongLyric()) }
     var isDraggingSlider by remember { mutableStateOf(false) }
     var sliderValue by remember { mutableFloatStateOf(0f) }
     var showMoreSheet by remember { mutableStateOf(false) }
 
-    // 下拉拖拽关闭手势状态
+    // 下拉拖拽关闭手势状态 (配合 HyperOS 物理阻尼与弹性回弹)
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
     val animatedDragOffsetY by animateFloatAsState(
         targetValue = dragOffsetY,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioLowBouncy,
+            dampingRatio = 0.82f,
             stiffness = Spring.StiffnessMediumLow
         ),
         label = "playerDragOffset"
@@ -191,15 +198,17 @@ fun PlayerScreen(
         // 1. Apple Music 动态流光漫反射背景 (Ambient Artwork Glow Layer)
         // =========================================================================
         Box(modifier = Modifier.fillMaxSize()) {
-            AsyncImage(
-                url = song.coverUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .scale(1.35f)
-                    .blur(90.dp)
-            )
+            if (isBlurEnabled) {
+                AsyncImage(
+                    url = song.coverUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .scale(1.35f)
+                        .blur(90.dp)
+                )
+            }
 
             // 多重渐变暗色蒙版：确保顶部状态与底部控制具备澎湃OS通透质感与纯粹对比度
             Box(
@@ -458,15 +467,16 @@ fun PlayerScreen(
                         CenterDisplayMode.LYRICS -> {
                             AccompanistLyricsContainer(
                                 lyrics = lyrics,
-                                currentPositionMs = currentPositionMs,
-                                onSeek = { NocturnPlayer.seekTo(it) }
+                                currentPositionMs = effectivePositionMs,
+                                onSeek = { NocturnPlayer.seekTo(it) },
+                                isBlurEnabled = isBlurEnabled
                             )
                         }
                         CenterDisplayMode.VINYL -> {
                             VinylView(
                                 coverUrl = song.coverUrl,
-                                rotation = if (isPlaying) rotationAngle else 0f,
-                                tonearmAngle = tonearmAngle,
+                                rotation = if (isPlaying && isVinylAnimationEnabled) rotationAngle else 0f,
+                                tonearmAngle = if (isVinylAnimationEnabled) tonearmAngle else 0f,
                                 onToggleCover = { displayMode = CenterDisplayMode.COVER }
                             )
                         }
@@ -666,10 +676,19 @@ fun PlayerScreen(
                         )
                     }
 
-                    // 主播放/暂停键 (HyperOS 澎湃大圆角大按键，带柔光投射)
+                    // 主播放/暂停键 (HyperOS 澎湃大圆角大按键，带柔光投射与物理弹性动画)
+                    val playBtnScale by animateFloatAsState(
+                        targetValue = if (isPlaying) 1.0f else 0.94f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessLow
+                        ),
+                        label = "playerPlayBtnScale"
+                    )
                     Box(
                         modifier = Modifier
                             .size(72.dp)
+                            .scale(playBtnScale)
                             .squircleClip(24.dp)
                             .background(Color.White)
                             .shadow(16.dp, CircleShape, ambientColor = Color.White.copy(alpha = 0.35f))
@@ -679,12 +698,21 @@ fun PlayerScreen(
                         if (isBuffering) {
                             Text(text = "...", color = Color.Black, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
                         } else {
-                            Icon(
-                                imageVector = if (isPlaying) AppIcons.Pause else AppIcons.Play,
-                                contentDescription = if (isPlaying) "暂停" else "播放",
-                                tint = Color.Black,
-                                modifier = Modifier.size(30.dp)
-                            )
+                            AnimatedContent(
+                                targetState = isPlaying,
+                                transitionSpec = {
+                                    (scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeIn(tween(180)))
+                                        .togetherWith(scaleOut(spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeOut(tween(140)))
+                                },
+                                label = "playPauseIconAnim"
+                            ) { playing ->
+                                Icon(
+                                    imageVector = if (playing) AppIcons.Pause else AppIcons.Play,
+                                    contentDescription = if (playing) "暂停" else "播放",
+                                    tint = Color.Black,
+                                    modifier = Modifier.size(30.dp)
+                                )
+                            }
                         }
                     }
 
@@ -862,7 +890,8 @@ private fun AccompanistLyricsContainer(
     lyrics: SongLyric,
     currentPositionMs: Long,
     onSeek: (Long) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isBlurEnabled: Boolean = true
 ) {
     val synced = lyrics.syncedLyrics
     val lines = synced?.lines ?: emptyList()
@@ -997,7 +1026,7 @@ private fun AccompanistLyricsContainer(
             ),
             textColor = Color.White,
             blendMode = BlendMode.Plus,
-            useBlurEffect = true,
+            useBlurEffect = isBlurEnabled,
             blurDelta = 3.2f,
             showTranslation = true,
             showPhonetic = true,

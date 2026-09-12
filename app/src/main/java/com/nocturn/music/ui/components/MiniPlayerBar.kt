@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -61,13 +62,16 @@ fun MiniPlayerBar(
     if (currentSong == null) return
 
     val themeMode by SettingsRepository.themeMode.collectAsState()
+    val isBlurEnabled by SettingsRepository.isBlurEnabled.collectAsState()
+    val isVinylAnimationEnabled by SettingsRepository.isVinylAnimationEnabled.collectAsState()
+
     val isDark = when (themeMode) {
         1 -> false
         2 -> true
         else -> isSystemInDarkTheme()
     }
 
-    val blurActive = isRuntimeShaderSupported() && backdrop != null
+    val blurActive = isRuntimeShaderSupported() && isBlurEnabled && backdrop != null
     val cardShape = remember { RoundedCornerShape(18.dp) }
     val floatingHighlight = remember(isDark) {
         if (isDark) Highlight.GlassStrokeMiddleDark else Highlight.GlassStrokeMiddleLight
@@ -82,6 +86,15 @@ fun MiniPlayerBar(
             repeatMode = RepeatMode.Restart
         ),
         label = "rotation"
+    )
+
+    val playIconScale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isPlaying) 1.05f else 0.95f,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessLow
+        ),
+        label = "playIconScale"
     )
 
     val surfaceContainerColor = MiuixTheme.colorScheme.surfaceContainerHighest
@@ -134,7 +147,7 @@ fun MiniPlayerBar(
                     .size(44.dp)
                     .clip(CircleShape)
                     .background(Color(0xFF1E1E1E))
-                    .rotate(if (isPlaying) rotationAngle else 0f),
+                    .rotate(if (isPlaying && isVinylAnimationEnabled) rotationAngle else 0f),
                 contentAlignment = Alignment.Center
             ) {
                 AsyncImage(
@@ -184,7 +197,9 @@ fun MiniPlayerBar(
                     imageVector = if (isPlaying) AppIcons.Pause else AppIcons.Play,
                     contentDescription = if (isPlaying) "暂停" else "播放",
                     tint = HyperBlue,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier
+                        .size(20.dp)
+                        .scale(playIconScale)
                 )
             }
 

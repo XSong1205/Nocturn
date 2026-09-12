@@ -66,6 +66,62 @@ object SettingsRepository {
         prefs.edit().putBoolean("lyricon_enabled", enabled).apply()
     }
 
+    private val _isBlurEnabled = MutableStateFlow(prefs.getBoolean("blur_enabled", true))
+    val isBlurEnabled = _isBlurEnabled.asStateFlow()
+
+    fun setBlurEnabled(enabled: Boolean) {
+        _isBlurEnabled.value = enabled
+        prefs.edit().putBoolean("blur_enabled", enabled).apply()
+    }
+
+    private val _isVinylAnimationEnabled = MutableStateFlow(prefs.getBoolean("vinyl_animation_enabled", true))
+    val isVinylAnimationEnabled = _isVinylAnimationEnabled.asStateFlow()
+
+    fun setVinylAnimationEnabled(enabled: Boolean) {
+        _isVinylAnimationEnabled.value = enabled
+        prefs.edit().putBoolean("vinyl_animation_enabled", enabled).apply()
+    }
+
+    private val _isAutoLosslessVip = MutableStateFlow(prefs.getBoolean("auto_lossless_vip", true))
+    val isAutoLosslessVip = _isAutoLosslessVip.asStateFlow()
+
+    fun setAutoLosslessVip(enabled: Boolean) {
+        _isAutoLosslessVip.value = enabled
+        prefs.edit().putBoolean("auto_lossless_vip", enabled).apply()
+    }
+
+    private val _isCrossfadeEnabled = MutableStateFlow(prefs.getBoolean("crossfade_enabled", false))
+    val isCrossfadeEnabled = _isCrossfadeEnabled.asStateFlow()
+
+    fun setCrossfadeEnabled(enabled: Boolean) {
+        _isCrossfadeEnabled.value = enabled
+        prefs.edit().putBoolean("crossfade_enabled", enabled).apply()
+    }
+
+    private val _lyricOffsetMs = MutableStateFlow(prefs.getInt("lyric_offset_ms", 0))
+    val lyricOffsetMs = _lyricOffsetMs.asStateFlow()
+
+    fun setLyricOffsetMs(offset: Int) {
+        _lyricOffsetMs.value = offset
+        prefs.edit().putInt("lyric_offset_ms", offset).apply()
+    }
+
+    private val _isYrcHighlightEnabled = MutableStateFlow(prefs.getBoolean("yrc_highlight_enabled", true))
+    val isYrcHighlightEnabled = _isYrcHighlightEnabled.asStateFlow()
+
+    fun setYrcHighlightEnabled(enabled: Boolean) {
+        _isYrcHighlightEnabled.value = enabled
+        prefs.edit().putBoolean("yrc_highlight_enabled", enabled).apply()
+    }
+
+    private val _isCellularDataSaver = MutableStateFlow(prefs.getBoolean("cellular_data_saver", false))
+    val isCellularDataSaver = _isCellularDataSaver.asStateFlow()
+
+    fun setCellularDataSaver(enabled: Boolean) {
+        _isCellularDataSaver.value = enabled
+        prefs.edit().putBoolean("cellular_data_saver", enabled).apply()
+    }
+
     fun setThemeMode(mode: Int) {
         _themeMode.value = mode
         prefs.edit().putInt("theme_mode", mode).apply()
@@ -181,5 +237,50 @@ object SettingsRepository {
         val arr = JSONArray()
         list.forEach { arr.put(it) }
         prefs.edit().putString("search_history", arr.toString()).apply()
+    }
+
+    fun getCacheSizeBytes(): Long {
+        return try {
+            val cacheDir = NocturnApp.appContext.cacheDir
+            calculateDirSize(cacheDir)
+        } catch (e: Exception) {
+            0L
+        }
+    }
+
+    private fun calculateDirSize(dir: java.io.File?): Long {
+        if (dir == null || !dir.exists()) return 0L
+        var size = 0L
+        dir.listFiles()?.forEach { file ->
+            size += if (file.isDirectory) {
+                calculateDirSize(file)
+            } else {
+                file.length()
+            }
+        }
+        return size
+    }
+
+    fun formatCacheSize(bytes: Long): String {
+        return when {
+            bytes <= 0 -> "0 B"
+            bytes < 1024 -> "$bytes B"
+            bytes < 1024 * 1024 -> String.format(java.util.Locale.getDefault(), "%.1f KB", bytes / 1024.0)
+            bytes < 1024 * 1024 * 1024 -> String.format(java.util.Locale.getDefault(), "%.1f MB", bytes / (1024.0 * 1024.0))
+            else -> String.format(java.util.Locale.getDefault(), "%.2f GB", bytes / (1024.0 * 1024.0 * 1024.0))
+        }
+    }
+
+    fun clearAppCache(): Long {
+        val initialSize = getCacheSizeBytes()
+        try {
+            val cacheDir = NocturnApp.appContext.cacheDir
+            cacheDir.listFiles()?.forEach { file ->
+                file.deleteRecursively()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return initialSize
     }
 }

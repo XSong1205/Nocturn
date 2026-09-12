@@ -13,15 +13,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nocturn.music.BuildConfig
@@ -30,20 +31,23 @@ import com.nocturn.music.data.api.NcmApiClient
 import com.nocturn.music.data.repository.SettingsRepository
 import com.nocturn.music.model.ApiMode
 import com.nocturn.music.model.AudioQuality
+import com.nocturn.music.ui.navigation.LocalBottomBarPadding
 import com.nocturn.music.ui.navigation.SecondaryRoute
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import top.yukonga.miuix.kmp.preference.SliderPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import com.nocturn.music.ui.navigation.LocalBottomBarPadding
 
 @Composable
 fun SettingsScreen(
@@ -56,11 +60,26 @@ fun SettingsScreen(
     val customApiUrl by SettingsRepository.customApiUrl.collectAsState()
     val lyriconEnabled by SettingsRepository.lyriconEnabled.collectAsState()
 
+    val isBlurEnabled by SettingsRepository.isBlurEnabled.collectAsState()
+    val isVinylAnimationEnabled by SettingsRepository.isVinylAnimationEnabled.collectAsState()
+    val isAutoLosslessVip by SettingsRepository.isAutoLosslessVip.collectAsState()
+    val isCrossfadeEnabled by SettingsRepository.isCrossfadeEnabled.collectAsState()
+    val lyricOffsetMs by SettingsRepository.lyricOffsetMs.collectAsState()
+    val isYrcHighlightEnabled by SettingsRepository.isYrcHighlightEnabled.collectAsState()
+    val isCellularDataSaver by SettingsRepository.isCellularDataSaver.collectAsState()
+
     var showApiDialog by remember { mutableStateOf(false) }
     var apiUrlInput by remember { mutableStateOf(customApiUrl) }
     var pingStatus by remember { mutableStateOf<String?>(null) }
-    var cacheClearedMessage by remember { mutableStateOf<String?>(null) }
+    var cacheBytes by remember { mutableLongStateOf(0L) }
+    var cacheActionMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            cacheBytes = SettingsRepository.getCacheSizeBytes()
+        }
+    }
 
     val bottomBarPadding = LocalBottomBarPadding.current
 
@@ -73,57 +92,111 @@ fun SettingsScreen(
             bottom = maxOf(bottomBarPadding + 16.dp, 100.dp)
         )
     ) {
+        // =========================================================================
+        // 1. 外观与显示动效
+        // =========================================================================
         item {
-            SmallTitle(text = "外观与显示")
+            SmallTitle(text = "外观与动效")
 
             Card(modifier = Modifier.fillMaxWidth()) {
-                val themeLabel = when (themeMode) {
-                    0 -> "跟随系统"
-                    1 -> "浅色模式"
-                    2 -> "深色模式"
-                    else -> "跟随系统"
-                }
-                ArrowPreference(
+                val themeOptions = listOf("跟随系统", "浅色模式", "深色模式")
+                OverlayDropdownPreference(
                     title = "主题外观",
-                    summary = themeLabel,
-                    onClick = {
-                        val nextMode = (themeMode + 1) % 3
-                        SettingsRepository.setThemeMode(nextMode)
-                    }
+                    summary = "当前为: ${themeOptions.getOrElse(themeMode) { "跟随系统" }}",
+                    items = themeOptions,
+                    selectedIndex = themeMode,
+                    onSelectedIndexChange = { SettingsRepository.setThemeMode(it) }
+                )
+
+                SwitchPreference(
+                    title = "界面动态毛玻璃效果",
+                    summary = if (isBlurEnabled) "开启背景实时着色器模糊，呈现 HyperOS 通透质感" else "已关闭动态模糊以降低功耗并提高流畅度",
+                    checked = isBlurEnabled,
+                    onCheckedChange = { SettingsRepository.setBlurEnabled(it) }
+                )
+
+                SwitchPreference(
+                    title = "播放页黑胶旋转动效",
+                    summary = if (isVinylAnimationEnabled) "开启唱盘旋转、唱臂起落与封面呼吸动效" else "已停用旋转动效",
+                    checked = isVinylAnimationEnabled,
+                    onCheckedChange = { SettingsRepository.setVinylAnimationEnabled(it) }
                 )
             }
             Spacer(modifier = Modifier.height(14.dp))
         }
 
+        // =========================================================================
+        // 2. 播放与音质控制
+        // =========================================================================
         item {
             SmallTitle(text = "播放与音质")
 
             Card(modifier = Modifier.fillMaxWidth()) {
-                ArrowPreference(
+                val qualities = AudioQuality.values()
+                val qualityOptions = qualities.map { "${it.label} (${it.bitrate})" }
+                OverlayDropdownPreference(
                     title = "在线播放音质",
-                    summary = "${audioQuality.label} (${audioQuality.bitrate})",
-                    onClick = {
-                        val qualities = AudioQuality.values()
-                        val nextIndex = (audioQuality.ordinal + 1) % qualities.size
-                        SettingsRepository.setAudioQuality(qualities[nextIndex])
-                    }
+                    summary = "默认音质: ${audioQuality.label} (${audioQuality.bitrate})",
+                    items = qualityOptions,
+                    selectedIndex = audioQuality.ordinal,
+                    onSelectedIndexChange = { SettingsRepository.setAudioQuality(qualities[it]) }
+                )
+
+                SwitchPreference(
+                    title = "VIP 会员歌曲无损优先",
+                    summary = if (isAutoLosslessVip) "登录后优先通过官方 EAPI 鉴权调度最高可用码率" else "按默认选定音质播放",
+                    checked = isAutoLosslessVip,
+                    onCheckedChange = { SettingsRepository.setAutoLosslessVip(it) }
+                )
+
+                SwitchPreference(
+                    title = "切歌与暂停淡入淡出",
+                    summary = if (isCrossfadeEnabled) "切歌与暂停时平滑过渡音量，消除爆音" else "立即切换",
+                    checked = isCrossfadeEnabled,
+                    onCheckedChange = { SettingsRepository.setCrossfadeEnabled(it) }
+                )
+
+                SwitchPreference(
+                    title = "逐字动态歌词高亮 (YRC)",
+                    summary = if (isYrcHighlightEnabled) "使用 Canvas 逐字平滑渐进染色渲染" else "使用普通逐行平滑高亮",
+                    checked = isYrcHighlightEnabled,
+                    onCheckedChange = { SettingsRepository.setYrcHighlightEnabled(it) }
+                )
+
+                SliderPreference(
+                    title = "歌词时间轴微调 (毫秒)",
+                    summary = if (lyricOffsetMs == 0) "当前时间轴精准同步 (0ms)" else "偏移: ${if (lyricOffsetMs > 0) "+$lyricOffsetMs" else "$lyricOffsetMs"}ms",
+                    value = lyricOffsetMs.toFloat(),
+                    valueRange = -1000f..1000f,
+                    onValueChange = { SettingsRepository.setLyricOffsetMs(it.toInt()) }
                 )
             }
             Spacer(modifier = Modifier.height(14.dp))
         }
 
+        // =========================================================================
+        // 3. 网络与存储缓存
+        // =========================================================================
         item {
-            SmallTitle(text = "API 引擎架构")
+            SmallTitle(text = "网络与存储")
 
             Card(modifier = Modifier.fillMaxWidth()) {
                 SwitchPreference(
+                    title = "移动网络省流模式",
+                    summary = if (isCellularDataSaver) "蜂窝网络下自动将音质调整为标准 128k 节省流量" else "始终使用选定音质",
+                    checked = isCellularDataSaver,
+                    onCheckedChange = { SettingsRepository.setCellularDataSaver(it) }
+                )
+
+                SwitchPreference(
                     title = "内置原生引擎 (推荐)",
-                    summary = if (apiMode == ApiMode.EMBEDDED) "已启用内嵌直连官方网关，无需外部服务器" else "已切换为自定义远程 API 代理",
+                    summary = if (apiMode == ApiMode.EMBEDDED) "直连网易云官方网关，无需外部第三方服务器" else "已切换为自定义远程 API 代理",
                     checked = apiMode == ApiMode.EMBEDDED,
                     onCheckedChange = { checked ->
                         SettingsRepository.setApiMode(if (checked) ApiMode.EMBEDDED else ApiMode.CUSTOM)
                     }
                 )
+
                 ArrowPreference(
                     title = "自定义远程 API 地址",
                     summary = if (customApiUrl.isBlank()) "https://ncmapi.rpixel.online" else customApiUrl,
@@ -133,6 +206,7 @@ fun SettingsScreen(
                         showApiDialog = true
                     }
                 )
+
                 ArrowPreference(
                     title = "内置服务器状态 (127.0.0.1:1145)",
                     summary = if (EmbeddedHttpServer.isRunning) "已启动 (嵌入式端口 1145)" else "就绪",
@@ -142,33 +216,52 @@ fun SettingsScreen(
                         }
                     }
                 )
+
                 ArrowPreference(
-                    title = "清理图片与离线缓存",
-                    summary = cacheClearedMessage ?: "释放内存与临时数据",
+                    title = "清理图片与媒体缓存",
+                    summary = cacheActionMessage ?: "已占用磁盘空间: ${SettingsRepository.formatCacheSize(cacheBytes)}",
                     onClick = {
-                        cacheClearedMessage = "缓存已清理完毕"
+                        scope.launch {
+                            val cleared = withContext(Dispatchers.IO) {
+                                SettingsRepository.clearAppCache()
+                            }
+                            cacheBytes = 0L
+                            cacheActionMessage = "已释放 ${SettingsRepository.formatCacheSize(cleared)} 磁盘空间"
+                        }
                     }
                 )
             }
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(14.dp))
         }
 
+        // =========================================================================
+        // 4. 扩展与系统集成
+        // =========================================================================
         item {
-            SmallTitle(text = "扩展与歌词联动")
+            SmallTitle(text = "扩展与系统联动")
 
             Card(modifier = Modifier.fillMaxWidth()) {
                 SwitchPreference(
                     title = "词幕 (Lyricon) 歌词联动",
-                    summary = if (lyriconEnabled) "已启用状态栏/悬浮窗歌词与播放状态实时同步" else "未启用",
+                    summary = if (lyriconEnabled) "已启用状态栏/灵动岛/悬浮窗歌词与播放状态实时同步" else "未启用",
                     checked = lyriconEnabled,
                     onCheckedChange = { checked ->
                         SettingsRepository.setLyriconEnabled(checked)
                     }
                 )
+
+                ArrowPreference(
+                    title = "开机引导向导 (OOBE)",
+                    summary = "重新体验 HyperOS 风格初始化欢迎流程",
+                    onClick = { SettingsRepository.setOobeCompleted(false) }
+                )
             }
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(14.dp))
         }
 
+        // =========================================================================
+        // 5. 关于应用
+        // =========================================================================
         item {
             SmallTitle(text = "关于")
 
@@ -180,13 +273,8 @@ fun SettingsScreen(
                 }
                 ArrowPreference(
                     title = "关于 Nocturn",
-                    summary = "版本 $formattedVersion / 开源鸣谢与项目信息",
+                    summary = "版本 $formattedVersion / HyperOS 音乐客户端 / 开源致谢",
                     onClick = { onOpenRoute(SecondaryRoute.About) }
-                )
-                ArrowPreference(
-                    title = "开机向导 (OOBE)",
-                    summary = "重新体验 HyperOS 风格初始化引导",
-                    onClick = { SettingsRepository.setOobeCompleted(false) }
                 )
             }
             Spacer(modifier = Modifier.height(28.dp))

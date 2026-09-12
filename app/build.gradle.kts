@@ -48,8 +48,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 
     packaging {
@@ -65,7 +65,7 @@ tasks.matching { it.name.contains("AarMetadata") }.configureEach {
 
 kotlin {
     compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
+        jvmTarget.set(JvmTarget.JVM_21)
     }
 }
 
@@ -89,6 +89,7 @@ dependencies {
     implementation(libs.miuix.icons)
     implementation(libs.miuix.blur)
     implementation(libs.miuix.squircle)
+    implementation(libs.miuix.nav)
     implementation(libs.accompanist.lyrics.ui)
     implementation(libs.accompanist.lyrics.core)
     implementation(libs.lyricon.provider)
