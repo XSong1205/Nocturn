@@ -96,8 +96,7 @@ import com.nocturn.music.ui.navigation.SecondaryRoute
 
 enum class CenterDisplayMode {
     COVER,
-    LYRICS,
-    VINYL
+    LYRICS
 }
 
 @Composable
@@ -117,7 +116,6 @@ fun PlayerScreen(
     val audioQuality by SettingsRepository.audioQuality.collectAsState()
 
     val isBlurEnabled by SettingsRepository.isBlurEnabled.collectAsState()
-    val isVinylAnimationEnabled by SettingsRepository.isVinylAnimationEnabled.collectAsState()
     val lyricOffsetMs by SettingsRepository.lyricOffsetMs.collectAsState()
     val isYrcHighlightEnabled by SettingsRepository.isYrcHighlightEnabled.collectAsState()
 
@@ -148,26 +146,7 @@ fun PlayerScreen(
         lyrics = MusicRepository.getLyric(song.id)
     }
 
-    // 黑胶旋转动画
-    val infiniteTransition = rememberInfiniteTransition(label = "vinyl")
-    val rotationAngle by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(18000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "rotation"
-    )
-
-    // 唱臂角度
-    val tonearmAngle by animateFloatAsState(
-        targetValue = if (isPlaying) 0f else -32f,
-        animationSpec = tween(400, easing = FastOutSlowInEasing),
-        label = "tonearm"
-    )
-
-    // Apple Music 标志性封面随播放状态缩放动效 (播放时放大且浮起，暂停时微缩)
+    // Apple Music 标志性超椭圆封面随播放状态缩放动效 (播放时放大且浮起，暂停时微缩)
     val coverScale by animateFloatAsState(
         targetValue = if (isPlaying) 1.0f else 0.88f,
         animationSpec = spring(
@@ -472,14 +451,6 @@ fun PlayerScreen(
                                 isBlurEnabled = isBlurEnabled
                             )
                         }
-                        CenterDisplayMode.VINYL -> {
-                            VinylView(
-                                coverUrl = song.coverUrl,
-                                rotation = if (isPlaying && isVinylAnimationEnabled) rotationAngle else 0f,
-                                tonearmAngle = if (isVinylAnimationEnabled) tonearmAngle else 0f,
-                                onToggleCover = { displayMode = CenterDisplayMode.COVER }
-                            )
-                        }
                     }
                 }
             }
@@ -733,24 +704,19 @@ fun PlayerScreen(
                         )
                     }
 
-                    // 黑胶 / 封面模式切换小胶囊
+                    // 播放列表按钮 (与左侧播放模式按键对称呼应)
                     Box(
                         modifier = Modifier
                             .size(44.dp)
                             .squircleClip(14.dp)
-                            .background(
-                                if (displayMode == CenterDisplayMode.VINYL) HyperBlue.copy(alpha = 0.35f)
-                                else Color.White.copy(alpha = 0.08f)
-                            )
-                            .clickable {
-                                displayMode = if (displayMode == CenterDisplayMode.VINYL) CenterDisplayMode.COVER else CenterDisplayMode.VINYL
-                            },
+                            .background(Color.White.copy(alpha = 0.08f))
+                            .clickable(onClick = onOpenQueue),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = AppIcons.Album,
-                            contentDescription = "唱片模式",
-                            tint = Color.White,
+                            imageVector = AppIcons.Playlist,
+                            contentDescription = "播放列表",
+                            tint = Color.White.copy(alpha = 0.9f),
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -759,14 +725,13 @@ fun PlayerScreen(
                 Spacer(modifier = Modifier.height(18.dp))
 
                 // -----------------------------------------------------------------
-                // 底部辅助栏 (歌词开关与播放队列按键)
+                // 底部辅助栏 (Apple Music 风格居中歌词/超椭圆封面切换胶囊)
                 // -----------------------------------------------------------------
-                Row(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 8.dp, end = 8.dp, bottom = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(bottom = 6.dp),
+                    contentAlignment = Alignment.Center
                 ) {
                     // 歌词按钮 (Apple Music 标志性对话框歌词图标)
                     Box(
@@ -779,7 +744,7 @@ fun PlayerScreen(
                             .clickable {
                                 displayMode = if (displayMode == CenterDisplayMode.LYRICS) CenterDisplayMode.COVER else CenterDisplayMode.LYRICS
                             }
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .padding(horizontal = 20.dp, vertical = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -796,27 +761,6 @@ fun PlayerScreen(
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
-                        }
-                    }
-
-                    // 播放列表按钮 (小米澎湃通透卡片)
-                    Box(
-                        modifier = Modifier
-                            .squircleClip(16.dp)
-                            .background(Color.White.copy(alpha = 0.10f))
-                            .clickable(onClick = onOpenQueue)
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = AppIcons.Playlist,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(text = "播放列表", color = Color.White.copy(alpha = 0.9f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -1082,92 +1026,3 @@ private fun AccompanistLyricsContainer(
     }
 }
 
-/**
- * 经典黑胶唱盘视图 (保留传统发烧友复古美学)
- */
-@Composable
-private fun VinylView(
-    coverUrl: String,
-    rotation: Float,
-    tonearmAngle: Float,
-    onToggleCover: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onToggleCover
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .size(280.dp)
-                .clip(CircleShape)
-                .background(Color(0xFF111113))
-                .rotate(rotation),
-            contentAlignment = Alignment.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(260.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF1A1A1C)),
-                contentAlignment = Alignment.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(240.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF131315)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(170.dp)
-                            .clip(CircleShape)
-                    ) {
-                        AsyncImage(
-                            url = coverUrl,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .size(28.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF0A0A0A)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(10.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.8f))
-                        )
-                    }
-                }
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 10.dp)
-                .rotate(tonearmAngle)
-        ) {
-            Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .height(60.dp)
-                    .background(Color.White.copy(alpha = 0.4f))
-            )
-        }
-    }
-}

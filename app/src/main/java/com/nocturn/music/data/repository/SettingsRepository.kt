@@ -74,14 +74,6 @@ object SettingsRepository {
         prefs.edit().putBoolean("blur_enabled", enabled).apply()
     }
 
-    private val _isVinylAnimationEnabled = MutableStateFlow(prefs.getBoolean("vinyl_animation_enabled", true))
-    val isVinylAnimationEnabled = _isVinylAnimationEnabled.asStateFlow()
-
-    fun setVinylAnimationEnabled(enabled: Boolean) {
-        _isVinylAnimationEnabled.value = enabled
-        prefs.edit().putBoolean("vinyl_animation_enabled", enabled).apply()
-    }
-
     private val _isAutoLosslessVip = MutableStateFlow(prefs.getBoolean("auto_lossless_vip", true))
     val isAutoLosslessVip = _isAutoLosslessVip.asStateFlow()
 

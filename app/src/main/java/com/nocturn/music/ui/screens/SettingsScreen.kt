@@ -61,7 +61,6 @@ fun SettingsScreen(
     val lyriconEnabled by SettingsRepository.lyriconEnabled.collectAsState()
 
     val isBlurEnabled by SettingsRepository.isBlurEnabled.collectAsState()
-    val isVinylAnimationEnabled by SettingsRepository.isVinylAnimationEnabled.collectAsState()
     val isAutoLosslessVip by SettingsRepository.isAutoLosslessVip.collectAsState()
     val isCrossfadeEnabled by SettingsRepository.isCrossfadeEnabled.collectAsState()
     val lyricOffsetMs by SettingsRepository.lyricOffsetMs.collectAsState()
@@ -113,13 +112,6 @@ fun SettingsScreen(
                     summary = if (isBlurEnabled) "开启背景实时着色器模糊，呈现 HyperOS 通透质感" else "已关闭动态模糊以降低功耗并提高流畅度",
                     checked = isBlurEnabled,
                     onCheckedChange = { SettingsRepository.setBlurEnabled(it) }
-                )
-
-                SwitchPreference(
-                    title = "播放页黑胶旋转动效",
-                    summary = if (isVinylAnimationEnabled) "开启唱盘旋转、唱臂起落与封面呼吸动效" else "已停用旋转动效",
-                    checked = isVinylAnimationEnabled,
-                    onCheckedChange = { SettingsRepository.setVinylAnimationEnabled(it) }
                 )
             }
             Spacer(modifier = Modifier.height(14.dp))
