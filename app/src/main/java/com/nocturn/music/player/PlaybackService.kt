@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
+import android.media.session.PlaybackState
 import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
@@ -275,8 +276,9 @@ class PlaybackService : Service() {
             .build()
 
         mediaSession.setPlaybackState(playbackState)
-        LyriconBridge.onPlaybackStateChanged(isPlaying)
-        LyriconBridge.onPositionUpdate(positionMs)
+        (playbackState.playbackState as? PlaybackState)?.let { ps ->
+            LyriconBridge.updatePlaybackState(ps)
+        } ?: LyriconBridge.syncPlaybackState(isPlaying, positionMs, isBuffering)
     }
 
     private fun updateMetadata(song: Song?, durationMs: Long, coverBitmap: Bitmap?) {
