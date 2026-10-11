@@ -1,5 +1,6 @@
 package com.nocturn.music.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -76,11 +77,13 @@ fun QueueSheet(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    val pillShape = com.nocturn.music.ui.theme.ExpressiveShapes.FullPill
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(pillShape)
+                            .background(MiuixTheme.colorScheme.surfaceContainerHighest)
                             .clickable { NocturnPlayer.togglePlayMode() }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
                         val (modeIcon, modeText) = when (playMode) {
                             PlayMode.LIST_LOOP -> AppIcons.Repeat to "列表循环"
@@ -91,14 +94,15 @@ fun QueueSheet(
                             Icon(
                                 imageVector = modeIcon,
                                 contentDescription = null,
-                                tint = MiuixTheme.colorScheme.onSurfaceSecondary,
+                                tint = MiuixTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(13.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = modeText,
-                                color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                                fontSize = 12.sp
+                                color = MiuixTheme.colorScheme.onSurface,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
                             )
                         }
                     }
@@ -107,17 +111,19 @@ fun QueueSheet(
 
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(pillShape)
+                            .background(MiuixTheme.colorScheme.surfaceContainerHighest)
                             .clickable {
                                 NocturnPlayer.clearQueue()
                                 onDismissRequest()
                             }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
                         Text(
                             text = "清空",
                             color = MiuixTheme.colorScheme.onSurfaceVariantActions,
-                            fontSize = 12.sp
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
                         )
                     }
                 }

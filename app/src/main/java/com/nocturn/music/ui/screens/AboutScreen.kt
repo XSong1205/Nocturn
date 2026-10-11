@@ -81,11 +81,12 @@ fun AboutScreen(
                         .padding(vertical = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    val logoShape = com.nocturn.music.ui.theme.ExpressiveShapes.ContainerLarge
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
                             .size(88.dp)
-                            .clip(RoundedCornerShape(24.dp))
+                            .clip(logoShape)
                             .background(MiuixTheme.colorScheme.primaryContainer)
                     ) {
                         Icon(

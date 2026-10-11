@@ -202,11 +202,12 @@ fun OobeScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (currentStep > 0) {
+                        val pillShape = com.nocturn.music.ui.theme.ExpressiveShapes.FullPill
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(52.dp)
-                                .squircleCard(26.dp)
+                                .clip(pillShape)
                                 .background(MiuixTheme.colorScheme.surface)
                                 .clickable {
                                     if (currentStep > 0) currentStep--

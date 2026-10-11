@@ -117,11 +117,12 @@ fun TopChartsSquareScreen(
                             .clickable { onChartClick(chart.id, chart.name, chart.coverUrl) }
                     ) {
                         Column(modifier = Modifier.padding(10.dp)) {
+                            val chartCoverShape = com.nocturn.music.ui.theme.ExpressiveShapes.AsymmetricCardSmall
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(130.dp)
-                                    .squircleCard(14.dp)
+                                    .clip(chartCoverShape)
                             ) {
                                 AsyncImage(
                                     url = chart.coverUrl,
