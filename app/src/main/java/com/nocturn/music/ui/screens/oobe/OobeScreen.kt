@@ -148,12 +148,16 @@ fun OobeScreen(
                 AnimatedContent(
                     targetState = currentStep,
                     transitionSpec = {
+                        val offsetSpring = androidx.compose.animation.core.spring<androidx.compose.ui.unit.IntOffset>(
+                            dampingRatio = 0.82f,
+                            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                        )
                         if (targetState > initialState) {
-                            (slideInHorizontally(tween(350, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(250)))
-                                .togetherWith(slideOutHorizontally(tween(350, easing = FastOutSlowInEasing)) { -it / 3 } + fadeOut(tween(200)))
+                            (slideInHorizontally(offsetSpring) { it / 2 } + fadeIn(tween(240)))
+                                .togetherWith(slideOutHorizontally(offsetSpring) { -it / 3 } + fadeOut(tween(180)))
                         } else {
-                            (slideInHorizontally(tween(350, easing = FastOutSlowInEasing)) { -it } + fadeIn(tween(250)))
-                                .togetherWith(slideOutHorizontally(tween(350, easing = FastOutSlowInEasing)) { it / 3 } + fadeOut(tween(200)))
+                            (slideInHorizontally(offsetSpring) { -it / 2 } + fadeIn(tween(240)))
+                                .togetherWith(slideOutHorizontally(offsetSpring) { it / 3 } + fadeOut(tween(180)))
                         }
                     },
                     label = "oobe-step-transition",

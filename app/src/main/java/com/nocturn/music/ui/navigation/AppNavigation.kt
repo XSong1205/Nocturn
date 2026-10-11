@@ -275,12 +275,16 @@ fun AppNavigation() {
                                 AnimatedContent(
                                     targetState = currentTab,
                                     transitionSpec = {
+                                        val offsetSpring = spring<androidx.compose.ui.unit.IntOffset>(
+                                            dampingRatio = 0.82f,
+                                            stiffness = Spring.StiffnessMediumLow
+                                        )
                                         if (targetState.ordinal > initialState.ordinal) {
-                                            (slideInHorizontally(tween(300, easing = FastOutSlowInEasing)) { it / 3 } + fadeIn(tween(240)))
-                                                .togetherWith(slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) { -it / 3 } + fadeOut(tween(180)))
+                                            (slideInHorizontally(offsetSpring) { it / 4 } + fadeIn(tween(220)))
+                                                .togetherWith(slideOutHorizontally(offsetSpring) { -it / 4 } + fadeOut(tween(160)))
                                         } else {
-                                            (slideInHorizontally(tween(300, easing = FastOutSlowInEasing)) { -it / 3 } + fadeIn(tween(240)))
-                                                .togetherWith(slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) { it / 3 } + fadeOut(tween(180)))
+                                            (slideInHorizontally(offsetSpring) { -it / 4 } + fadeIn(tween(220)))
+                                                .togetherWith(slideOutHorizontally(offsetSpring) { it / 4 } + fadeOut(tween(160)))
                                         }
                                     },
                                     label = "tab-transition"

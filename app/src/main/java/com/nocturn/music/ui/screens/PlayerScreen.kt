@@ -159,7 +159,10 @@ fun PlayerScreen(
 
     val coverShadowElevation by animateFloatAsState(
         targetValue = if (isPlaying) 28f else 10f,
-        animationSpec = tween(350),
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
         label = "coverShadow"
     )
 
@@ -429,8 +432,12 @@ fun PlayerScreen(
                 AnimatedContent(
                     targetState = displayMode,
                     transitionSpec = {
-                        (fadeIn(tween(350)) + scaleIn(tween(350), initialScale = 0.95f))
-                            .togetherWith(fadeOut(tween(250)) + scaleOut(tween(250), targetScale = 0.95f))
+                        val springSpec = spring<Float>(
+                            dampingRatio = 0.78f,
+                            stiffness = Spring.StiffnessMediumLow
+                        )
+                        (fadeIn(tween(260)) + scaleIn(springSpec, initialScale = 0.90f))
+                            .togetherWith(fadeOut(tween(180)) + scaleOut(springSpec, targetScale = 0.90f))
                     },
                     label = "center-display-switch"
                 ) { mode ->
