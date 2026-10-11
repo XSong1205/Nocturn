@@ -68,10 +68,11 @@ fun SongListItem(
                 }
             }
         } else if (showCover) {
+            val songCoverShape = com.nocturn.music.ui.theme.ExpressiveShapes.ContainerSmall
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .squircleCard(10.dp)
+                    .clip(songCoverShape)
             ) {
                 AsyncImage(
                     url = song.coverUrl,
@@ -113,14 +114,14 @@ fun SongListItem(
                     Spacer(modifier = Modifier.width(6.dp))
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
+                            .clip(com.nocturn.music.ui.theme.ExpressiveShapes.FullPill)
                             .background(HyperRed.copy(alpha = 0.15f))
-                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                            .padding(horizontal = 6.dp, vertical = 1.5.dp)
                     ) {
                         Text(
                             text = "VIP",
                             color = HyperRed,
-                            fontSize = 10.sp,
+                            fontSize = 9.5.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }

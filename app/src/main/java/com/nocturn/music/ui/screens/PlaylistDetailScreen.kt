@@ -387,10 +387,11 @@ fun PlaylistDetailScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.Top
                             ) {
+                                val detailCoverShape = com.nocturn.music.ui.theme.ExpressiveShapes.AsymmetricCardLarge
                                 Box(
                                     modifier = Modifier
-                                        .size(122.dp)
-                                        .squircleCard(18.dp)
+                                        .size(126.dp)
+                                        .clip(detailCoverShape)
                                         .background(MiuixTheme.colorScheme.surfaceContainer)
                                 ) {
                                     if (isFavoriteMode) {
@@ -627,30 +628,31 @@ fun PlaylistDetailScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // 播放全部按钮
+                            // 播放全部按钮 (M3E FullPill 高光胶囊)
+                            val pillShape = com.nocturn.music.ui.theme.ExpressiveShapes.FullPill
                             Row(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(20.dp))
+                                    .clip(pillShape)
                                     .background(HyperBlue)
                                     .clickable {
                                         if (displayTracks.isNotEmpty()) {
                                             NocturnPlayer.playQueue(displayTracks, 0)
                                         }
                                     }
-                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                    .padding(horizontal = 20.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
                                     imageVector = AppIcons.Play,
                                     contentDescription = null,
                                     tint = Color.White,
-                                    modifier = Modifier.size(14.dp)
+                                    modifier = Modifier.size(15.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = "播放全部",
                                     color = Color.White,
-                                    fontSize = 14.sp,
+                                    fontSize = 14.5.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
@@ -660,24 +662,24 @@ fun PlaylistDetailScreen(
                                 )
                             }
 
-                            // 随机播放按钮
+                            // 随机播放按钮 (M3E 次级药丸胶囊)
                             Row(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(20.dp))
+                                    .clip(pillShape)
                                     .background(MiuixTheme.colorScheme.surfaceContainerHighest)
                                     .clickable {
                                         if (displayTracks.isNotEmpty()) {
                                             NocturnPlayer.playQueueShuffled(displayTracks)
                                         }
                                     }
-                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                                    .padding(horizontal = 16.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
                                     imageVector = AppIcons.Shuffle,
                                     contentDescription = null,
                                     tint = MiuixTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(14.dp)
+                                    modifier = Modifier.size(15.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(

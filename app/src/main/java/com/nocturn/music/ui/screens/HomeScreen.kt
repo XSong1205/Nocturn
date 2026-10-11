@@ -293,49 +293,53 @@ private fun QuickActionsBar(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.SpaceAround
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        QuickActionButton(icon = AppIcons.FavoritesFill, label = "每日推荐", color = Color(0xFFFF5252), onClick = onDailyRecommend)
-        QuickActionButton(icon = AppIcons.Sort, label = "排行榜", color = Color(0xFFFF9800), onClick = onTopCharts)
-        QuickActionButton(icon = AppIcons.Playlist, label = "歌单广场", color = MiuixTheme.colorScheme.primary, onClick = onSearch)
-        QuickActionButton(icon = AppIcons.Search, label = "全网搜索", color = Color(0xFF4CAF50), onClick = onSearch)
+        QuickActionChip(icon = AppIcons.FavoritesFill, label = "每日推荐", color = Color(0xFFFF5252), onClick = onDailyRecommend, modifier = Modifier.weight(1f))
+        QuickActionChip(icon = AppIcons.Sort, label = "排行榜", color = Color(0xFFFF9800), onClick = onTopCharts, modifier = Modifier.weight(1f))
+        QuickActionChip(icon = AppIcons.Playlist, label = "歌单广场", color = MiuixTheme.colorScheme.primary, onClick = onSearch, modifier = Modifier.weight(1f))
+        QuickActionChip(icon = AppIcons.Search, label = "搜索", color = Color(0xFF4CAF50), onClick = onSearch, modifier = Modifier.weight(1f))
     }
 }
 
 @Composable
-private fun QuickActionButton(
+private fun QuickActionChip(
     icon: ImageVector,
     label: String,
     color: Color,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
+    val chipShape = com.nocturn.music.ui.theme.ExpressiveShapes.ContainerMedium
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
+        modifier = modifier
+            .clip(chipShape)
+            .background(color.copy(alpha = 0.08f))
             .clickable(onClick = onClick)
-            .padding(8.dp)
+            .padding(vertical = 12.dp, horizontal = 4.dp)
     ) {
         Box(
             modifier = Modifier
-                .size(46.dp)
+                .size(38.dp)
                 .clip(CircleShape)
-                .background(color.copy(alpha = 0.12f)),
+                .background(color.copy(alpha = 0.16f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
                 tint = color,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = label,
             color = MiuixTheme.colorScheme.onSurface,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium
+            fontSize = 11.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1
         )
     }
 }
@@ -352,11 +356,12 @@ private fun TopChartCard(
             .clickable(onClick = onClick)
     ) {
         Column(modifier = Modifier.padding(10.dp)) {
+            val chartShape = com.nocturn.music.ui.theme.ExpressiveShapes.AsymmetricCardSmall
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(110.dp)
-                    .squircleCard(14.dp)
+                    .clip(chartShape)
             ) {
                 AsyncImage(
                     url = chart.coverUrl,

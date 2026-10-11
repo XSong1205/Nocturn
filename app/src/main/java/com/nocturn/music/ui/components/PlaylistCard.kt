@@ -39,11 +39,12 @@ fun PlaylistCard(
             .width(130.dp)
             .clickable(onClick = onClick)
     ) {
+        val coverShape = com.nocturn.music.ui.theme.ExpressiveShapes.AsymmetricCardSmall
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
-                .squircleCard(16.dp)
+                .clip(coverShape)
         ) {
             AsyncImage(
                 url = playlist.coverUrl,
@@ -56,9 +57,9 @@ fun PlaylistCard(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(6.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color.Black.copy(alpha = 0.5f))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                        .clip(com.nocturn.music.ui.theme.ExpressiveShapes.FullPill)
+                        .background(Color.Black.copy(alpha = 0.55f))
+                        .padding(horizontal = 7.dp, vertical = 3.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(

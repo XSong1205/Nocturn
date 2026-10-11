@@ -65,16 +65,16 @@ fun MiniPlayerBar(
     }
 
     val blurActive = isRuntimeShaderSupported() && isBlurEnabled && backdrop != null
-    val cardShape = remember { RoundedCornerShape(18.dp) }
+    val cardShape = com.nocturn.music.ui.theme.ExpressiveShapes.IslandBar
     val floatingHighlight = remember(isDark) {
         if (isDark) Highlight.GlassStrokeMiddleDark else Highlight.GlassStrokeMiddleLight
     }
 
     val playIconScale by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (isPlaying) 1.05f else 0.95f,
+        targetValue = if (isPlaying) 1.08f else 0.94f,
         animationSpec = androidx.compose.animation.core.spring(
-            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-            stiffness = androidx.compose.animation.core.Spring.StiffnessLow
+            dampingRatio = 0.65f,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
         ),
         label = "playIconScale"
     )
@@ -84,12 +84,12 @@ fun MiniPlayerBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .padding(horizontal = 14.dp, vertical = 6.dp)
             .shadow(
-                elevation = 12.dp,
+                elevation = 14.dp,
                 shape = cardShape,
-                ambientColor = Color.Black.copy(alpha = if (isDark) 0.35f else 0.12f),
-                spotColor = Color.Black.copy(alpha = if (isDark) 0.45f else 0.18f)
+                ambientColor = Color.Black.copy(alpha = if (isDark) 0.40f else 0.15f),
+                spotColor = Color.Black.copy(alpha = if (isDark) 0.50f else 0.20f)
             )
             .then(
                 if (blurActive) {
@@ -101,9 +101,9 @@ fun MiniPlayerBar(
                             blendColors = listOf(
                                 BlendColorEntry(
                                     color = if (isDark) {
-                                        surfaceContainerColor.copy(alpha = 0.55f)
+                                        surfaceContainerColor.copy(alpha = 0.60f)
                                     } else {
-                                        surfaceContainerColor.copy(alpha = 0.65f)
+                                        surfaceContainerColor.copy(alpha = 0.70f)
                                     }
                                 )
                             )
@@ -112,7 +112,7 @@ fun MiniPlayerBar(
                     )
                 } else {
                     Modifier
-                        .squircleCard(18.dp)
+                        .clip(cardShape)
                         .background(surfaceContainerColor.copy(alpha = 0.95f))
                 }
             )
@@ -124,11 +124,12 @@ fun MiniPlayerBar(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 封面卡片 (HyperOS 统一超椭圆样式)
+            // 封面卡片 (M3E 形状张力容器)
+            val coverShape = com.nocturn.music.ui.theme.ExpressiveShapes.ContainerSmall
             Box(
                 modifier = Modifier
-                    .size(44.dp)
-                    .squircleCard(12.dp)
+                    .size(46.dp)
+                    .clip(coverShape)
                     .background(Color(0xFF1E1E1E))
             ) {
                 AsyncImage(

@@ -288,22 +288,22 @@ fun MyScreen(
                     if (!userProfile.isLogin) {
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(com.nocturn.music.ui.theme.ExpressiveShapes.FullPill)
                                 .background(HyperBlue)
                                 .clickable { showLoginDialog = true }
-                                .padding(horizontal = 14.dp, vertical = 7.dp)
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
                         ) {
-                            Text(text = "登录", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(text = "登录", color = Color.White, fontSize = 13.5.sp, fontWeight = FontWeight.Bold)
                         }
                     } else {
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(com.nocturn.music.ui.theme.ExpressiveShapes.FullPill)
                                 .background(MiuixTheme.colorScheme.surfaceContainerHighest)
                                 .clickable { showAccountDialog = true }
-                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
-                            Text(text = "管理", color = MiuixTheme.colorScheme.onSurfaceSecondary, fontSize = 11.sp)
+                            Text(text = "管理", color = MiuixTheme.colorScheme.onSurfaceSecondary, fontSize = 11.5.sp)
                         }
                     }
                 }
@@ -313,12 +313,13 @@ fun MyScreen(
 
         item {
             val favPlaylist = userPlaylists.firstOrNull { it.name.contains("喜欢的音乐") } ?: userPlaylists.firstOrNull()
+            val bannerShape = com.nocturn.music.ui.theme.ExpressiveShapes.ContainerLarge
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                    .height(100.dp)
-                    .squircleCard(20.dp)
+                    .height(104.dp)
+                    .clip(bannerShape)
                     .background(
                         Brush.linearGradient(
                             colors = listOf(Color(0xFFE53935), Color(0xFFFF7043))

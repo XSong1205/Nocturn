@@ -200,18 +200,19 @@ fun SearchScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
+                            val chipShape = com.nocturn.music.ui.theme.ExpressiveShapes.FullPill
                             searchHistory.forEach { historyTag ->
                                 Box(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(14.dp))
+                                        .clip(chipShape)
                                         .background(MiuixTheme.colorScheme.surfaceContainerHighest)
                                         .clickable { performSearch(historyTag) }
-                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                        .padding(horizontal = 14.dp, vertical = 7.dp)
                                 ) {
                                     Text(
                                         text = historyTag,
                                         color = MiuixTheme.colorScheme.onSurface,
-                                        fontSize = 13.sp
+                                        fontSize = 12.5.sp
                                     )
                                 }
                             }
@@ -230,23 +231,24 @@ fun SearchScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        val hotChipShape = com.nocturn.music.ui.theme.ExpressiveShapes.FullPill
                         hotKeywordsList.forEachIndexed { i, keyword ->
                             val isTop = i < 3
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(14.dp))
+                                    .clip(hotChipShape)
                                     .background(
-                                        if (isTop) HyperBlue.copy(alpha = 0.1f)
+                                        if (isTop) HyperBlue.copy(alpha = 0.12f)
                                         else MiuixTheme.colorScheme.surfaceContainerHighest
                                     )
                                     .clickable { performSearch(keyword) }
-                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                                    .padding(horizontal = 14.dp, vertical = 7.dp)
                             ) {
                                 Text(
                                     text = "${i + 1}. $keyword",
                                     color = if (isTop) HyperBlue else MiuixTheme.colorScheme.onSurface,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (isTop) FontWeight.SemiBold else FontWeight.Normal
+                                    fontSize = 12.5.sp,
+                                    fontWeight = if (isTop) FontWeight.Bold else FontWeight.Normal
                                 )
                             }
                         }

@@ -85,6 +85,7 @@ import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
 import com.mocharealm.accompanist.lyrics.ui.composable.lyrics.KaraokeLyricsView
 import top.yukonga.miuix.kmp.squircle.squircleClip
 import com.nocturn.music.ui.theme.AppIcons
+import com.nocturn.music.ui.theme.ExpressiveShapes
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -541,7 +542,7 @@ fun PlayerScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // -----------------------------------------------------------------
-                // Apple Music 风格扁平高灵敏度进度条 (剩余时间显示)
+                // Material 3 Expressive (M3E) 呼吸律动波浪进度条 (Wavy Slider)
                 // -----------------------------------------------------------------
                 val progress = if (durationMs > 0) {
                     (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
@@ -550,8 +551,9 @@ fun PlayerScreen(
                 val currentDisplayValue = if (isDraggingSlider) sliderValue else progress
 
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    Slider(
+                    com.nocturn.music.ui.components.ExpressiveWavySlider(
                         value = currentDisplayValue,
+                        isPlaying = isPlaying,
                         onValueChange = {
                             isDraggingSlider = true
                             sliderValue = it
@@ -561,12 +563,10 @@ fun PlayerScreen(
                             val targetMs = (sliderValue * durationMs).toLong()
                             NocturnPlayer.seekTo(targetMs)
                         },
-                        colors = SliderDefaults.colors(
-                            thumbColor = Color.White,
-                            activeTrackColor = Color.White.copy(alpha = 0.85f),
-                            inactiveTrackColor = Color.White.copy(alpha = 0.18f)
-                        ),
-                        modifier = Modifier.fillMaxWidth()
+                        activeColor = Color.White,
+                        inactiveColor = Color.White.copy(alpha = 0.22f),
+                        thumbColor = Color.White,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp)
                     )
 
                     Row(
@@ -599,7 +599,7 @@ fun PlayerScreen(
                 Spacer(modifier = Modifier.height(14.dp))
 
                 // -----------------------------------------------------------------
-                // 核心控制区 (融合 Apple Music 极简大键位与小米澎湃超级椭圆触控感)
+                // 核心控制区 (Material 3 Expressive 悬浮形态与形变按键)
                 // -----------------------------------------------------------------
                 Row(
                     modifier = Modifier
@@ -611,9 +611,9 @@ fun PlayerScreen(
                     // 播放模式
                     Box(
                         modifier = Modifier
-                            .size(44.dp)
-                            .squircleClip(14.dp)
-                            .background(Color.White.copy(alpha = 0.08f))
+                            .size(46.dp)
+                            .clip(ExpressiveShapes.ContainerSmall)
+                            .background(Color.White.copy(alpha = 0.10f))
                             .clickable { NocturnPlayer.togglePlayMode() },
                         contentAlignment = Alignment.Center
                     ) {
@@ -633,9 +633,9 @@ fun PlayerScreen(
                     // 上一曲
                     Box(
                         modifier = Modifier
-                            .size(52.dp)
-                            .squircleClip(18.dp)
-                            .background(Color.White.copy(alpha = 0.1f))
+                            .size(54.dp)
+                            .clip(ExpressiveShapes.ContainerMedium)
+                            .background(Color.White.copy(alpha = 0.12f))
                             .clickable { NocturnPlayer.playPrevious() },
                         contentAlignment = Alignment.Center
                     ) {
@@ -643,26 +643,27 @@ fun PlayerScreen(
                             imageVector = AppIcons.SkipPrevious,
                             contentDescription = "上一曲",
                             tint = Color.White,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(26.dp)
                         )
                     }
 
-                    // 主播放/暂停键 (HyperOS 澎湃大圆角大按键，带柔光投射与物理弹性动画)
+                    // 主播放/暂停键 (M3E 标志性 形变按键 Shape Morphing：播放时圆形/暂停时超大圆角软矩形)
+                    val playBtnShape = if (isPlaying) CircleShape else ExpressiveShapes.SuperPill
                     val playBtnScale by animateFloatAsState(
                         targetValue = if (isPlaying) 1.0f else 0.94f,
                         animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessLow
+                            dampingRatio = 0.68f,
+                            stiffness = Spring.StiffnessMediumLow
                         ),
                         label = "playerPlayBtnScale"
                     )
                     Box(
                         modifier = Modifier
-                            .size(72.dp)
+                            .size(76.dp)
                             .scale(playBtnScale)
-                            .squircleClip(24.dp)
+                            .shadow(20.dp, playBtnShape, ambientColor = Color.White.copy(alpha = 0.4f))
+                            .clip(playBtnShape)
                             .background(Color.White)
-                            .shadow(16.dp, CircleShape, ambientColor = Color.White.copy(alpha = 0.35f))
                             .clickable { NocturnPlayer.togglePlayPause() },
                         contentAlignment = Alignment.Center
                     ) {
@@ -681,7 +682,7 @@ fun PlayerScreen(
                                     imageVector = if (playing) AppIcons.Pause else AppIcons.Play,
                                     contentDescription = if (playing) "暂停" else "播放",
                                     tint = Color.Black,
-                                    modifier = Modifier.size(30.dp)
+                                    modifier = Modifier.size(32.dp)
                                 )
                             }
                         }
@@ -690,9 +691,9 @@ fun PlayerScreen(
                     // 下一曲
                     Box(
                         modifier = Modifier
-                            .size(52.dp)
-                            .squircleClip(18.dp)
-                            .background(Color.White.copy(alpha = 0.1f))
+                            .size(54.dp)
+                            .clip(ExpressiveShapes.ContainerMedium)
+                            .background(Color.White.copy(alpha = 0.12f))
                             .clickable { NocturnPlayer.playNext() },
                         contentAlignment = Alignment.Center
                     ) {
@@ -700,22 +701,22 @@ fun PlayerScreen(
                             imageVector = AppIcons.SkipNext,
                             contentDescription = "下一曲",
                             tint = Color.White,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(26.dp)
                         )
                     }
 
-                    // 播放列表按钮 (与左侧播放模式按键对称呼应)
+                    // 播放队列入口
                     Box(
                         modifier = Modifier
-                            .size(44.dp)
-                            .squircleClip(14.dp)
-                            .background(Color.White.copy(alpha = 0.08f))
+                            .size(46.dp)
+                            .clip(ExpressiveShapes.ContainerSmall)
+                            .background(Color.White.copy(alpha = 0.10f))
                             .clickable(onClick = onOpenQueue),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = AppIcons.Playlist,
-                            contentDescription = "播放列表",
+                            contentDescription = "播放队列",
                             tint = Color.White.copy(alpha = 0.9f),
                             modifier = Modifier.size(20.dp)
                         )
@@ -802,6 +803,7 @@ private fun AppleMusicCoverView(
             ),
         contentAlignment = Alignment.Center
     ) {
+        val coverShape = ExpressiveShapes.ContainerLarge
         Box(
             modifier = Modifier
                 .fillMaxWidth(0.85f)
@@ -809,11 +811,11 @@ private fun AppleMusicCoverView(
                 .scale(scale)
                 .shadow(
                     elevation = shadowElevation.dp,
-                    shape = RoundedCornerShape(28.dp),
+                    shape = coverShape,
                     ambientColor = Color.Black.copy(alpha = 0.45f),
                     spotColor = Color.Black.copy(alpha = 0.6f)
                 )
-                .squircleClip(28.dp)
+                .clip(coverShape)
                 .background(Color(0xFF1B1B1E))
         ) {
             AsyncImage(
