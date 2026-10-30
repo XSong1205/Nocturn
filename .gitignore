@@ -1,0 +1,14 @@
+.gradle/
+.kotlin/
+.idea/
+**/build/
+**/node_modules/
+local-api-node/dist/
+local.properties
+*.iml
+*.log
+.runtime-cache/
+.cache/
+.cxx/
+**/.cxx/
+captures/

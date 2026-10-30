@@ -1,0 +1,22 @@
+{
+  "name": "@nocturn/local-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "node dist/main.cjs",
+    "pretest": "npm run build",
+    "test": "node --test",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@neteasecloudmusicapienhanced/api": "4.36.2"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  }
+}
