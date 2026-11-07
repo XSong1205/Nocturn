@@ -2,7 +2,20 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { startRuntime } from '../scripts/runtime-helper.mjs';
+
+const bundleRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist');
+
+test('Android bundle resolves upstream temp state through NOCTURN_DATA_DIR instead of /tmp', async () => {
+  const bundle = await fs.readFile(path.join(bundleRoot, 'main.cjs'), 'utf8');
+  // Upstream reads os.tmpdir() at module load; Android has no /tmp. The adapter must rewrite
+  // every such read to the app-private data directory while keeping the host fallback.
+  assert.match(bundle, /process\.env\.NOCTURN_DATA_DIR \|\| require\("os"\)\.tmpdir\(\)/);
+  assert.doesNotMatch(bundle, /const tmpPath = require\("os"\)\.tmpdir\(\)/);
+  // Startup diagnostics remain app-private instead of being written to logcat.
+  assert.match(bundle, /startup-error\.log/);
+});
 
 test('actual bundled provider starts offline, writes readiness and handles a local QR create request', async (t) => {
   const runtime = await startRuntime();

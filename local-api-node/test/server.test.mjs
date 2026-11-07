@@ -203,7 +203,7 @@ test('search, suggestions and banner validate their own type namespaces', async 
   ]) assert.equal((await post(api, route, params)).status, 400, route);
 });
 
-test('account endpoints dispatch explicit actions without accepting password/transport overrides', async (t) => {
+test('account endpoints dispatch explicit actions with one phone credential', async (t) => {
   const api = await fixture(t);
   for (const [route, params] of [
     ['register/anonimous', {}], ['login/refresh', { cookie: 'test' }],
@@ -211,6 +211,7 @@ test('account endpoints dispatch explicit actions without accepting password/tra
     ['captcha/sent', { phone: '13800138000', ctcode: '86' }],
     ['captcha/verify', { phone: '13800138000', captcha: '012345', ctcode: '86' }],
     ['login/cellphone', { phone: '13800138000', captcha: '012345', countrycode: '86' }],
+    ['login/cellphone', { phone: '13800138000', password: 'local-secret', countrycode: '86' }],
     ['song/like', { id: '1', uid: '2', like: false }],
     ['user/playlist/create', { uid: '2', limit: 50, offset: 50 }],
     ['user/playlist/collect', { uid: '2' }], ['record/recent/song', { limit: 20 }],
@@ -218,7 +219,10 @@ test('account endpoints dispatch explicit actions without accepting password/tra
   for (const params of [
     { phone: 'not-a-phone', captcha: '1234' },
     { phone: '13800138000', captcha: 'not-a-code' },
-    { phone: '13800138000', password: 'secret' },
+    { phone: '13800138000' },
+    { phone: '13800138000', password: '' },
+    { phone: '13800138000', password: 'secret', captcha: '1234' },
+    { phone: '13800138000', md5_password: 'secret' },
     { phone: '13800138000', captcha: '1234', countrycode: '0' },
   ]) assert.equal((await post(api, 'login/cellphone', params)).status, 400);
 });

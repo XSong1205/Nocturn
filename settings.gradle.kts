@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "Nocturn"
-include(":local-api", ":local-api-android")
+include(":app", ":local-api", ":local-api-android")

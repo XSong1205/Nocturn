@@ -3,8 +3,6 @@ package dev.nocturn.localapi
 import android.app.Application
 import android.content.Context
 import android.os.SystemClock
-import android.system.Os
-import android.system.OsConstants
 import android.util.Base64
 import java.io.File
 import java.net.HttpURLConnection
@@ -52,9 +50,6 @@ class LocalApiRuntime private constructor(private val context: Application) {
             try {
                 check(Application.getProcessName() == context.packageName) {
                     "LocalAPI must be started in the application's main process."
-                }
-                check(Os.sysconf(OsConstants._SC_PAGESIZE) == 4096L) {
-                    "The pinned Node runtime supports 4 KB memory pages only; this device requires a rebuilt libnode.so."
                 }
                 mutableState.value = LocalApiRuntimeState.Preparing
                 val entry = installBundle()

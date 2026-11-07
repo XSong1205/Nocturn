@@ -1,6 +1,6 @@
 # Nocturn LocalAPI — Node 层
 
-独立实现的 loopback HTTP 服务与 Android 资源打包工具；未复制 SPlayer 的实现。通过精选模块使用 `@neteasecloudmusicapienhanced/api@4.36.2`，与用户提供的参考服务当前版本一致。运行时只需要 Node.js 18+；已在 **Node.js 18.20.4** 上实际执行测试与在线调用。
+独立实现的 loopback HTTP 服务与 Android 资源打包工具；未复制 SPlayer 的实现。通过精选模块使用 `@neteasecloudmusicapienhanced/api@4.41.1`，共 63 个白名单端点。2026-11-01 Docs 重抓时参考服务已从此前 `4.36.2` 升为 `4.41.1`，但新版搜索与 banner 模块仍缺于锁定 npm 包；公开契约需单独核对。运行时只需要 Node.js 18+；此前已在 **Node.js 18.20.4** 上实际执行测试与在线调用。
 
 ## 开发与构建
 
@@ -38,7 +38,7 @@ npm.cmd run build
 | `NOCTURN_API_PORT` | 可选，默认 `0`，由系统分配空闲端口 |
 | `NOCTURN_DATA_DIR` | 必填，应用私有数据目录的绝对路径 |
 
-服务始终只监听 `127.0.0.1`。上游缓存密钥和设备标识保存在私有数据目录中，`TMPDIR` 等在加载上游模块前设置。启动不依赖网络；只有歌曲 URL 等需要新密钥的请求会按需联网初始化。
+服务始终只监听 `127.0.0.1`。上游缓存密钥和设备标识保存在私有数据目录中，`TMPDIR` 等在加载上游模块前设置。上游 API 在模块加载时读取 `os.tmpdir()`；Android 上没有 `/tmp`，因此打包适配层把所有上游 `os.tmpdir()` 读取重定向到 `NOCTURN_DATA_DIR`（缺少该变量时回退标准 tmpdir），保证 `anonymous_token`、xeapi 密钥与临时文件只落在应用私有目录。启动不依赖网络；只有歌曲 URL 等需要新密钥的请求会按需联网初始化。
 
 监听成功后，先原子写入 `<NOCTURN_DATA_DIR>/runtime-ready.json`，然后写出 stdout 标记：
 
@@ -46,7 +46,7 @@ npm.cmd run build
 NOCTURN_LOCAL_API_READY {"port":12345,"version":"0.1.0"}
 ```
 
-就绪文件内容与标记中的 JSON 一致，不包含 token。Android 在启动前删除旧就绪文件，并在读到新端口后请求 `/health` 确认服务可用。初始化失败只写 `NOCTURN_LOCAL_API_FAILED STARTUP_FAILURE`，不打印任意依赖错误。Node 生命周期不能在同一进程内反复重启，具体由 Android 模块管理。
+就绪文件内容与标记中的 JSON 一致，不包含 token。Android 在启动前删除旧就绪文件，并在读到新端口后请求 `/health` 确认服务可用。初始化失败只写 `NOCTURN_LOCAL_API_FAILED STARTUP_FAILURE`，不打印任意依赖错误；同时在 `<NOCTURN_DATA_DIR>/startup-error.log` 写入 Node 版本、架构与错误摘要，供设备端通过 `run-as` 诊断。该文件位于应用私有目录，不会进入 logcat。Node 生命周期不能在同一进程内反复重启，具体由 Android 模块管理。
 
 ## HTTP 契约
 
@@ -76,7 +76,7 @@ Content-Type: application/json
 | `login/refresh`、`register/anonimous` | `{}`，刷新登录需要 Cookie，二维码会话不支持刷新 |
 | `captcha/sent` | `phone`，可选 `ctcode` |
 | `captcha/verify` | `phone`、`captcha`，可选 `ctcode` |
-| `login/cellphone` | `phone`、`captcha`，可选 `countrycode`；仅开放短信方式 |
+| `login/cellphone` | `phone`、`captcha` 或 `password` 二选一，可选 `countrycode`；不接受预计算的 `md5_password` |
 | `search`、`cloudsearch` | `keywords`，可选 `type`（含 1018）、`limit`、`offset` |
 | `search/suggest` | `keywords`，可选 `type=mobile/web` |
 | `search/default` | `{}` |
@@ -86,7 +86,7 @@ Content-Type: application/json
 | `check/music` | `id`，可选 `br` |
 | `song/music/detail` | `id` |
 | `lyric`、`lyric/new` | `id` |
-| `personalized` | 可选 `limit` |
+| `personalized`、`personalized/newsong` | 可选 `limit` |
 | `recommend/resource`、`toplist`、`toplist/detail` | `{}` |
 | `recommend/songs` | 可选布尔 `afresh` |
 | `homepage/block/page` | 可选布尔 `refresh`、字符串 `cursor` |
@@ -94,6 +94,15 @@ Content-Type: application/json
 | `playlist/detail` | `id`，可选 `s` |
 | `playlist/track/all` | `id`，可选 `limit`、`offset` |
 | `playlist/subscribe` | `id`、`t`（1 收藏／2 取消） |
+| `playlist/catlist`、`playlist/hot`、`playlist/highquality/tags` | `{}` |
+| `top/playlist` | 可选 `cat`、`order=hot/new`、`limit`、`offset` |
+| `top/playlist/highquality` | 可选 `cat`、`limit`、`before`（上页末尾 `updateTime`），不接受 `offset` |
+| `playlist/create` | `name`、`cookie`，可选 `privacy=0/10`、`type=NORMAL/VIDEO/SHARED` |
+| `playlist/delete` | `id`（最多 200 个逗号分隔 ID）、`cookie` |
+| `playlist/tracks` | `pid`、`tracks`（最多 200 个歌曲 ID）、`op=add/del`、`cookie` |
+| `playlist/name/update` | `id`、`name`（1–40 字符）、`cookie` |
+| `playlist/desc/update` | `id`、`desc`（最多 1000 字符，空串清除）、`cookie` |
+| `playlist/tags/update` | `id`、`tags`（最多 3 个分号分隔标签，每个最多 40 字符，空串清除）、`cookie` |
 | `user/detail`、`likelist` | `uid` |
 | `user/account`、`user/subcount` | `{}` |
 | `user/playlist`、`user/playlist/create`、`user/playlist/collect` | `uid`，可选 `limit`、`offset` |
@@ -102,13 +111,18 @@ Content-Type: application/json
 | `song/like` | `id`、`uid`、布尔 `like` |
 | `album`、`artists`、`artist/detail` | `id` |
 | `artist/album` | `id`，可选 `limit`、`offset` |
+| `artist/songs` | `id`，可选 `order=hot/time`、`limit`、`offset` |
+| `album/sub`、`artist/sub` | `id`、`t=1/2`、`cookie` |
+| `album/sublist`、`artist/sublist` | `cookie`，可选 `limit`、`offset` |
 | `personal/fm` | `{}` |
 
 精确参数白名单见 `src/endpoints.mjs`。分页 `limit` 为 1–200，`offset` 为 0–100000，正文上限 64 KiB。未知字段、`proxy`、`domain`、`crypto`、`headers`、`unblock` 等均拒绝。
 
-音质统一为 `standard/higher/exhigh/lossless/hires/jyeffect/sky/dolby/jymaster`。非文档音质 `vivid` 已移出白名单。数字形式 ID 必须为安全整数；大 ID 与批量 ID 应传字符串。适配层只把 `like` 转成上游需要的字符串形式，避免 JSON `false` 被上游误当作喜欢；`afresh/refresh/qrimg` 保留布尔语义。
+当前实现接受九档音质 `standard/higher/exhigh/lossless/hires/jyeffect/sky/dolby/jymaster`。最新 Docs 已加入 `vivid` 和仅在 sky 生效的 `immerseType`，本地尚未开放，具体缺口见 [Docs 重抓记录](../docs/DOCS_REFRESH_2026-11-01.md)。数字形式 ID 必须为安全整数；大 ID 与批量 ID 应传字符串。适配层只把 `like` 转成上游需要的字符串形式，避免 JSON `false` 被上游误当作喜欢；`afresh/refresh/qrimg` 保留布尔语义。
 
 游客注册会轮换上游设备标识，适配层将新标识写回私有目录，并在后续需要时更新对应的 xeapi 密钥。所有登录及账号写操作均为显式调用，不会在服务启动时执行。
+
+新增写操作及收藏列表要求非空账号 Cookie。音乐歌单增删使用独立的 `playlist/tracks` 适配器，只提交一次，业务码 512 原样返回，不执行上游模块的重复提交。视频专用 `playlist/track/add`、`playlist/track/delete` 未开放；元数据使用独立更新接口，保留名称与简介中的引号和换行。
 
 传输层错误统一为：
 
@@ -125,6 +139,6 @@ $env:NOCTURN_REFERENCE_API = 'https://ncmapi.rpixel.online'
 npm.cmd run smoke
 ```
 
-该脚本临时启动真实 bundle，调用 12 类公开接口，逐项检查本地与参考服务的响应结构。它不登录、不传 Cookie、不调用收藏等写操作。参考 HTTP 请求附加时间戳；仅只读请求的瞬时传输故障允许重试一次，业务或断言失败不会重试。没有设置参考服务时，只检查本地。网络冒烟测试不属于 `npm test`，避免离线构建受外部服务影响。
+该脚本临时启动真实 bundle，调用 18 类公开接口、19 个场景，逐项检查本地与参考服务的响应结构，包括精品歌单 `before` 下一页。它不登录、不传 Cookie、不调用收藏等写操作。参考 HTTP 请求附加时间戳；仅只读请求的瞬时传输故障允许重试一次，业务或断言失败不会重试。没有设置参考服务时，只检查本地。网络冒烟测试不属于 `npm test`，避免离线构建受外部服务影响。
 
-已验证：Node 18.20.4 的 22 项离线测试、12 类接口的本地／参考服务共 24 项在线契约检查全部通过；另外实际验证了游客会话与轮换后的设备标识／密钥一致性。批量 URL 为 null 或有效地址均符合契约，具体可用性由账号、地区和网易云服务决定。发送短信和真实账号登录／收藏只做隔离测试，不触发真实账号操作。
+2026-11-01 上轮功能扩展验证：Node 24.19.0 的 35 项离线测试、18 类接口／19 个场景的本地与参考服务共 38 项在线契约检查通过，当时参考服务为 4.36.2。分类歌单 `order=new` 可以返回合法空页，smoke 核对其列表、总数和 `more`，不假定固定数量。此前还实际验证过游客会话与轮换后的设备标识／密钥一致性。打包适配层的 `os.tmpdir()` 重定向有独立回归测试（构建产物必须经 `NOCTURN_DATA_DIR` 解析临时状态）。批量 URL 为 null 或有效地址均符合契约，具体可用性由账号、地区和网易云服务决定。发送短信、真实账号登录和账号写操作只做隔离测试，不触发真实账号操作。

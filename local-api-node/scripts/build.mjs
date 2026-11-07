@@ -10,6 +10,25 @@ const dist = path.join(root, 'dist');
 const stage = path.resolve(root, '../local-api-android/build/generated/nodeAssets/nocturn-local-api');
 await fs.mkdir(dist, { recursive: true });
 
+// Upstream's ICU-dependent UTF-8 probe and its replacement. The replacement keeps the original
+// throw-on-invalid behaviour using buffer.isUtf8, with a round-trip fallback for older runtimes.
+const ICU_TEXT_DECODER_PROBE = "const decoder = new TextDecoder('utf-8', { fatal: true })";
+const ICU_TEXT_DECODER_REPLACEMENT = [
+  'const { isUtf8: detectUtf8 } = require("node:buffer")',
+  'const decoder = {',
+  '  decode: (buf) => {',
+  '    const bytes = Buffer.from(buf)',
+  '    if (typeof detectUtf8 === "function") {',
+  '      if (!detectUtf8(bytes)) throw new TypeError("invalid utf-8")',
+  '    } else {',
+  '      const text = bytes.toString("utf8")',
+  '      if (!Buffer.from(text, "utf8").equals(bytes)) throw new TypeError("invalid utf-8")',
+  '    }',
+  '    return bytes.toString("utf8")',
+  '  },',
+  '}',
+].join('\n');
+
 const result = await build({
   entryPoints: [path.join(root, 'src/main.mjs')],
   outfile: path.join(dist, 'main.cjs'),
@@ -29,13 +48,42 @@ const result = await build({
       // Explicitly unsupported optional upstream functionality. Avoid its dependencies entirely.
       context.onResolve({ filter: /^@neteasecloudmusicapienhanced\/unblockmusic-utils$/ }, () => ({ path: 'unblock-disabled', namespace: 'nocturn' }));
       context.onLoad({ filter: /.*/, namespace: 'nocturn' }, () => ({ contents: 'module.exports = { matchID: async () => { throw new Error("Unsupported capability"); } };', loader: 'js' }));
+      // jsdom (pulled in transitively by the upstream checkToken helper) resolves its synchronous-XHR
+      // worker through require.resolve at module load. A single-file bundle has no such asset, and the
+      // worker re-requires jsdom internals, so keep only the async XHR path used by the upstream SDK.
+      context.onLoad({ filter: /jsdom[\\/]lib[\\/]jsdom[\\/]living[\\/]xhr[\\/]XMLHttpRequest-impl\.js$/ }, async ({ path: sourcePath }) => {
+        const source = await fs.readFile(sourcePath, 'utf8');
+        const patched = source.replace(
+          'const syncWorkerFile = require.resolve ? require.resolve("./xhr-sync-worker.js") : null;',
+          'const syncWorkerFile = null;',
+        );
+        if (patched === source) throw new Error('jsdom sync-worker patch no longer applies; review the upstream source.');
+        return { contents: patched, loader: 'js', resolveDir: path.dirname(sourcePath) };
+      });
       context.onLoad({ filter: /\.js$/ }, async ({ path: sourcePath }) => {
         if (!sourcePath.startsWith(apiRoot + path.sep)) return undefined;
         const source = await fs.readFile(sourcePath, 'utf8');
         const relativeDir = path.relative(apiRoot, path.dirname(sourcePath)).split(path.sep).join('/');
         // Bundled modules otherwise lose their own __dirname. Preserve data-file locations under api/.
         const directory = `require("node:path").join(__dirname, "api", ${JSON.stringify(relativeDir)})`;
-        return { contents: source.replace(/\b__dirname\b/g, directory), loader: 'js', resolveDir: path.dirname(sourcePath) };
+        // Upstream keeps account state and temp files in os.tmpdir(). /tmp does not exist on
+        // Android, so every read/write must resolve to the app-private NOCTURN_DATA_DIR.
+        const patched = source
+          .replace(/\b__dirname\b/g, directory)
+          .replace(
+            /require\((['"])os\1\)\.tmpdir\(\)/g,
+            '(process.env.NOCTURN_DATA_DIR || require("os").tmpdir())',
+          )
+          .replace(ICU_TEXT_DECODER_PROBE, ICU_TEXT_DECODER_REPLACEMENT);
+        // nodejs-mobile ships a Node build without ICU. Upstream's crypto helper probes payload
+        // encoding through `new TextDecoder('utf-8', { fatal: true })`, which throws ERR_NO_ICU
+        // there and aborts the runtime at load. Keep the throw-on-invalid contract with the
+        // built-in UTF-8 validator instead, and fail the build if the upstream probe moves.
+        if (relativeDir === 'util' && path.basename(sourcePath) === 'crypto.js' &&
+            !patched.includes(ICU_TEXT_DECODER_REPLACEMENT)) {
+          throw new Error('crypto.js ICU probe patch no longer applies; review the upstream source.');
+        }
+        return { contents: patched, loader: 'js', resolveDir: path.dirname(sourcePath) };
       });
     },
   }],

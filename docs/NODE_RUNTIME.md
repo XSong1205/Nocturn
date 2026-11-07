@@ -49,6 +49,19 @@ exist. The bridge sets `NOCTURN_API_PORT`, `NOCTURN_API_TOKEN`, and
 `NOCTURN_DATA_DIR` in the Android process. `HOME` and `TMPDIR` point to the
 private data directory so upstream configuration files cannot escape it.
 
+Upstream API code captures `os.tmpdir()` at module load for `anonymous_token`,
+the xeapi public key and temp files. Android has no writable `/tmp`, so the
+bundle build rewrites every such read to
+`process.env.NOCTURN_DATA_DIR || require("os").tmpdir()`; without that adapter
+the embedded runtime exits with status 1 during startup on real devices. The
+provider is also imported dynamically only after the environment is set, so no
+module reads `TMPDIR` before it is relocated.
+
+On startup failure the runtime writes `<data>/startup-error.log` (Node version,
+architecture, error summary) inside app-private storage and only emits the
+generic failure marker to stdout/stderr. This keeps device-side diagnosis
+possible via `run-as` without leaking dependency text into logcat.
+
 Port `0` requests an OS-assigned port. JavaScript writes its bound port into
 `runtime-ready.json` in the private data directory; Kotlin deletes stale
 readiness data before launch, reads the new file, then verifies server
@@ -78,6 +91,23 @@ packages the CMake imported dependency.
 The generated `licenses/nodejs-mobile-LICENSE` contains Node's MIT notice
 and the bundled dependencies' license notices. Include this file in APK
 assets and expose it through the app's eventual third-party notices screen.
+
+## Device validation
+
+On 2026-11-01 the embedded runtime was exercised over wireless ADB on a Redmi
+device running Android 17 (API 37), `arm64-v8a`, with a 4096-byte page size:
+
+- first-launch runtime startup reached `runtime-ready.json`, `/health` and the
+  bearer-authenticated local API;
+- the discovery feed, hot-search results and audio playback against the live
+  NetEase Cloud Music service worked end to end, including HTTPS artwork, the
+  system media notification and background playback;
+- the startup failure mode above was reproduced and fixed on this device (the
+  upstream `/tmp/anonymous_token` read).
+
+QR-code login, credential persistence across account flows, audio-focus edge
+cases and the 16 KiB page-size limitation were not part of this device pass and
+still require dedicated validation.
 
 ## Verified limitations
 

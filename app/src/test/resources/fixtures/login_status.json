@@ -1,0 +1,18 @@
+{
+  "data": {
+    "code": 200,
+    "account": {
+      "id": 32953014,
+      "type": 1,
+      "anonimousUser": false
+    },
+    "profile": {
+      "userId": 32953014,
+      "nickname": "夜行者",
+      "avatarUrl": "https://p1.music.126.net/avatar.jpg",
+      "backgroundUrl": "https://p1.music.126.net/background.jpg",
+      "signature": "只在夜晚出现",
+      "vipType": 11
+    }
+  }
+}

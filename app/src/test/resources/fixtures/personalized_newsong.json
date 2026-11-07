@@ -1,0 +1,62 @@
+{
+  "code": 200,
+  "category": 5,
+  "result": [
+    {
+      "id": 3451531276,
+      "type": 4,
+      "name": "一张相片",
+      "copywriter": null,
+      "picUrl": "http://p1.music.126.net/Eafh2qRUgw2IXXOVD4B9LQ==/109951174139932904.jpg",
+      "canDislike": false,
+      "song": {
+        "name": "一张相片",
+        "id": 3451531276,
+        "alias": [],
+        "fee": 8,
+        "artists": [
+          {"name": "连麻Swimming", "id": 12064019, "picUrl": "", "alias": []}
+        ],
+        "album": {
+          "name": "斩鸭线",
+          "id": 404975764,
+          "picUrl": "http://p3.music.126.net/Eafh2qRUgw2IXXOVD4B9LQ==/109951174139932904.jpg",
+          "artists": [{"name": "连麻Swimming", "id": 12064019}]
+        },
+        "duration": 224842
+      },
+      "alg": "hot_server"
+    },
+    {
+      "id": 1330348068,
+      "type": 4,
+      "name": "起风了",
+      "picUrl": "http://p1.music.126.net/wrapper-cover.jpg",
+      "song": {
+        "name": "起风了",
+        "id": 1330348068,
+        "alias": ["电视剧《加油，你是最棒的》插曲"],
+        "fee": 1,
+        "artists": [
+          {"name": "买辣椒也用券", "id": 12085537},
+          {"name": "合作歌手", "id": 1}
+        ],
+        "album": {"name": "起风了", "id": 74715426},
+        "duration": 325868
+      }
+    },
+    {
+      "id": 1330348068,
+      "type": 4,
+      "name": "起风了（重复）",
+      "picUrl": "http://p1.music.126.net/duplicate.jpg",
+      "song": {"name": "起风了", "id": 1330348068, "artists": [], "duration": 1}
+    },
+    {
+      "id": 0,
+      "type": 4,
+      "name": "无效条目",
+      "song": {"name": "", "id": 0}
+    }
+  ]
+}

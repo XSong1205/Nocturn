@@ -1,7 +1,5 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import createProvider from './provider.cjs';
-import { startLocalApi, VERSION } from './server.mjs';
 
 export async function main() {
   const token = process.env.NOCTURN_API_TOKEN;
@@ -13,6 +11,13 @@ export async function main() {
   process.env.TMPDIR = dataDir;
   process.env.TMP = dataDir;
   process.env.TEMP = dataDir;
+  // The upstream API reads its private state (anonymous token, xeapi key, temp files) from
+  // `os.tmpdir()` at module load. Load the provider only after the environment is configured,
+  // and keep the bundled adapter pointing os.tmpdir() at the app-private data directory.
+  const [{ default: createProvider }, { startLocalApi, VERSION }] = await Promise.all([
+    import('./provider.cjs'),
+    import('./server.mjs'),
+  ]);
   const instance = await startLocalApi({ token, port: Number(rawPort), provider: createProvider(dataDir) });
   const ready = JSON.stringify({ port: instance.port, version: VERSION });
   const temporaryReady = path.join(dataDir, 'runtime-ready.json.tmp');
@@ -35,8 +40,25 @@ export async function main() {
   return instance;
 }
 
-main().catch(() => {
-  // Error text from dependencies can contain app-private data; publish only a stable failure marker.
+main().catch((error) => {
+  // Error text from dependencies can contain app-private data; publish only a stable failure
+  // marker to stdout/stderr. A redacted, app-private diagnostics file keeps the cause
+  // retrievable on device without ever writing it to logcat.
+  try {
+    const dataDir = process.env.NOCTURN_DATA_DIR;
+    if (dataDir) {
+      const detail = error instanceof Error
+        ? `${error.name}: ${error.message}\n${error.stack || ''}`
+        : String(error);
+      fs.writeFileSync(
+        path.join(dataDir, 'startup-error.log'),
+        `node=${process.version} arch=${process.arch}\n${detail}\n`,
+        { mode: 0o600 },
+      );
+    }
+  } catch {
+    // Diagnostics are best-effort; the stable marker below is the contract.
+  }
   process.stderr.write('NOCTURN_LOCAL_API_FAILED STARTUP_FAILURE\n');
   process.exitCode = 1;
 });

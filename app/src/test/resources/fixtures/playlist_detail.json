@@ -1,0 +1,29 @@
+{
+  "code": 200,
+  "playlist": {
+    "id": 24381616,
+    "name": "深夜安静的歌",
+    "coverImgUrl": "https://p2.music.126.net/playlist.jpg",
+    "description": "适合深夜循环的歌单",
+    "creator": {
+      "userId": 100,
+      "nickname": "夜行者",
+      "avatarUrl": "https://p1.music.126.net/avatar.jpg"
+    },
+    "playCount": 15432,
+    "trackCount": 4,
+    "subscribed": false,
+    "tags": ["华语", "安静"],
+    "updateFrequency": "每周更新",
+    "createTime": 1600000000000,
+    "trackIds": [
+      {"id": 347230},
+      {"id": 186016},
+      {"id": 1330348068},
+      {"id": 28815250}
+    ],
+    "tracks": [
+      {"id": 347230, "name": "预览里的第一首"}
+    ]
+  }
+}

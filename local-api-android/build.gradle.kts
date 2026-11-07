@@ -4,14 +4,14 @@ plugins {
 
 val nodeCommand = if (System.getProperty("os.name").startsWith("Windows")) "npm.cmd" else "npm"
 
-val installNodeDependencies by tasks.registering(Exec::class) {
+val installNodeDependencies = tasks.register<Exec>("installNodeDependencies") {
     workingDir(rootProject.file("local-api-node"))
     commandLine(nodeCommand, "ci", "--no-audit", "--no-fund")
     inputs.files(rootProject.file("local-api-node/package.json"), rootProject.file("local-api-node/package-lock.json"))
     outputs.file(rootProject.file("local-api-node/node_modules/.package-lock.json"))
 }
 
-val buildNodeAssets by tasks.registering(Exec::class) {
+val buildNodeAssets = tasks.register<Exec>("buildNodeAssets") {
     dependsOn(installNodeDependencies)
     workingDir(rootProject.file("local-api-node"))
     commandLine(nodeCommand, "run", "build")
@@ -21,14 +21,14 @@ val buildNodeAssets by tasks.registering(Exec::class) {
     outputs.dir(layout.buildDirectory.dir("generated/nodeAssets"))
 }
 
-val prepareNodeRuntime by tasks.registering(Exec::class) {
+val prepareNodeRuntime = tasks.register<Exec>("prepareNodeRuntime") {
     workingDir(rootProject.projectDir)
     commandLine("node", "scripts/prepare-node-runtime.mjs")
     inputs.file(rootProject.file("scripts/prepare-node-runtime.mjs"))
     outputs.dir(layout.buildDirectory.dir("node-runtime"))
 }
 
-val copyRuntimeNotices by tasks.registering(Sync::class) {
+val copyRuntimeNotices = tasks.register<Sync>("copyRuntimeNotices") {
     dependsOn(prepareNodeRuntime)
     from(layout.buildDirectory.dir("node-runtime/licenses"))
     into(layout.buildDirectory.dir("generated/runtimeNotices/node-runtime"))
@@ -36,7 +36,7 @@ val copyRuntimeNotices by tasks.registering(Sync::class) {
 
 android {
     namespace = "dev.nocturn.localapi"
-    compileSdk = 36
+    compileSdk = 37
     ndkVersion = "28.2.13676358"
     defaultConfig {
         minSdk = 29
@@ -68,10 +68,10 @@ tasks.configureEach {
 }
 
 dependencies {
-    api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     testImplementation("junit:junit:4.13.2")
-    androidTestImplementation("androidx.test:runner:1.6.2")
-    androidTestImplementation("androidx.test.ext:junit:1.2.1")
-    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    androidTestImplementation("androidx.test:runner:1.7.0")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
 }

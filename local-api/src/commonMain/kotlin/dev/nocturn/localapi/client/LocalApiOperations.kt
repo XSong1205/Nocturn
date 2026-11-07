@@ -118,12 +118,47 @@ suspend fun LocalApiClient.loginWithCode(phone: String, captcha: String, country
     })
 }
 
+/** Passwords are sent only in the authenticated loopback POST body, never in a URL. */
+suspend fun LocalApiClient.loginWithPassword(phone: String, password: String, countryCode: String = "86"): JsonObject {
+    requirePhone(phone, countryCode)
+    require(password.length in 1..128) { "A password of 1 to 128 characters is required." }
+    return request(LocalApiEndpoint.LoginCellphone, buildJsonObject {
+        put("phone", phone)
+        put("password", password)
+        put("countrycode", countryCode)
+    })
+}
+
 suspend fun LocalApiClient.dailySongs(cookie: String, afresh: Boolean = false): JsonObject {
     require(cookie.isNotBlank()) { "An account cookie is required." }
     return request(LocalApiEndpoint.RecommendSongs, buildJsonObject {
         put("afresh", afresh)
         put("cookie", cookie)
     })
+}
+
+/**
+ * `personalized/newsong` recommendations. Works anonymously; an account cookie personalises the
+ * list. The upstream route has no offset, so only [limit] is sent.
+ */
+suspend fun LocalApiClient.personalizedNewSongs(limit: Int = 10, cookie: String? = null): JsonObject {
+    require(limit in 1..200) { "Page limit must be between 1 and 200." }
+    return request(LocalApiEndpoint.PersonalizedNewSongs, buildJsonObject {
+        put("limit", limit)
+        cookie?.let { put("cookie", it) }
+    })
+}
+
+/**
+ * `recommend/resource`: the playlists the account is recommended today. It is the account-aware
+ * counterpart of the public `/personalized` shelf, so it always carries the login cookie.
+ */
+suspend fun LocalApiClient.recommendPlaylists(cookie: String): JsonObject {
+    require(cookie.isNotBlank()) { "An account cookie is required." }
+    return request(
+        LocalApiEndpoint.RecommendResource,
+        buildJsonObject { put("cookie", cookie) },
+    )
 }
 
 /** Explicit pagination avoids the upstream module's implicit 1000-song default. */

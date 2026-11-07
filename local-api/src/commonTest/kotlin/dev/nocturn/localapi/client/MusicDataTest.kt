@@ -167,12 +167,35 @@ class MusicDataTest {
     }
 
     @Test
+    fun personalizedNewSongsSendOnlyAnExplicitLimitAndOptionalCookie() = runTest {
+        val bodies = mutableListOf<JsonObject>()
+        withApi({ route, body ->
+            assertEquals("personalized/newsong", route)
+            bodies += body
+            """{"code":200,"result":[]}"""
+        }) { api ->
+            api.personalizedNewSongs()
+            api.personalizedNewSongs(30, "MUSIC_U=session")
+            assertFailsWith<IllegalArgumentException> { api.personalizedNewSongs(0) }
+            assertFailsWith<IllegalArgumentException> { api.personalizedNewSongs(201) }
+        }
+        assertEquals(2, bodies.size)
+        assertEquals(setOf("limit"), bodies[0].keys)
+        assertEquals("10", bodies[0]["limit"]!!.jsonPrimitive.content)
+        assertFalse(bodies[0]["limit"]!!.jsonPrimitive.isString)
+        assertEquals(setOf("limit", "cookie"), bodies[1].keys)
+        assertEquals("30", bodies[1]["limit"]!!.jsonPrimitive.content)
+        assertEquals("MUSIC_U=session", bodies[1]["cookie"]!!.jsonPrimitive.content)
+    }
+
+    @Test
     fun invalidArgumentsNeverSendSmsOrOtherRequests() = runTest {
         withApi({ _, _ -> error("No request may be sent") }) { api ->
             assertFailsWith<IllegalArgumentException> { api.songUrls(emptyList()) }
             assertFailsWith<IllegalArgumentException> { api.songUrls(List(201) { 1L }) }
             assertFailsWith<IllegalArgumentException> { api.sendVerificationCode("invalid") }
             assertFailsWith<IllegalArgumentException> { api.loginWithCode("13800138000", "bad") }
+            assertFailsWith<IllegalArgumentException> { api.loginWithPassword("13800138000", "") }
             assertFailsWith<IllegalArgumentException> { api.dailySongs("") }
             assertFailsWith<IllegalArgumentException> { ApiPage(201) }
         }

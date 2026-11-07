@@ -14,9 +14,9 @@
     "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
-    "@neteasecloudmusicapienhanced/api": "4.36.2"
+    "@neteasecloudmusicapienhanced/api": "4.41.1"
   },
   "devDependencies": {
-    "esbuild": "0.25.12"
+    "esbuild": "0.28.2"
   }
 }

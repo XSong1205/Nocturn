@@ -55,6 +55,34 @@ class LocalApiClientTest {
     }
 
     @Test
+    fun accountPlaylistRecommendationsAlwaysCarryTheCookie() = runTest {
+        withClient({ request ->
+            assertEquals("/api/recommend/resource", request.url.encodedPath)
+            assertEquals(HttpMethod.Post, request.method)
+            val body = Json.parseToJsonElement(request.body.toByteArray().decodeToString()) as JsonObject
+            assertEquals("account-session", body["cookie"]?.jsonPrimitive?.content)
+            assertFalse(request.url.toString().contains("account-session"))
+            respondJson("""{"code":200,"recommend":[]}""")
+        }) { client ->
+            client.recommendPlaylists("account-session")
+        }
+    }
+
+    @Test
+    fun personalizedNewSongsKeepTheCookieThatPersonalisesTheGrid() = runTest {
+        withClient({ request ->
+            assertEquals("/api/personalized/newsong", request.url.encodedPath)
+            val body = Json.parseToJsonElement(request.body.toByteArray().decodeToString()) as JsonObject
+            assertEquals("12", body["limit"]?.jsonPrimitive?.content)
+            assertEquals("account-session", body["cookie"]?.jsonPrimitive?.content)
+            assertFalse(request.url.toString().contains("account-session"))
+            respondJson("""{"code":200,"result":[]}""")
+        }) { client ->
+            client.personalizedNewSongs(limit = 12, cookie = "account-session")
+        }
+    }
+
+    @Test
     fun songUrlUsesTheSingleIdContract() = runTest {
         withClient({ request ->
             assertEquals("/api/song/url/v1", request.url.encodedPath)
@@ -151,6 +179,7 @@ class LocalApiClientTest {
             assertFailsWith<IllegalArgumentException> { client.songDetail(emptyList()) }
             assertFailsWith<IllegalArgumentException> { client.lyrics(-1) }
             assertFailsWith<IllegalArgumentException> { client.loginQrCheck("") }
+            assertFailsWith<IllegalArgumentException> { client.recommendPlaylists("") }
         }
     }
 

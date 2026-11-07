@@ -1,0 +1,59 @@
+{
+  "code": 200,
+  "result": {
+    "songs": [
+      {
+        "id": 347230,
+        "name": "海阔天空",
+        "ar": [{"id": 11127, "name": "Beyond"}],
+        "al": {"id": 34017, "name": "乐与怒", "picUrl": "https://p1.music.126.net/cover-1.jpg"},
+        "dt": 326000,
+        "fee": 8,
+        "alia": ["电影《BEYOND日记》主题曲"]
+      },
+      {
+        "id": 186016,
+        "name": "晴天",
+        "ar": [{"id": 6452, "name": "周杰伦"}],
+        "al": {"id": 32311, "name": "叶惠美", "picUrl": "https://p1.music.126.net/cover-2.jpg"},
+        "dt": 269000,
+        "fee": 0,
+        "alia": []
+      }
+    ],
+    "songCount": 523,
+    "playlists": [
+      {
+        "id": 24381616,
+        "name": "华语流行精选",
+        "coverImgUrl": "https://p2.music.126.net/playlist.jpg",
+        "playCount": 90210,
+        "trackCount": 50,
+        "creator": {"userId": 100, "nickname": "歌单作者"}
+      }
+    ],
+    "playlistCount": 87,
+    "albums": [
+      {
+        "id": 32311,
+        "name": "叶惠美",
+        "picUrl": "https://p1.music.126.net/album.jpg",
+        "artist": {"id": 6452, "name": "周杰伦"},
+        "size": 11,
+        "publishTime": 1058400000000
+      }
+    ],
+    "albumCount": 9,
+    "artists": [
+      {
+        "id": 6452,
+        "name": "周杰伦",
+        "picUrl": "https://p1.music.126.net/artist.jpg",
+        "albumSize": 30,
+        "musicSize": 300,
+        "fansCount": 1234567
+      }
+    ],
+    "artistCount": 3
+  }
+}
