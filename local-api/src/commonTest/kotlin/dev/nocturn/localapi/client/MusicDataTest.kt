@@ -52,6 +52,27 @@ class MusicDataTest {
     }
 
     @Test
+    fun searchDefaultsAndSuggestionsPreserveAccountCookie() = runTest {
+        withApi({ route, body ->
+            when (route) {
+                "search/default" -> assertEquals("session-token", body["cookie"]?.jsonPrimitive?.content)
+                "search/hot/detail" -> assertEquals("session-token", body["cookie"]?.jsonPrimitive?.content)
+                "search/suggest" -> {
+                    assertEquals("周杰伦", body["keywords"]?.jsonPrimitive?.content)
+                    assertEquals("mobile", body["type"]?.jsonPrimitive?.content)
+                    assertEquals("session-token", body["cookie"]?.jsonPrimitive?.content)
+                }
+                else -> error("Unexpected request: $route")
+            }
+            """{"code":200}"""
+        }) { api ->
+            api.defaultSearch(cookie = "session-token")
+            api.searchHotDetail(cookie = "session-token")
+            api.searchSuggestions("周杰伦", cookie = "session-token")
+        }
+    }
+
+    @Test
     fun playlistRequestsAlwaysSendExplicitPagination() = runTest {
         withApi({ route, body ->
             assertEquals("playlist/track/all", route)

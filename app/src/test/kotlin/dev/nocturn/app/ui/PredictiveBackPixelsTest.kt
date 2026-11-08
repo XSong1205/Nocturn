@@ -29,10 +29,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * Pixel-level checks of the predictive back preview: bounds cannot show a clip or a scrim, so
- * these read the rendered frame.
- */
+/** Verify that native slides reveal two opaque pages without gaps, fading or stale overlays. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "w411dp-h914dp-xhdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -40,26 +37,90 @@ class PredictiveBackPixelsTest {
     @get:Rule
     val compose = createComposeRule()
 
-    private var nav by mutableStateOf(NavState(stack = listOf(Screen.Album(1))))
+    private var navigation by mutableStateOf(NavState(stack = listOf(Screen.Album(1))))
     private var pops = 0
     private lateinit var dispatcher: OnBackPressedDispatcher
-
     private val foreground = Color(0xFFE53935)
     private val background = Color(0xFF3949AB)
+
+    @Test
+    fun nativePredictiveSlideKeepsBothPagesOpaqueWithoutAGap() {
+        start()
+        compose.mainClock.autoAdvance = false
+        try {
+            dragTo(0.5f)
+            val bitmap = frame()
+            File("build/screenshots").apply { mkdirs() }
+                .resolve("predictive-back-preview.png")
+                .outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            assertColor(background, bitmap, 2, bitmap.height / 2)
+            assertColor(foreground, bitmap, bitmap.width - 3, bitmap.height / 2)
+            // Allow the rasterizer's one-pixel antialiasing at the moving seam.
+            var seamPixels = 0
+            for (x in 0 until bitmap.width) {
+                val pixel = Color(bitmap.getPixel(x, bitmap.height / 2))
+                val expected = if (pixel.red > 0.5f) foreground else background
+                if (kotlin.math.abs(pixel.red - expected.red) > 0.02f ||
+                    kotlin.math.abs(pixel.green - expected.green) > 0.02f ||
+                    kotlin.math.abs(pixel.blue - expected.blue) > 0.02f
+                ) seamPixels++
+            }
+            assertTrue("Only the seam may blend, got $seamPixels pixels", seamPixels <= 2)
+            assertEquals(0, pops)
+        } finally {
+            compose.mainClock.autoAdvance = true
+            compose.runOnIdle { dispatcher.dispatchOnBackCancelled() }
+        }
+    }
+
+    @Test
+    fun commitUpdatesStackImmediatelyAndRevealsThePreviousPage() {
+        start()
+        compose.mainClock.autoAdvance = false
+        try {
+            dragTo(0.5f)
+            compose.runOnIdle {
+                dispatcher.onBackPressed()
+                assertEquals("No delayed pop or second commit animation", 1, pops)
+            }
+            advanceFrames(30)
+            val bitmap = frame()
+            assertColor(background, bitmap, bitmap.width / 2, bitmap.height / 2)
+            assertColor(background, bitmap, 2, 2)
+            assertColor(background, bitmap, bitmap.width - 3, bitmap.height - 3)
+            assertEquals(1, pops)
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+    }
+
+    @Test
+    fun cancellationRestoresAnOpaquePageWithoutResidualTransforms() {
+        start()
+        compose.mainClock.autoAdvance = false
+        try {
+            dragTo(0.6f)
+            compose.runOnIdle { dispatcher.dispatchOnBackCancelled() }
+            advanceFrames(30)
+            val bitmap = frame()
+            assertColor(foreground, bitmap, 2, 2)
+            assertColor(foreground, bitmap, bitmap.width / 2, bitmap.height / 2)
+            assertColor(foreground, bitmap, bitmap.width - 3, bitmap.height - 3)
+            assertEquals(0, pops)
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+    }
 
     private fun start() {
         compose.setContent {
             dispatcher = LocalOnBackPressedDispatcherOwner.current!!.onBackPressedDispatcher
             NocturnTheme {
-                ScreenNavigationHost(nav, true, {
+                ScreenNavigationHost(navigation, true, {
                     pops++
-                    nav = nav.copy(stack = nav.stack.dropLast(1))
+                    navigation = navigation.copy(stack = navigation.stack.dropLast(1))
                 }) { screen ->
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .background(if (screen == Screen.Home) background else foreground),
-                    )
+                    Box(Modifier.fillMaxSize().background(if (screen == Screen.Home) background else foreground))
                 }
             }
         }
@@ -68,122 +129,34 @@ class PredictiveBackPixelsTest {
 
     private fun frame(): Bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
 
-    private fun Bitmap.color(x: Int, y: Int) = Color(getPixel(x, y))
+    private fun assertColor(expected: Color, bitmap: Bitmap, x: Int, y: Int) {
+        val actual = Color(bitmap.getPixel(x, y))
+        assertEquals("Red at ($x,$y)", expected.red, actual.red, 0.02f)
+        assertEquals("Green at ($x,$y)", expected.green, actual.green, 0.02f)
+        assertEquals("Blue at ($x,$y)", expected.blue, actual.blue, 0.02f)
+    }
 
-    private fun dragTo(target: Float, edge: Int = BackEventCompat.EDGE_LEFT) {
+    private fun dragTo(target: Float) {
         compose.runOnIdle {
-            dispatcher.dispatchOnBackStarted(BackEventCompat(0f, 100f, 0f, edge))
-            dispatcher.dispatchOnBackProgressed(BackEventCompat(0f, 100f, 0f, edge))
+            dispatcher.dispatchOnBackStarted(BackEventCompat(0f, 100f, 0f, BackEventCompat.EDGE_LEFT))
+            dispatcher.dispatchOnBackProgressed(BackEventCompat(0f, 100f, 0f, BackEventCompat.EDGE_LEFT))
         }
-        compose.mainClock.advanceTimeByFrame()
+        advanceFrames(1)
         var progress = 0f
         while (progress < target - 1e-4f) {
             progress = minOf(progress + 0.02f, target)
             compose.runOnIdle {
-                dispatcher.dispatchOnBackProgressed(BackEventCompat(0f, 100f, progress, edge))
+                dispatcher.dispatchOnBackProgressed(BackEventCompat(0f, 100f, progress, BackEventCompat.EDGE_LEFT))
             }
+            advanceFrames(1)
+        }
+        advanceFrames(3)
+    }
+
+    private fun advanceFrames(count: Int) {
+        repeat(count) {
             compose.mainClock.advanceTimeByFrame()
             compose.runOnIdle { }
-        }
-        repeat(3) {
-            compose.mainClock.advanceTimeByFrame()
-            compose.runOnIdle { }
-        }
-    }
-
-    @Test
-    fun theForegroundPageStaysOpaqueWhileTheFingerIsStillDown() {
-        start()
-        compose.mainClock.autoAdvance = false
-        try {
-            dragTo(0.9f)
-            val bitmap = frame()
-            val centre = bitmap.color(bitmap.width / 2, bitmap.height / 2)
-            assertEquals("No fade before release: red", foreground.red, centre.red, 0.02f)
-            assertEquals("No fade before release: blue", foreground.blue, centre.blue, 0.02f)
-            assertEquals("The page is still on the stack", 0, pops)
-        } finally {
-            compose.mainClock.autoAdvance = true
-            compose.runOnIdle { dispatcher.dispatchOnBackCancelled() }
-        }
-    }
-
-    @Test
-    fun releasingShrinksAndFadesThePageBeforeThePop() {
-        start()
-        compose.mainClock.autoAdvance = false
-        try {
-            dragTo(0.5f)
-            compose.runOnIdle { dispatcher.onBackPressed() }
-            compose.runOnIdle { }
-            assertEquals("The stack is untouched while the commit plays", 0, pops)
-
-            repeat(8) {
-                compose.mainClock.advanceTimeByFrame()
-                compose.runOnIdle { }
-            }
-            val mid = frame().color(frame().width / 2, frame().height / 2)
-            assertTrue(
-                "Mid-commit the page is partly faded: red=${mid.red} blue=${mid.blue}",
-                mid.red < foreground.red - 0.05f && mid.red > background.red - 0.2f,
-            )
-            assertEquals("Still not popped mid-commit", 0, pops)
-
-            repeat(40) {
-                compose.mainClock.advanceTimeByFrame()
-                compose.runOnIdle { }
-            }
-            assertEquals("The stack pops once, after the commit", 1, pops)
-            val end = frame().color(frame().width / 2, frame().height / 2)
-            assertEquals("The previous page is revealed undimmed", background.blue, end.blue, 0.02f)
-        } finally {
-            compose.mainClock.autoAdvance = true
-        }
-    }
-
-    @Test
-    fun theShrunkenForegroundPageKeepsRoundedCornersOverADimmedBackground() {
-        start()
-        compose.mainClock.autoAdvance = false
-        try {
-            dragTo(0.6f)
-            val bitmap = frame()
-            val width = bitmap.width
-            val height = bitmap.height
-            File("build/screenshots").apply { mkdirs() }
-                .resolve("predictive-back-preview.png")
-                .outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-
-            // The page is scaled to 90% and shifted toward the swiping side, so its centre is
-            // foreground colour and the corner of the shrunken page is cut away.
-            val centre = bitmap.color(width / 2, height / 2)
-            assertEquals("Page content is drawn at the centre", foreground.red, centre.red, 0.02f)
-
-            // Find the shrunken page's top-left corner on its edge row and column.
-            val midY = height / 2
-            var left = 0
-            while (left < width && bitmap.color(left, midY).red < 0.7f) left++
-            var top = 0
-            while (top < height && bitmap.color(width / 2, top).red < 0.7f) top++
-            assertTrue("The page no longer fills the window: left=$left top=$top", left > 4 && top > 4)
-
-            // Rounded: the pixel diagonally inside the page's corner is not page colour.
-            val inset = 3
-            val corner = bitmap.color(left + inset, top + inset)
-            assertTrue(
-                "The corner of the shrunken page is clipped, got $corner",
-                corner.red < 0.7f,
-            )
-
-            // Dimmed: the revealed page is darker than its own colour.
-            val revealed = bitmap.color(2, height / 2)
-            assertTrue(
-                "The page behind is dimmed: ${revealed.blue} vs ${background.blue}",
-                revealed.blue < background.blue * 0.85f && revealed.blue > 0f,
-            )
-        } finally {
-            compose.mainClock.autoAdvance = true
-            compose.runOnIdle { dispatcher.dispatchOnBackCancelled() }
         }
     }
 }

@@ -31,6 +31,8 @@ data class PlayableSong(
 /** The complete observable state of the media session, mirrored from Media3 callbacks. */
 data class PlaybackSnapshot(
     val currentSongId: Long? = null,
+    val title: String? = null,
+    val artist: String? = null,
     val playing: Boolean = false,
     val buffering: Boolean = false,
     val positionMs: Long = 0,

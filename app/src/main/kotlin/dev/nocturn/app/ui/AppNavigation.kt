@@ -1,19 +1,11 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
-
 package dev.nocturn.app.ui
 
-import androidx.compose.material3.MotionScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.navigation3.runtime.NavEntry
@@ -23,7 +15,6 @@ import androidx.navigation3.scene.SinglePaneSceneStrategy
 import androidx.navigation3.scene.rememberNavigationEventState
 import androidx.navigation3.scene.rememberSceneState
 import androidx.navigation3.ui.NavDisplay
-import androidx.navigationevent.NavigationEventTransitionState
 import androidx.navigationevent.compose.NavigationBackHandler
 import dev.nocturn.app.ui.components.NocturnBackdrop
 import dev.nocturn.app.ui.state.AppTab
@@ -31,20 +22,16 @@ import dev.nocturn.app.ui.state.NavState
 import dev.nocturn.app.ui.state.Screen
 import dev.nocturn.app.ui.state.tabRoot
 
-private val EdgeAnchoredMotion = MotionScheme.standard()
+private const val TAB_METADATA = "dev.nocturn.page.tab"
 
 /** Stack position distinguishes repeated visits to the same album, artist or playlist. */
 private data class ScreenDestination(val tab: AppTab, val index: Int, val screen: Screen) {
-    /** Saveable and unique per stack slot, so each visit keeps its own saved state. */
     val contentKey: String get() = "${tab.name}/$index/$screen"
 }
 
 /**
- * Routes the selected tab and its pushed pages through Navigation3's [NavDisplay].
- *
- * Scenes, the seekable predictive back transition and its commit/cancel settle are all the
- * library's. [PageMotion] only picks the native enter/exit transforms per transition, and
- * [PageSurface] adds the rounded corners and the scrim that native transforms cannot draw.
+ * Navigation follows the Navigation 3 animations recipe: native enter/exit transforms for push,
+ * pop and predictive pop. There is no separate gesture animation or delayed stack mutation.
  */
 @Composable
 internal fun ScreenNavigationHost(
@@ -54,19 +41,12 @@ internal fun ScreenNavigationHost(
     modifier: Modifier = Modifier,
     content: @Composable (Screen) -> Unit,
 ) {
-    val backStack = remember(navigation) {
+    val backStack = remember(navigation.tab, navigation.stack) {
         (listOf(tabRoot(navigation.tab)) + navigation.stack).mapIndexed { index, screen ->
             ScreenDestination(navigation.tab, index, screen)
         }
     }
-    val motion = remember { PageMotion() }
-    motion.rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    motion.density = LocalDensity.current.density
-    // Pages are anchored to the screen edge, so their slide must not overshoot and open a gap:
-    // Material's effects springs are critically damped, unlike its spatial ones.
-    motion.offsetSpec = EdgeAnchoredMotion.defaultEffectsSpec()
-    motion.floatSpec = EdgeAnchoredMotion.defaultEffectsSpec()
-    // Entries are remembered per back stack; they read the latest content through this state.
+    val direction = if (LocalLayoutDirection.current == LayoutDirection.Rtl) -1 else 1
     val latestContent = rememberUpdatedState(content)
     val entries = rememberDecoratedNavEntries(
         backStack = backStack,
@@ -75,14 +55,9 @@ internal fun ScreenNavigationHost(
             NavEntry(
                 key = destination,
                 contentKey = destination.contentKey,
-                metadata = mapOf(
-                    PageMetadata.TAB to destination.tab,
-                    PageMetadata.DEPTH to destination.index,
-                ),
+                metadata = mapOf(TAB_METADATA to destination.tab),
             ) {
-                PageSurface(motion, destination.contentKey) {
-                    RoutedPage(destination.screen, latestContent)
-                }
+                RoutedPage(destination.screen, latestContent)
             }
         },
     )
@@ -93,46 +68,39 @@ internal fun ScreenNavigationHost(
         onBack = onBack,
     )
     val navigationEventState = rememberNavigationEventState(sceneState)
-    val latestOnBack by rememberUpdatedState(onBack)
-    val scope = rememberCoroutineScope()
-    motion.scope = scope
-    // Completion goes through PageMotion so a released predictive gesture can play its commit
-    // animation before the stack is popped; a button or key back pops at once. The player above
-    // the pages owns back while it is open.
+    // Use the explicit state overload only to disable page back while the player owns it.
+    // NavDisplay handles seeking, cancellation, completion and entry lifecycle itself.
     NavigationBackHandler(
         state = navigationEventState,
         isBackEnabled = backEnabled && sceneState.currentScene.previousEntries.isNotEmpty(),
-        onBackCancelled = { motion.onCancelled() },
-        onBackCompleted = { motion.onCompleted { latestOnBack() } },
+        onBackCompleted = { if (backEnabled && backStack.size > 1) onBack() },
     )
-    // Gesture events feed the draw-phase state here, off composition.
-    LaunchedEffect(navigationEventState, motion) {
-        snapshotFlow { navigationEventState.transitionState }.collect { gesture ->
-            if (gesture is NavigationEventTransitionState.InProgress) {
-                motion.onGesture(gesture.latestEvent)
-            } else {
-                motion.onIdle()
-            }
-        }
-    }
     NavDisplay(
         sceneState = sceneState,
         navigationEventState = navigationEventState,
-        modifier = modifier.onSizeChanged {
-            motion.widthPx = it.width
-            motion.heightPx = it.height
+        modifier = modifier,
+        transitionSpec = {
+            if (initialState.metadata[TAB_METADATA] != targetState.metadata[TAB_METADATA]) {
+                PageTransitions.switchTab()
+            } else {
+                PageTransitions.push(direction)
+            }
         },
-        transitionSpec = { motion.transform(initialState, targetState, swipeEdge = null) },
-        popTransitionSpec = { motion.transform(initialState, targetState, swipeEdge = null) },
-        predictivePopTransitionSpec = { edge -> motion.transform(initialState, targetState, edge) },
+        popTransitionSpec = {
+            if (initialState.metadata[TAB_METADATA] != targetState.metadata[TAB_METADATA]) {
+                PageTransitions.switchTab()
+            } else {
+                PageTransitions.pop(direction)
+            }
+        },
+        // Keep the same transform after release so commit/cancel cannot reverse direction.
+        predictivePopTransitionSpec = { PageTransitions.pop(direction) },
     )
 }
 
-/**
- * The routed screen itself. Its parameters only change when the screen or the content lambda
- * does, so transition and gesture frames skip it.
- */
+/** Keep page content independent of the host's transition and gesture recompositions. */
 @Composable
 private fun RoutedPage(screen: Screen, content: State<@Composable (Screen) -> Unit>) {
-    NocturnBackdrop { content.value(screen) }
+    // Ambient circles extend beyond the page; keep them inside its sliding bounds.
+    NocturnBackdrop(Modifier.clipToBounds()) { content.value(screen) }
 }

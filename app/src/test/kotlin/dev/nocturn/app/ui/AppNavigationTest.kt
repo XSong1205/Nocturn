@@ -12,14 +12,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -27,6 +27,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.unit.LayoutDirection
 import dev.nocturn.app.ui.state.AppTab
 import dev.nocturn.app.ui.state.NavState
 import dev.nocturn.app.ui.state.Screen
@@ -38,7 +39,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import kotlin.math.abs
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "w411dp-h914dp")
@@ -46,96 +46,55 @@ class AppNavigationTest {
     @get:Rule
     val compose = createComposeRule()
 
-    // Shared predictive-back harness state. JUnit creates a fresh test instance per test method.
-    private var navState by mutableStateOf(NavState())
+    private var navigation by mutableStateOf(NavState())
+    private var pageBackEnabled by mutableStateOf(true)
     private var popCount = 0
-    private lateinit var backDispatcher: OnBackPressedDispatcher
-
-    /** Compositions of the routed album page content; finger progress must not change it. */
+    private var rootBacks = 0
     private var albumPageCompositions = 0
+    private lateinit var dispatcher: OnBackPressedDispatcher
 
     @Test
     fun repeatedDestinationsKeepIndependentStateAndRestoreThePreviousEntry() {
-        var navigation by mutableStateOf(NavState(stack = listOf(Screen.Album(1))))
-        lateinit var dispatcher: OnBackPressedDispatcher
+        navigation = NavState(stack = listOf(Screen.Album(1)))
         compose.setContent {
             dispatcher = LocalOnBackPressedDispatcherOwner.current!!.onBackPressedDispatcher
             NocturnTheme {
-                ScreenNavigationHost(navigation, true, {
-                    navigation = navigation.copy(stack = navigation.stack.dropLast(1))
-                }) {
-                    var count by rememberSaveable { mutableIntStateOf(0) }
+                ScreenNavigationHost(navigation, true, ::pop) {
+                    var count by rememberSaveable { mutableStateOf(0) }
                     Button(onClick = { count++ }) { Text("Visits: $count") }
                 }
             }
         }
         compose.onNodeWithText("Visits: 0").performClick()
-        compose.runOnIdle {
-            navigation = navigation.copy(stack = navigation.stack + Screen.Album(1))
-        }
+        compose.runOnIdle { navigation = navigation.copy(stack = navigation.stack + Screen.Album(1)) }
         compose.onNodeWithText("Visits: 0").assertIsDisplayed()
         compose.runOnIdle { dispatcher.onBackPressed() }
         compose.onNodeWithText("Visits: 1").assertIsDisplayed()
     }
 
     @Test
-    fun predictiveBackShrinksThePageAndCancellationRestoresItBeforeACommittedPop() {
-        var navigation by mutableStateOf(NavState())
-        var pops = 0
-        lateinit var dispatcher: OnBackPressedDispatcher
+    fun revisitingAPoppedDestinationStartsWithFreshState() {
+        navigation = NavState(stack = listOf(Screen.Album(1)))
         compose.setContent {
             dispatcher = LocalOnBackPressedDispatcherOwner.current!!.onBackPressedDispatcher
             NocturnTheme {
-                ScreenNavigationHost(navigation, true, {
-                    pops++
-                    navigation = navigation.copy(stack = navigation.stack.dropLast(1))
-                }) { screen ->
-                    if (screen == Screen.Home) {
-                        LazyColumn(Modifier.testTag("rows")) {
-                            items((0..100).toList()) { index -> Text("Row $index") }
-                        }
-                    } else {
-                        Box(Modifier.fillMaxSize().testTag("album-page")) {
-                            Text("Album")
-                        }
-                    }
+                ScreenNavigationHost(navigation, true, ::pop) { screen ->
+                    var count by rememberSaveable { mutableStateOf(0) }
+                    Button(onClick = { count++ }) { Text("$screen visits: $count") }
                 }
             }
         }
-        compose.onNodeWithTag("rows").performScrollToIndex(35)
-        compose.runOnIdle { navigation = navigation.copy(stack = listOf(Screen.Album(1))) }
-        compose.onNodeWithText("Album").assertIsDisplayed()
-        val fullBounds = compose.onNodeWithTag("album-page").fetchSemanticsNode().boundsInRoot
-        compose.runOnIdle {
-            dispatcher.dispatchOnBackStarted(backEvent(0f))
-            dispatcher.dispatchOnBackProgressed(backEvent(0.5f))
-        }
-        compose.waitForIdle()
-        val gestureBounds = compose.onNodeWithTag("album-page").fetchSemanticsNode().boundsInRoot
-        assertTrue("Predictive back shrinks the page horizontally", gestureBounds.width < fullBounds.width)
-        assertTrue("Predictive back shrinks the page vertically", gestureBounds.height < fullBounds.height)
-        compose.runOnIdle { dispatcher.dispatchOnBackCancelled() }
-        compose.onNodeWithText("Album").assertIsDisplayed()
-        val restoredBounds = compose.onNodeWithTag("album-page").fetchSemanticsNode().boundsInRoot
-        assertEquals(fullBounds.width, restoredBounds.width, 0.5f)
-        assertEquals(fullBounds.height, restoredBounds.height, 0.5f)
-        compose.runOnIdle {
-            assertEquals(0, pops)
-            dispatcher.dispatchOnBackStarted(backEvent(0f))
-            dispatcher.dispatchOnBackProgressed(backEvent(0.8f))
-        }
-        compose.waitForIdle()
+        compose.onNodeWithText("Album(id=1) visits: 0").performClick()
         compose.runOnIdle { dispatcher.onBackPressed() }
-        compose.onNodeWithText("Row 35").assertIsDisplayed()
-        compose.runOnIdle { assertEquals(1, pops) }
+        compose.onNodeWithText("Home visits: 0").assertIsDisplayed()
+        compose.runOnIdle { navigation = navigation.copy(stack = listOf(Screen.Album(1))) }
+        compose.onNodeWithText("Album(id=1) visits: 0").assertIsDisplayed()
     }
 
     @Test
     fun backClosesPlayerThenPopsThePageThenYieldsToTheTabHandler() {
-        var navigation by mutableStateOf(NavState(stack = listOf(Screen.Album(1))))
+        navigation = NavState(stack = listOf(Screen.Album(1)))
         var playerVisible by mutableStateOf(false)
-        var rootBacks = 0
-        lateinit var dispatcher: OnBackPressedDispatcher
         compose.setContent {
             dispatcher = LocalOnBackPressedDispatcherOwner.current!!.onBackPressedDispatcher
             BackHandler { rootBacks++ }
@@ -144,10 +103,8 @@ class AppNavigationTest {
                     visible = playerVisible,
                     onCollapse = { playerVisible = false },
                     shell = {
-                        ScreenNavigationHost(navigation, !playerVisible, {
-                            navigation = navigation.copy(stack = navigation.stack.dropLast(1))
-                        }) { screen ->
-                            var count by rememberSaveable { mutableIntStateOf(0) }
+                        ScreenNavigationHost(navigation, !playerVisible, ::pop) { screen ->
+                            var count by rememberSaveable { mutableStateOf(0) }
                             Column {
                                 Text(screen.toString())
                                 Button(onClick = { count++ }) { Text("Page count: $count") }
@@ -171,470 +128,313 @@ class AppNavigationTest {
     }
 
     @Test
+    fun disabledPageBackYieldsWithoutChangingTheStack() {
+        startHost()
+        pushAlbum()
+        compose.runOnIdle {
+            pageBackEnabled = false
+        }
+        compose.runOnIdle { dispatcher.onBackPressed() }
+        compose.runOnIdle {
+            assertEquals(0, popCount)
+            assertEquals(1, rootBacks)
+            assertEquals(listOf(Screen.Album(1)), navigation.stack)
+        }
+    }
+
+    @Test
     fun rapidNavigationAndBackSettleOnTheSelectedTab() {
-        var navigation by mutableStateOf(NavState())
-        lateinit var dispatcher: OnBackPressedDispatcher
-        compose.setContent {
-            dispatcher = LocalOnBackPressedDispatcherOwner.current!!.onBackPressedDispatcher
-            NocturnTheme {
-                ScreenNavigationHost(navigation, true, {
-                    navigation = navigation.copy(stack = navigation.stack.dropLast(1))
-                }) { screen -> Text(screen.toString()) }
-            }
-        }
-        compose.waitForIdle()
+        startHost()
         compose.mainClock.autoAdvance = false
-        compose.runOnIdle { navigation = navigation.copy(stack = listOf(Screen.Album(1))) }
-        compose.mainClock.advanceTimeByFrame()
-        compose.runOnIdle {
-            navigation = navigation.copy(stack = navigation.stack + Screen.Artist(2))
+        try {
+            compose.runOnIdle { navigation = navigation.copy(stack = listOf(Screen.Album(1))) }
+            advanceFrames(1)
+            compose.runOnIdle { navigation = navigation.copy(stack = navigation.stack + Screen.Artist(2)) }
+            advanceFrames(1)
+            compose.runOnIdle { dispatcher.onBackPressed() }
+            advanceFrames(1)
+            compose.runOnIdle { dispatcher.onBackPressed() }
+            advanceFrames(1)
+            compose.runOnIdle {
+                assertEquals(emptyList<Screen>(), navigation.stack)
+                navigation = NavState(tab = AppTab.Search)
+            }
+        } finally {
+            compose.mainClock.autoAdvance = true
         }
-        compose.mainClock.advanceTimeByFrame()
-        compose.runOnIdle { dispatcher.onBackPressed() }
-        compose.mainClock.advanceTimeByFrame()
-        compose.runOnIdle { dispatcher.onBackPressed() }
-        compose.mainClock.advanceTimeByFrame()
-        compose.runOnIdle {
-            assertEquals(emptyList<Screen>(), navigation.stack)
-            navigation = NavState(tab = AppTab.Search)
-        }
-        compose.mainClock.autoAdvance = true
         compose.onNodeWithText("Search").assertIsDisplayed()
-        compose.onNodeWithText("Album(id=1)").assertDoesNotExist()
+        compose.onNodeWithTag("album-page").assertDoesNotExist()
         compose.onNodeWithText("Artist(id=2)").assertDoesNotExist()
     }
 
-    // ---------------------------------------------------------------------------------------------
-    // Predictive-back recede engine: frame-precise regression tests.
-    // ---------------------------------------------------------------------------------------------
-
-    /**
-     * The page slides in on the theme's spatial spring. If that spring overshoots, the page would
-     * pass its resting place and open a gap at the right edge, so sample every frame of the push.
-     */
     @Test
-    fun pushedPageNeverOpensAGapAtTheEdgeWhileItSettles() {
-        startTwoPageNavigationHost()
-        compose.waitForIdle()
+    fun predictiveBackCancellationRestoresPageAndCommitPopsImmediatelyOnce() {
+        startHost()
+        compose.onNodeWithTag("rows").performScrollToIndex(35)
+        pushAlbum()
+        val resting = bounds()
         compose.mainClock.autoAdvance = false
         try {
-            compose.runOnIdle { navState = navState.copy(stack = navState.stack + Screen.Album(1)) }
-            var leftMost = Float.MAX_VALUE
-            repeat(90) {
-                compose.mainClock.advanceTimeByFrame()
-                compose.runOnIdle { }
-                val node = runCatching {
-                    compose.onNodeWithTag("album-page").fetchSemanticsNode().boundsInRoot
-                }.getOrNull()
-                if (node != null) leftMost = minOf(leftMost, node.left)
+            beginGesture()
+            dragTo(0.5f)
+            assertTrue("The native transition follows the finger", bounds().left > resting.left + 1f)
+            compose.runOnIdle { assertEquals(0, popCount) }
+            compose.runOnIdle { dispatcher.dispatchOnBackCancelled() }
+            advanceFrames(30)
+            assertEquals(resting.left, bounds().left, 0.5f)
+            assertEquals(resting.width, bounds().width, 0.5f)
+            compose.runOnIdle { assertEquals(listOf(Screen.Album(1)), navigation.stack) }
+
+            beginGesture()
+            dragTo(0.6f)
+            compose.runOnIdle {
+                dispatcher.onBackPressed()
+                assertEquals("Commit updates the stack without a second animation delay", 1, popCount)
+                assertTrue(navigation.stack.isEmpty())
             }
-            assertTrue("The page reached its resting place: $leftMost", leftMost < 1f)
-            assertTrue("The page did not overshoot past the screen edge: $leftMost", leftMost >= -0.5f)
+            advanceFrames(30)
+            compose.onNodeWithTag("album-page").assertDoesNotExist()
+            compose.onNodeWithText("Row 35").assertIsDisplayed()
+        } finally {
+            finishGestureTest()
+        }
+    }
+
+    @Test
+    fun predictiveBackFromEitherEdgeUsesTheSamePopTransformThroughRelease() {
+        startHost()
+        pushAlbum()
+        compose.mainClock.autoAdvance = false
+        try {
+            beginGesture(BackEventCompat.EDGE_LEFT)
+            dragTo(0.5f, BackEventCompat.EDGE_LEFT)
+            assertTrue("Left-edge back slides right", bounds().left > 1f)
+            compose.runOnIdle { dispatcher.dispatchOnBackCancelled() }
+            advanceFrames(30)
+            assertEquals(0f, bounds().left, 0.5f)
+
+            beginGesture(BackEventCompat.EDGE_RIGHT)
+            dragTo(0.5f, BackEventCompat.EDGE_RIGHT)
+            val beforeCommit = bounds().left
+            assertTrue("Either edge seeks the normal pop transform", beforeCommit > 1f)
+            compose.runOnIdle { dispatcher.onBackPressed() }
+            advanceFrames(2)
+            assertTrue("Release continues in the same direction", bounds().left >= beforeCommit - 1f)
+            advanceFrames(30)
+            compose.onNodeWithTag("album-page").assertDoesNotExist()
+            compose.runOnIdle { assertEquals(1, popCount) }
+        } finally {
+            finishGestureTest()
+        }
+    }
+
+    @Test
+    fun gestureProgressDoesNotRecomposeTheRoutedPage() {
+        startHost()
+        pushAlbum()
+        compose.mainClock.autoAdvance = false
+        try {
+            beginGesture()
+            dragTo(0.1f)
+            val baseline = albumPageCompositions
+            val left = bounds().left
+            dragTo(0.6f)
+            assertTrue(bounds().left > left + 1f)
+            assertEquals("Only the native transition moves; content is skipped", baseline, albumPageCompositions)
+        } finally {
+            finishGestureTest()
+        }
+    }
+
+    @Test
+    fun restartingGestureDuringCancellationCanStillCommit() {
+        startHost()
+        pushAlbum()
+        compose.mainClock.autoAdvance = false
+        try {
+            beginGesture()
+            dragTo(0.6f)
+            compose.runOnIdle { dispatcher.dispatchOnBackCancelled() }
+            advanceFrames(2)
+            beginGesture()
+            dragTo(0.3f)
+            assertTrue(bounds().left > 1f)
+            compose.runOnIdle { dispatcher.onBackPressed() }
+            advanceFrames(30)
+            compose.runOnIdle {
+                assertEquals(1, popCount)
+                assertTrue(navigation.stack.isEmpty())
+            }
+            compose.onNodeWithTag("rows").assertIsDisplayed()
+            compose.onNodeWithTag("album-page").assertDoesNotExist()
+        } finally {
+            finishGestureTest()
+        }
+    }
+
+    @Test
+    fun programmaticBackSlidesOutAndRetainsThePreviousScrollPosition() {
+        startHost()
+        compose.onNodeWithTag("rows").performScrollToIndex(35)
+        pushAlbum()
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.runOnIdle { dispatcher.onBackPressed() }
+            advanceFrames(4)
+            assertTrue("Outgoing page remains composed and slides off", bounds().left > 1f)
+            compose.runOnIdle { assertEquals(1, popCount) }
+            advanceFrames(30)
+            compose.onNodeWithText("Row 35").assertIsDisplayed()
+            compose.onNodeWithTag("album-page").assertDoesNotExist()
         } finally {
             compose.mainClock.autoAdvance = true
         }
     }
 
-    /**
-     * Material's predictive back preview: the page shrinks toward 90% on a decelerated curve, so
-     * the start of the gesture is the most visible part and the shrink never passes 90%.
-     */
     @Test
-    fun fingerProgressShrinksThePageOnADeceleratedCurveToNinetyPercent() {
-        startTwoPageNavigationHost()
-        compose.onNodeWithTag("rows").performScrollToIndex(35)
-        pushAlbumPage()
-        compose.onNodeWithText("Album").assertIsDisplayed()
-        val fullWidth = pageWidth()
-
+    fun forwardAndBackSlidesMirrorInRtl() {
+        startHost(LayoutDirection.Rtl)
+        compose.mainClock.autoAdvance = false
         try {
-            compose.mainClock.autoAdvance = false
-            beginGesture()
-            dragTo(0.1f)
-            val widthAt10 = widthAwaitingMotion(fullWidth)
-            assertTrue("progress 0.1 shrinks the page: $widthAt10 of $fullWidth", widthAt10 < fullWidth)
-
-            dragTo(0.3f)
-            val widthAt30 = widthAwaitingMotion(widthAt10)
-            assertTrue("progress 0.3 shrinks the page further: $widthAt30 of $widthAt10", widthAt30 < widthAt10)
-
-            assertTrue(
-                "The curve decelerates: the first 0.1 of progress shrinks more than half of 0.3's",
-                fullWidth - widthAt10 > 0.5f * (fullWidth - widthAt30),
-            )
-
-            dragTo(1.0f)
-            val widthAt60 = widthAwaitingMotion(widthAt30)
-            assertEquals("The preview settles at 90% of the page", fullWidth * 0.9f, widthAt60, 2f)
-        } finally {
-            endPredictiveBackTest()
-        }
-    }
-
-    /** The preview follows the finger vertically and never comes closer than 8dp to the screen edge. */
-    @Test
-    fun previewFollowsTheFingerVerticallyWithinTheEdgeMargin() {
-        startTwoPageNavigationHost()
-        pushAlbumPage()
-        compose.onNodeWithText("Album").assertIsDisplayed()
-        val density = compose.density.density
-        val windowHeight = compose.onNodeWithTag("album-page").fetchSemanticsNode().boundsInRoot.height
-
-        try {
-            compose.mainClock.autoAdvance = false
-            compose.runOnIdle {
-                backDispatcher.dispatchOnBackStarted(BackEventCompat(0f, 100f, 0f, BackEventCompat.EDGE_LEFT))
-                backDispatcher.dispatchOnBackProgressed(BackEventCompat(0f, 100f, 0f, BackEventCompat.EDGE_LEFT))
-            }
-            compose.mainClock.advanceTimeByFrame()
-            var progress = 0f
-            while (progress < 0.6f - 1e-4f) {
-                progress = minOf(progress + 0.02f, 0.6f)
-                // The finger travels down the screen while it swipes in.
-                val touchY = 100f + progress * 1200f
-                compose.runOnIdle {
-                    backDispatcher.dispatchOnBackProgressed(
-                        BackEventCompat(0f, touchY, progress, BackEventCompat.EDGE_LEFT),
-                    )
-                }
-                advanceFrames(1)
-            }
+            compose.runOnIdle { navigation = navigation.copy(stack = listOf(Screen.Album(1))) }
             advanceFrames(4)
-            val bounds = compose.onNodeWithTag("album-page").fetchSemanticsNode().boundsInRoot
-            val centredTop = (windowHeight - bounds.height) / 2f
-            assertTrue("A downward finger moves the page down: ${bounds.top} vs $centredTop", bounds.top > centredTop + 1f)
-            val bottomMargin = windowHeight - bounds.bottom
-            assertTrue("The page keeps 8dp from the bottom edge: $bottomMargin", bottomMargin >= 8f * density - 1f)
-
-            compose.runOnIdle { backDispatcher.dispatchOnBackCancelled() }
-            settleTransition()
-            assertEquals("Cancellation re-centres the page vertically", 0f, pageTop(), 0.5f)
+            assertTrue("RTL push arrives from the left", bounds().left < -1f)
+            advanceFrames(30)
+            assertEquals(0f, bounds().left, 0.5f)
+            compose.runOnIdle { dispatcher.onBackPressed() }
+            advanceFrames(4)
+            assertTrue("RTL pop exits to the left", bounds().left < -1f)
+            advanceFrames(30)
+            compose.onNodeWithTag("rows").assertIsDisplayed()
         } finally {
-            endPredictiveBackTest()
+            compose.mainClock.autoAdvance = true
         }
     }
 
-    /** The preview moves toward the side the finger travels to, mirrored per swipe edge. */
     @Test
-    fun previewShiftsAwayFromTheSwipeEdge() {
-        startTwoPageNavigationHost()
-        pushAlbumPage()
-        compose.onNodeWithText("Album").assertIsDisplayed()
-        val restingCenter = pageCenterX()
-
-        try {
-            compose.mainClock.autoAdvance = false
-            beginGesture(BackEventCompat.EDGE_LEFT)
-            dragTo(0.6f, BackEventCompat.EDGE_LEFT)
-            advanceFrames(3)
-            val fromLeft = pageCenterX()
-            compose.runOnIdle { backDispatcher.dispatchOnBackCancelled() }
-            settleTransition()
-            compose.waitForIdle()
-            assertEquals("Cancellation re-centres the page", restingCenter, pageCenterX(), 0.5f)
-
-            beginGesture(BackEventCompat.EDGE_RIGHT)
-            dragTo(0.6f, BackEventCompat.EDGE_RIGHT)
-            advanceFrames(3)
-            val fromRight = pageCenterX()
-
-            assertTrue("A left-edge swipe moves the page right: $fromLeft vs $restingCenter", fromLeft > restingCenter + 1f)
-            assertTrue("A right-edge swipe moves the page left: $fromRight vs $restingCenter", fromRight < restingCenter - 1f)
-        } finally {
-            endPredictiveBackTest()
-        }
-    }
-
-    /**
-     * Cancelling a gesture must hand the page back to a settle animation: one frame after the
-     * cancellation the page is still shrunk, and it is only full size again once the settle ended.
-     */
-    @Test
-    fun cancellingTheGestureAnimatesBackInsteadOfSnapping() {
-        startTwoPageNavigationHost()
-        pushAlbumPage()
-        compose.onNodeWithText("Album").assertIsDisplayed()
-        val fullWidth = pageWidth()
-        val stackBeforeGesture = navState.stack
-
-        try {
-            compose.mainClock.autoAdvance = false
-            beginGesture()
-            dragTo(0.6f)
-            val widthAt60 = widthAwaitingMotion(fullWidth)
-            assertTrue("progress 0.6 shrinks the page: $widthAt60 of $fullWidth", widthAt60 < fullWidth - 1f)
-
-            compose.runOnIdle { backDispatcher.dispatchOnBackCancelled() }
-            compose.mainClock.advanceTimeByFrame()
-            val widthOneFrameAfterCancel = pageWidth()
-            assertTrue(
-                "One frame after cancellation the page is still mid-settle, not snapped back " +
-                    "($widthOneFrameAfterCancel of $fullWidth)",
-                widthOneFrameAfterCancel < fullWidth - 1f,
-            )
-
-            settleTransition()
-            compose.waitForIdle()
-            val settledWidth = pageWidth()
-            assertEquals("Cancellation restores the page to full size", fullWidth, settledWidth, 0.5f)
-            compose.onNodeWithText("Album").assertIsDisplayed()
-            assertEquals("Cancellation does not pop the page", stackBeforeGesture, navState.stack)
-        } finally {
-            endPredictiveBackTest()
-        }
-    }
-
-    /**
-     * The gesture path must be draw-phase only: the routed page content is composed at most once
-     * while the page is settled, and eight progress events must not recompose it.
-     */
-    @Test
-    fun fingerProgressDoesNotRecomposeTheRoutedPageContent() {
-        startTwoPageNavigationHost()
-        pushAlbumPage()
-        compose.onNodeWithText("Album").assertIsDisplayed()
-        compose.waitForIdle()
-        val baseline = albumPageCompositions
-        assertTrue("Baseline captured after the album page settled: $baseline", baseline > 0)
-        val fullWidth = pageWidth()
-
-        try {
-            compose.mainClock.autoAdvance = false
-            beginGesture()
-            compose.runOnIdle {
-                for (step in 1..8) {
-                    backDispatcher.dispatchOnBackProgressed(backEvent(step / 10f))
+    fun navigationActionsIgnorePagesThatAreEnteringOrLeaving() {
+        val actions = mutableMapOf<Screen, (Long) -> Unit>()
+        val clicks = mutableListOf<Long>()
+        compose.setContent {
+            NocturnTheme {
+                ScreenNavigationHost(navigation, true, ::pop) { screen ->
+                    val navigate = rememberResumedNavigation<Long> { clicks += it }
+                    SideEffect { actions[screen] = navigate }
+                    Text(screen.toString())
                 }
             }
-            val gesturedWidth = widthAwaitingMotion(fullWidth, maxFrames = 3)
-            assertTrue("Progress events move the page while the finger moves", gesturedWidth < fullWidth)
-            assertEquals(
-                "Progress is draw-phase only, so the routed page must not recompose",
-                baseline,
-                albumPageCompositions,
-            )
+        }
+        compose.waitForIdle()
+        compose.runOnIdle { actions.getValue(Screen.Home)(1) }
+        assertEquals(listOf(1L), clicks)
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.runOnIdle { navigation = navigation.copy(stack = listOf(Screen.Album(1))) }
+            advanceFrames(4)
+            compose.runOnIdle {
+                actions.getValue(Screen.Home)(2)
+                actions.getValue(Screen.Album(1))(3)
+            }
+            assertEquals("Neither transitioning page accepts navigation", listOf(1L), clicks)
+            advanceFrames(30)
+            compose.runOnIdle {
+                actions.getValue(Screen.Home)(4)
+                actions.getValue(Screen.Album(1))(5)
+            }
+            assertEquals("Only the resumed destination accepts navigation", listOf(1L, 5L), clicks)
         } finally {
-            endPredictiveBackTest()
+            compose.mainClock.autoAdvance = true
         }
     }
 
-    /**
-     * A committed programmatic pop slides the outgoing page off toward the end edge: it stays
-     * composed and moves before the previous page is revealed.
-     */
     @Test
-    fun programmaticBackSlidesThePageOffBeforeRevealingThePreviousPage() {
-        startTwoPageNavigationHost()
-        compose.onNodeWithTag("rows").performScrollToIndex(35)
-        pushAlbumPage()
-        compose.onNodeWithText("Album").assertIsDisplayed()
-        val restingLeft = pageLeft()
-        assertEquals(0, popCount)
-
+    fun switchingTabsDuringPredictiveBackDoesNotLeaveAnOutgoingPage() {
+        startHost()
+        pushAlbum()
+        compose.mainClock.autoAdvance = false
         try {
-            compose.mainClock.autoAdvance = false
-            compose.runOnIdle { backDispatcher.onBackPressed() }
-            compose.mainClock.advanceTimeByFrame()
-            compose.onNodeWithTag("album-page")
-                .assertExists("The outgoing page must stay composed while the pop slides off")
-            var left = pageLeft()
-            var framesWaited = 0
-            while (framesWaited < 3 && abs(left - restingLeft) < 0.5f) {
-                compose.mainClock.advanceTimeByFrame()
-                framesWaited++
-                left = pageLeft()
-            }
-            assertTrue(
-                "Programmatic back slides the page toward the end edge: $left from $restingLeft",
-                left > restingLeft + 0.5f,
-            )
-
-            settleTransition()
-            compose.waitForIdle()
-            compose.onNodeWithText("Row 35").assertIsDisplayed()
+            beginGesture()
+            dragTo(0.4f)
+            compose.runOnIdle { navigation = NavState(tab = AppTab.Search) }
+            advanceFrames(1)
+            compose.runOnIdle { dispatcher.dispatchOnBackCancelled() }
+            advanceFrames(30)
+            compose.onNodeWithText("Search").assertIsDisplayed()
             compose.onNodeWithTag("album-page").assertDoesNotExist()
-            assertEquals("The programmatic pop is committed exactly once", 1, popCount)
+            compose.runOnIdle { assertEquals(0, popCount) }
         } finally {
-            endPredictiveBackTest()
+            finishGestureTest()
         }
     }
 
-    /**
-     * A gesture restarted in the middle of the cancel settle must adopt the new progress directly:
-     * the page lands on the geometry of the new progress instead of jumping or finishing the old
-     * settle first.
-     */
-    @Test
-    fun restartingTheGestureMidSettleFollowsTheNewProgress() {
-        startTwoPageNavigationHost()
-        pushAlbumPage()
-        compose.onNodeWithText("Album").assertIsDisplayed()
-        val fullWidth = pageWidth()
-
-        try {
-            compose.mainClock.autoAdvance = false
-            // Reference geometry of an uninterrupted gesture at 0.3.
-            beginGesture()
-            dragTo(0.3f)
-            val expectedWidthAt30 = widthAwaitingMotion(fullWidth)
-            compose.runOnIdle { backDispatcher.dispatchOnBackCancelled() }
-            settleTransition()
-            compose.waitForIdle()
-            assertEquals(fullWidth, pageWidth(), 0.5f)
-
-            beginGesture()
-            dragTo(0.5f)
-            val widthAt50 = widthAwaitingMotion(fullWidth)
-            assertTrue("progress 0.5 shrinks the page: $widthAt50 of $fullWidth", widthAt50 < fullWidth - 1f)
-
-            compose.runOnIdle { backDispatcher.dispatchOnBackCancelled() }
-            advanceFrames(2)
-
-            beginGesture()
-            dragTo(0.3f)
-            var widthAt30 = pageWidth()
-            var framesWaited = 0
-            while (framesWaited < 3 && abs(widthAt30 - expectedWidthAt30) > 2f) {
-                compose.mainClock.advanceTimeByFrame()
-                framesWaited++
-                widthAt30 = pageWidth()
-            }
-            assertEquals(
-                "A restarted gesture tracks its own progress without jumping",
-                expectedWidthAt30,
-                widthAt30,
-                2f,
-            )
-            assertTrue("A restarted gesture still shrinks the page: $widthAt30 of $fullWidth", widthAt30 < fullWidth - 1f)
-        } finally {
-            endPredictiveBackTest()
-        }
+    private fun pop() {
+        popCount++
+        navigation = navigation.copy(stack = navigation.stack.dropLast(1))
     }
 
-    private fun startTwoPageNavigationHost() {
+    private fun startHost(layoutDirection: LayoutDirection = LayoutDirection.Ltr) {
         compose.setContent {
-            backDispatcher = LocalOnBackPressedDispatcherOwner.current!!.onBackPressedDispatcher
-            NocturnTheme {
-                ScreenNavigationHost(
-                    navigation = navState,
-                    backEnabled = true,
-                    onBack = {
-                        popCount++
-                        navState = navState.copy(stack = navState.stack.dropLast(1))
-                    },
-                ) { screen ->
-                    if (screen == Screen.Home) {
-                        LazyColumn(Modifier.testTag("rows")) {
-                            items((0..100).toList()) { index -> Text("Row $index") }
+            dispatcher = LocalOnBackPressedDispatcherOwner.current!!.onBackPressedDispatcher
+            BackHandler { rootBacks++ }
+            CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
+                NocturnTheme {
+                    ScreenNavigationHost(navigation, pageBackEnabled, ::pop) { screen ->
+                        when (screen) {
+                            Screen.Home -> LazyColumn(Modifier.testTag("rows")) {
+                                items((0..100).toList()) { Text("Row $it") }
+                            }
+                            is Screen.Album -> AlbumPage()
+                            else -> Text(screen.toString())
                         }
-                    } else {
-                        AlbumPage()
                     }
                 }
             }
         }
-    }
-
-    /** Routed album page whose composition count is exposed through [albumPageCompositions]. */
-    @Composable
-    private fun AlbumPage() {
-        var compositions by remember { mutableIntStateOf(0) }
-        SideEffect {
-            compositions++
-            albumPageCompositions = compositions
-        }
-        Box(Modifier.fillMaxSize().testTag("album-page")) {
-            Text("Album")
-        }
-    }
-
-    private fun pushAlbumPage() {
-        compose.runOnIdle { navState = navState.copy(stack = navState.stack + Screen.Album(1)) }
         compose.waitForIdle()
     }
 
-    private fun pageWidth(): Float =
-        compose.onNodeWithTag("album-page").fetchSemanticsNode().boundsInRoot.width
+    @Composable
+    private fun AlbumPage() {
+        SideEffect { albumPageCompositions++ }
+        Box(Modifier.fillMaxSize().testTag("album-page")) { Text("Album") }
+    }
 
-    private fun pageLeft(): Float =
-        compose.onNodeWithTag("album-page").fetchSemanticsNode().boundsInRoot.left
+    private fun pushAlbum() {
+        compose.runOnIdle { navigation = navigation.copy(stack = navigation.stack + Screen.Album(1)) }
+        compose.onNodeWithText("Album").assertIsDisplayed()
+    }
 
-    private fun pageTop(): Float =
-        compose.onNodeWithTag("album-page").fetchSemanticsNode().boundsInRoot.top
+    private fun bounds() = compose.onNodeWithTag("album-page").fetchSemanticsNode().boundsInRoot
 
-    private fun pageCenterX(): Float =
-        compose.onNodeWithTag("album-page").fetchSemanticsNode().boundsInRoot.center.x
-
-    private fun advanceFrames(frames: Int) {
-        repeat(frames) {
+    private fun advanceFrames(count: Int) {
+        repeat(count) {
             compose.mainClock.advanceTimeByFrame()
-            // Resumed coroutines (the settle after cancel or commit) run on the main looper, which
-            // only drains when the test syncs with it.
             compose.runOnIdle { }
         }
     }
 
-    /**
-     * Reads the outgoing page width, giving the engine up to [maxFrames] frames to register a new
-     * transition target while the width has not moved at all yet.
-     */
-    private fun widthAwaitingMotion(unchangedFrom: Float, maxFrames: Int = 6): Float {
-        var width = pageWidth()
-        var framesWaited = 0
-        while (framesWaited < maxFrames && abs(width - unchangedFrom) < 0.01f) {
-            compose.mainClock.advanceTimeByFrame()
-            framesWaited++
-            width = pageWidth()
-        }
-        return width
-    }
-
-    /** Progress the simulated finger has reached since [beginGesture]. */
-    private var gestureProgress = 0f
-
-    /**
-     * Moves the finger to [target] one frame at a time, as a device streams events. A single jump
-     * right after the start is absorbed by the frame that composes the revealed page.
-     */
-    private fun dragTo(target: Float, edge: Int = BackEventCompat.EDGE_LEFT) {
-        while (gestureProgress < target - 1e-4f) {
-            gestureProgress = minOf(gestureProgress + 0.02f, target)
-            compose.runOnIdle {
-                backDispatcher.dispatchOnBackProgressed(backEvent(gestureProgress, edge))
-            }
-            compose.mainClock.advanceTimeByFrame()
-        }
-    }
-
-    /**
-     * Runs a started transition to its end. NavDisplay launches the settle from an effect that
-     * only starts on a frame, and a single large clock jump would skip past that start.
-     */
-    private fun settleTransition() {
-        advanceFrames(60)
-    }
-
-    /**
-     * Starts a gesture the way a device does: the start and a first progress event land on their
-     * own frame before the finger moves. NavDisplay composes the revealed page on that first seek.
-     */
     private fun beginGesture(edge: Int = BackEventCompat.EDGE_LEFT) {
-        gestureProgress = 0f
         compose.runOnIdle {
-            backDispatcher.dispatchOnBackStarted(backEvent(0f, edge))
-            backDispatcher.dispatchOnBackProgressed(backEvent(0f, edge))
+            dispatcher.dispatchOnBackStarted(backEvent(0f, edge))
+            dispatcher.dispatchOnBackProgressed(backEvent(0f, edge))
         }
-        compose.mainClock.advanceTimeByFrame()
+        advanceFrames(1)
     }
 
-    /** Restores the automatic clock and drops any gesture still in flight. */
-    private fun endPredictiveBackTest() {
+    private fun dragTo(target: Float, edge: Int = BackEventCompat.EDGE_LEFT) {
+        var progress = 0f
+        while (progress < target - 1e-4f) {
+            progress = minOf(progress + 0.02f, target)
+            compose.runOnIdle { dispatcher.dispatchOnBackProgressed(backEvent(progress, edge)) }
+            advanceFrames(1)
+        }
+        advanceFrames(3)
+    }
+
+    private fun finishGestureTest() {
         compose.mainClock.autoAdvance = true
-        runCatching {
-            compose.runOnIdle { backDispatcher.dispatchOnBackCancelled() }
-        }
+        compose.runOnIdle { dispatcher.dispatchOnBackCancelled() }
     }
 
-    private fun backEvent(progress: Float, edge: Int = BackEventCompat.EDGE_LEFT) =
-        BackEventCompat(0f, 100f, progress, edge)
+    private fun backEvent(progress: Float, edge: Int) = BackEventCompat(0f, 100f, progress, edge)
 }

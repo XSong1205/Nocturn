@@ -51,6 +51,7 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.dropUnlessResumed
 import dev.nocturn.app.NocturnViewModel
 import dev.nocturn.app.ui.components.GlassMaterials
 import dev.nocturn.app.ui.components.LocalBottomChromePadding
@@ -73,6 +74,12 @@ import dev.nocturn.app.ui.screens.playlist.AlbumScreen
 import dev.nocturn.app.ui.screens.playlist.ArtistScreen
 import dev.nocturn.app.ui.screens.playlist.PlaylistScreen
 import dev.nocturn.app.ui.screens.search.SearchScreen
+import dev.nocturn.app.ui.screens.settings.SettingsAboutScreen
+import dev.nocturn.app.ui.screens.settings.SettingsAppearanceScreen
+import dev.nocturn.app.ui.screens.settings.SettingsGeneralScreen
+import dev.nocturn.app.ui.screens.settings.SettingsPlaybackScreen
+import dev.nocturn.app.ui.screens.settings.SettingsScreen
+import dev.nocturn.app.ui.screens.settings.SettingsStorageScreen
 import dev.nocturn.app.ui.state.AlbumUiState
 import dev.nocturn.app.ui.state.AppTab
 import dev.nocturn.app.ui.state.ArtistUiState
@@ -327,6 +334,12 @@ private fun ScreenContent(
         Screen.RecentSongs -> RecentSongsRoute(model)
         Screen.LikedSongs -> LikedSongsRoute(model)
         Screen.DailySongs -> DailySongsRoute(model)
+        Screen.Settings -> SettingsRoute(model)
+        Screen.SettingsPlayback -> SettingsPlaybackRoute(model)
+        Screen.SettingsAppearance -> SettingsAppearanceRoute(model)
+        Screen.SettingsGeneral -> SettingsGeneralRoute(model)
+        Screen.SettingsStorage -> SettingsStorageRoute(model)
+        Screen.SettingsAbout -> SettingsAboutRoute(model)
     }
 }
 
@@ -336,18 +349,18 @@ private fun HomeRoute(model: NocturnViewModel) {
     HomeScreen(
         state = home,
         onRefresh = model::refreshHome,
-        onPlaylistClick = model::openPlaylist,
-        onChartClick = { toplist -> model.openPlaylist(toplist.id) },
+        onPlaylistClick = rememberResumedNavigation(model::openPlaylist),
+        onChartClick = rememberResumedNavigation { toplist -> model.openPlaylist(toplist.id) },
         onSongClick = { song, songs ->
             model.playSongs(songs, songs.indexOf(song).coerceAtLeast(0))
         },
-        onOpenDaily = model::openDailySongs,
+        onOpenDaily = dropUnlessResumed { model.openDailySongs() },
         onPlayAllDaily = { model.playAll(home.dailySongs) },
-        onSearchClick = {
+        onSearchClick = dropUnlessResumed {
             model.selectTab(AppTab.Search)
             model.expandSearch()
         },
-        onAccountClick = { model.selectTab(AppTab.Library) },
+        onAccountClick = dropUnlessResumed { model.selectTab(AppTab.Library) },
     )
 }
 
@@ -367,9 +380,9 @@ private fun SearchRoute(model: NocturnViewModel) {
             model.playSongs(songs, songs.indexOf(song).coerceAtLeast(0))
         },
         onLikeClick = model::toggleLike,
-        onPlaylistClick = model::openPlaylist,
-        onAlbumClick = model::openAlbum,
-        onArtistClick = model::openArtist,
+        onPlaylistClick = rememberResumedNavigation(model::openPlaylist),
+        onAlbumClick = rememberResumedNavigation(model::openAlbum),
+        onArtistClick = rememberResumedNavigation(model::openArtist),
         onBack = { model.onSearchBack() },
         onRetry = model::retrySearch,
         onExpand = model::expandSearch,
@@ -384,14 +397,77 @@ private fun LibraryRoute(model: NocturnViewModel) {
         state = library,
         onLoginClick = model::startLogin,
         onLogout = model::logout,
-        onLikedSongsClick = model::openLikedSongs,
-        onPlaylistClick = model::openPlaylist,
-        onRecentSongsClick = model::openRecentSongs,
+        onLikedSongsClick = dropUnlessResumed { model.openLikedSongs() },
+        onPlaylistClick = rememberResumedNavigation(model::openPlaylist),
+        onRecentSongsClick = dropUnlessResumed { model.openRecentSongs() },
+        onSettingsClick = dropUnlessResumed { model.openSettings() },
+        onRetry = model::refreshLibrary,
+    )
+}
+
+@Composable
+private fun SettingsRoute(model: NocturnViewModel) {
+    val settingsState by model.settingsUi.collectAsStateWithLifecycle()
+    SettingsScreen(
+        state = settingsState,
+        onBack = dropUnlessResumed { model.back() },
+        onNavigatePlayback = dropUnlessResumed { model.openSettingsPlayback() },
+        onNavigateAppearance = dropUnlessResumed { model.openSettingsAppearance() },
+        onNavigateGeneral = dropUnlessResumed { model.openSettingsGeneral() },
+        onNavigateStorage = dropUnlessResumed { model.openSettingsStorage() },
+        onNavigateAbout = dropUnlessResumed { model.openSettingsAbout() },
+    )
+}
+
+@Composable
+private fun SettingsPlaybackRoute(model: NocturnViewModel) {
+    val settingsState by model.settingsUi.collectAsStateWithLifecycle()
+    SettingsPlaybackScreen(
+        state = settingsState,
+        onBack = dropUnlessResumed { model.back() },
         onQualityChange = model::setQuality,
+    )
+}
+
+@Composable
+private fun SettingsAppearanceRoute(model: NocturnViewModel) {
+    val settingsState by model.settingsUi.collectAsStateWithLifecycle()
+    SettingsAppearanceScreen(
+        state = settingsState,
+        onBack = dropUnlessResumed { model.back() },
         onThemeModeChange = model::setThemeMode,
         onDynamicColorChange = model::setDynamicColor,
+    )
+}
+
+@Composable
+private fun SettingsGeneralRoute(model: NocturnViewModel) {
+    val settingsState by model.settingsUi.collectAsStateWithLifecycle()
+    SettingsGeneralScreen(
+        state = settingsState,
+        onBack = dropUnlessResumed { model.back() },
         onHapticsChange = model::setHapticsEnabled,
-        onRetry = model::refreshLibrary,
+        onLyriconChange = model::setLyriconEnabled,
+    )
+}
+
+@Composable
+private fun SettingsStorageRoute(model: NocturnViewModel) {
+    val settingsState by model.settingsUi.collectAsStateWithLifecycle()
+    SettingsStorageScreen(
+        state = settingsState,
+        onBack = dropUnlessResumed { model.back() },
+        onClearSearchHistory = model::clearSearchHistory,
+        onClearCache = model::clearCache,
+    )
+}
+
+@Composable
+private fun SettingsAboutRoute(model: NocturnViewModel) {
+    val settingsState by model.settingsUi.collectAsStateWithLifecycle()
+    SettingsAboutScreen(
+        state = settingsState,
+        onBack = dropUnlessResumed { model.back() },
     )
 }
 
@@ -405,7 +481,7 @@ private fun PlaylistRoute(id: Long, model: NocturnViewModel) {
     val entry by remember(id) { derivedStateOf { all.value[id] } }
     PlaylistScreen(
         state = rememberLastNonNull(entry) ?: PlaylistUiState(playlistId = id, loading = true),
-        onBack = { model.back() },
+        onBack = dropUnlessResumed { model.back() },
         onPlayAll = model::playAll,
         onSongClick = { song, songs ->
             model.playSongs(songs, songs.indexOf(song).coerceAtLeast(0))
@@ -414,6 +490,10 @@ private fun PlaylistRoute(id: Long, model: NocturnViewModel) {
         onLoadMore = { model.loadMorePlaylist(id) },
         onRetry = { model.loadPlaylist(id) },
         onSubscribeToggle = { model.togglePlaylistSubscription(id) },
+        onSearchClick = dropUnlessResumed {
+            model.selectTab(AppTab.Search)
+            model.expandSearch()
+        },
     )
 }
 
@@ -423,13 +503,13 @@ private fun AlbumRoute(id: Long, model: NocturnViewModel) {
     val entry by remember(id) { derivedStateOf { all.value[id] } }
     AlbumScreen(
         state = rememberLastNonNull(entry) ?: AlbumUiState(albumId = id, loading = true),
-        onBack = { model.back() },
+        onBack = dropUnlessResumed { model.back() },
         onPlayAll = model::playAll,
         onSongClick = { song, songs ->
             model.playSongs(songs, songs.indexOf(song).coerceAtLeast(0))
         },
         onLikeClick = model::toggleLike,
-        onArtistClick = model::openArtist,
+        onArtistClick = rememberResumedNavigation(model::openArtist),
     )
 }
 
@@ -439,12 +519,12 @@ private fun ArtistRoute(id: Long, model: NocturnViewModel) {
     val entry by remember(id) { derivedStateOf { all.value[id] } }
     ArtistScreen(
         state = rememberLastNonNull(entry) ?: ArtistUiState(artistId = id, loading = true),
-        onBack = { model.back() },
+        onBack = dropUnlessResumed { model.back() },
         onSongClick = { song, songs ->
             model.playSongs(songs, songs.indexOf(song).coerceAtLeast(0))
         },
         onLikeClick = model::toggleLike,
-        onAlbumClick = model::openAlbum,
+        onAlbumClick = rememberResumedNavigation(model::openAlbum),
         onPlayAll = model::playAll,
     )
 }
@@ -454,7 +534,7 @@ private fun RecentSongsRoute(model: NocturnViewModel) {
     val library by model.library.collectAsStateWithLifecycle()
     RecentSongsScreen(
         state = library,
-        onBack = { model.back() },
+        onBack = dropUnlessResumed { model.back() },
         onPlayAll = { model.playAll(library.recentSongs) },
         onSongClick = { song, songs ->
             model.playSongs(songs, songs.indexOf(song).coerceAtLeast(0))
@@ -468,7 +548,7 @@ private fun LikedSongsRoute(model: NocturnViewModel) {
     val likedSongs by model.likedSongs.collectAsStateWithLifecycle()
     LikedSongsScreen(
         state = likedSongs,
-        onBack = { model.back() },
+        onBack = dropUnlessResumed { model.back() },
         onPlayAll = { model.playAll(likedSongs.songs) },
         onSongClick = { song, songs ->
             model.playSongs(songs, songs.indexOf(song).coerceAtLeast(0))
@@ -482,7 +562,7 @@ private fun DailySongsRoute(model: NocturnViewModel) {
     val home by model.home.collectAsStateWithLifecycle()
     DailySongsScreen(
         state = home,
-        onBack = { model.back() },
+        onBack = dropUnlessResumed { model.back() },
         onPlayAll = { model.playAll(home.dailySongs) },
         onSongClick = { song, songs ->
             model.playSongs(songs, songs.indexOf(song).coerceAtLeast(0))

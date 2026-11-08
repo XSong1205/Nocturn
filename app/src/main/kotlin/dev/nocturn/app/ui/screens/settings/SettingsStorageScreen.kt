@@ -225,9 +225,10 @@ fun SettingsStorageScreen(
                                 haptics.confirm()
                                 onClearCache()
                             },
+                            enabled = !state.isClearing,
                             modifier = Modifier.testTag("settings-clear-cache-button"),
                         ) {
-                            Text("清理")
+                            Text(if (state.isClearing) "清理中…" else "清理")
                         }
                     }
                 }

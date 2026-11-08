@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performScrollToNode
@@ -23,6 +24,7 @@ import dev.nocturn.app.data.model.ThemeMode
 import dev.nocturn.app.ui.preview.PreviewData
 import dev.nocturn.app.ui.screens.library.LibraryScreen
 import dev.nocturn.app.ui.screens.library.LikedSongsScreen
+import dev.nocturn.app.ui.screens.library.RecentSongsScreen
 import dev.nocturn.app.ui.screens.library.LoginSheet
 import dev.nocturn.app.ui.screens.search.SearchScreen
 import dev.nocturn.app.ui.state.LibraryUiState
@@ -134,6 +136,42 @@ class SearchLibraryScreensTest {
         compose.onNodeWithTag("search-clear-history").performScrollTo().performClick()
 
         assertTrue(cleared)
+    }
+
+    @Test
+    fun typingInSearchInputUpdatesQueryAndTriggersRealtimeSuggestions() {
+        var queried = ""
+        setScreen {
+            var state by remember { mutableStateOf(SearchUiState(expanded = true)) }
+            SearchScreen(
+                state = state,
+                onQueryChange = {
+                    queried = it
+                    state = state.copy(query = it)
+                },
+            )
+        }
+        compose.waitForIdle()
+        compose.onNodeWithTag("search-input").performTextInput("x")
+        compose.waitForIdle()
+        assertEquals("x", queried)
+    }
+
+    @Test
+    fun searchInputFieldUsesDefaultKeywordAsPlaceholderAndFallback() {
+        var searched = ""
+        setScreen {
+            SearchScreen(
+                state = PreviewData.searchIdle.copy(defaultKeyword = "晴天", query = ""),
+                onSearch = { searched = it },
+            )
+        }
+        compose.waitForIdle()
+
+        assertTrue(compose.onAllNodesWithText("晴天").fetchSemanticsNodes().isNotEmpty())
+        compose.onNodeWithTag("search-input").performImeAction()
+        compose.waitForIdle()
+        assertEquals("晴天", searched)
     }
 
     @Test
@@ -281,10 +319,12 @@ class SearchLibraryScreensTest {
     @Test
     fun librarySignedInShowsProfileStatsAndLikedEntry() {
         var likedClicks = 0
+        var recentClicks = 0
         setScreen {
             LibraryScreen(
                 state = PreviewData.libraryLoggedIn,
                 onLikedSongsClick = { likedClicks += 1 },
+                onRecentSongsClick = { recentClicks += 1 },
             )
         }
         compose.waitForIdle()
@@ -293,10 +333,39 @@ class SearchLibraryScreensTest {
         compose.onNodeWithText("夜行电台").assertExists()
         compose.onNodeWithText("把夜色交给音乐。").assertExists()
         compose.onNodeWithText("我喜欢的音乐").assertExists()
+        compose.onNodeWithText("最近播放").assertExists()
 
         compose.onNodeWithTag("library-screen").performScrollToNode(hasTestTag("library-liked-entry"))
         compose.onNodeWithTag("library-liked-entry").performClick()
         assertEquals(1, likedClicks)
+
+        compose.onNodeWithTag("library-screen").performScrollToNode(hasTestTag("library-recent-entry"))
+        compose.onNodeWithTag("library-recent-entry").performClick()
+        assertEquals(1, recentClicks)
+    }
+
+    @Test
+    fun libraryEntriesDebounceRapidClicks() {
+        var likedClicks = 0
+        var recentClicks = 0
+        setScreen {
+            LibraryScreen(
+                state = PreviewData.libraryLoggedIn,
+                onLikedSongsClick = { likedClicks += 1 },
+                onRecentSongsClick = { recentClicks += 1 },
+            )
+        }
+        compose.waitForIdle()
+
+        compose.onNodeWithTag("library-screen").performScrollToNode(hasTestTag("library-liked-entry"))
+        compose.onNodeWithTag("library-liked-entry").performClick()
+        compose.onNodeWithTag("library-liked-entry").performClick()
+        assertEquals(1, likedClicks)
+
+        compose.onNodeWithTag("library-screen").performScrollToNode(hasTestTag("library-recent-entry"))
+        compose.onNodeWithTag("library-recent-entry").performClick()
+        compose.onNodeWithTag("library-recent-entry").performClick()
+        assertEquals(1, recentClicks)
     }
 
     @Test
@@ -317,34 +386,18 @@ class SearchLibraryScreensTest {
     }
 
     @Test
-    fun librarySettingsAreVisibleWithoutAnAccount() {
-        setScreen { LibraryScreen(state = PreviewData.libraryAnonymous) }
-        compose.waitForIdle()
-
-        compose.onNodeWithTag("library-screen").performScrollToNode(hasTestTag("library-settings"))
-        compose.onNodeWithTag("library-settings").assertExists()
-        compose.onNodeWithTag("library-quality-Exhigh").assertExists()
-        compose.onNodeWithTag("library-theme-system").assertExists()
-        compose.onNodeWithTag("library-dynamic-color-switch").assertExists()
-    }
-
-    @Test
-    fun libraryDynamicColorToggleInvokesCallback() {
-        var toggled: Boolean? = null
+    fun librarySettingsButtonNavigatesToSettings() {
+        var opened = 0
         setScreen {
             LibraryScreen(
-                state = PreviewData.libraryAnonymous.copy(dynamicColor = true),
-                onDynamicColorChange = { toggled = it },
+                state = PreviewData.libraryAnonymous,
+                onSettingsClick = { opened++ },
             )
         }
         compose.waitForIdle()
 
-        compose.onNodeWithTag("library-screen")
-            .performScrollToNode(hasTestTag("library-dynamic-color-switch"))
-        compose.onNodeWithTag("library-dynamic-color-switch").performClick()
-        compose.waitForIdle()
-
-        assertEquals(false, toggled)
+        compose.onNodeWithTag("library-settings-button").performClick()
+        assertEquals(1, opened)
     }
 
     // ---------------------------------------------------------------------------------------
@@ -457,5 +510,47 @@ class SearchLibraryScreensTest {
 
         compose.onNodeWithTag("liked-empty").assertExists()
         compose.onNodeWithText("还没有喜欢的歌曲").assertExists()
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Recent songs
+    // ---------------------------------------------------------------------------------------
+
+    @Test
+    fun recentSongsRowsReportPlayAndLikeCallbacks() {
+        val expectedSong = PreviewData.songs.first()
+        var played: Song? = null
+        var liked: Song? = null
+        var allPlayed = false
+        setScreen {
+            RecentSongsScreen(
+                state = PreviewData.libraryLoggedIn.copy(likedSongIds = setOf(expectedSong.id)),
+                onSongClick = { song, _ -> played = song },
+                onLikeClick = { liked = it },
+                onPlayAll = { allPlayed = true },
+            )
+        }
+        compose.waitForIdle()
+
+        compose.onNodeWithTag("recent-songs-list").assertExists()
+        compose.onNodeWithTag("recent-play-all").performClick()
+        assertTrue(allPlayed)
+
+        compose.onNodeWithTag("recent-song-row-${expectedSong.id}").performClick()
+        assertEquals(expectedSong, played)
+
+        compose.onAllNodesWithContentDescription("取消喜欢")[0].performClick()
+        assertEquals(expectedSong, liked)
+    }
+
+    @Test
+    fun recentSongsEmptyStateRenders() {
+        setScreen {
+            RecentSongsScreen(state = PreviewData.libraryLoggedIn.copy(recentSongs = emptyList()))
+        }
+        compose.waitForIdle()
+
+        compose.onNodeWithTag("recent-empty").assertExists()
+        compose.onNodeWithText("还没有播放记录").assertExists()
     }
 }

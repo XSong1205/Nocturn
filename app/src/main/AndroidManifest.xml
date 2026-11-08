@@ -20,6 +20,21 @@
         android:label="Nocturn"
         android:supportsRtl="true"
         android:theme="@style/Theme.Nocturn">
+
+        <!-- Lyricon Provider module metadata -->
+        <meta-data
+            android:name="lyricon_module"
+            android:value="true" />
+        <meta-data
+            android:name="lyricon_module_author"
+            android:value="Nocturn" />
+        <meta-data
+            android:name="lyricon_module_description"
+            android:value="Nocturn NetEase Cloud Music Client" />
+        <meta-data
+            android:name="lyricon_module_tags"
+            android:resource="@array/lyricon_module_tags" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true">

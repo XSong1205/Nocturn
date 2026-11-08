@@ -94,9 +94,86 @@ class PlaybackSnapshotMappingTest {
     }
 
     @Test
+    fun mirrorsTitleAndArtistIntoSnapshot() {
+        val snapshot = PlaybackSnapshotMapping.fromPlayer(
+            currentIndex = 0,
+            mediaIds = listOf("42"),
+            isPlaying = true,
+            playbackState = Player.STATE_READY,
+            positionMs = 10_000L,
+            durationMs = 180_000L,
+            playerRepeatMode = Player.REPEAT_MODE_OFF,
+            shuffleEnabled = false,
+            title = "夜曲",
+            artist = "周杰伦",
+        )
+
+        assertEquals(42L, snapshot.currentSongId)
+        assertEquals("夜曲", snapshot.title)
+        assertEquals("周杰伦", snapshot.artist)
+    }
+
+    @Test
+    fun fallbackPreservesTitleAndArtistForSameSongWhenNull() {
+        val previous = PlaybackSnapshot(
+            currentSongId = 42L,
+            title = "夜曲",
+            artist = "周杰伦",
+            playing = true,
+        )
+
+        val updated = PlaybackSnapshotMapping.fromPlayer(
+            currentIndex = 0,
+            mediaIds = listOf("42"),
+            isPlaying = true,
+            playbackState = Player.STATE_READY,
+            positionMs = 12_000L,
+            durationMs = 180_000L,
+            playerRepeatMode = Player.REPEAT_MODE_OFF,
+            shuffleEnabled = false,
+            previous = previous,
+            title = null,
+            artist = null,
+        )
+
+        assertEquals("夜曲", updated.title)
+        assertEquals("周杰伦", updated.artist)
+    }
+
+    @Test
+    fun changingSongClearsStaleTitleAndArtistWhenNewMetadataIsNull() {
+        val previous = PlaybackSnapshot(
+            currentSongId = 42L,
+            title = "夜曲",
+            artist = "周杰伦",
+            playing = true,
+        )
+
+        val nextSong = PlaybackSnapshotMapping.fromPlayer(
+            currentIndex = 1,
+            mediaIds = listOf("42", "43"),
+            isPlaying = true,
+            playbackState = Player.STATE_READY,
+            positionMs = 0L,
+            durationMs = 200_000L,
+            playerRepeatMode = Player.REPEAT_MODE_OFF,
+            shuffleEnabled = false,
+            previous = previous,
+            title = null,
+            artist = null,
+        )
+
+        assertEquals(43L, nextSong.currentSongId)
+        assertNull(nextSong.title)
+        assertNull(nextSong.artist)
+    }
+
+    @Test
     fun progressUpdatesOnlyTouchPositionAndDuration() {
         val previous = PlaybackSnapshot(
             currentSongId = 8L,
+            title = "枫",
+            artist = "周杰伦",
             playing = true,
             positionMs = 1_000L,
             durationMs = 245_000L,
@@ -116,6 +193,8 @@ class PlaybackSnapshotMappingTest {
         assertEquals(30_000L, progressed.positionMs)
         assertEquals(0L, progressed.durationMs)
         assertEquals(previous.currentSongId, progressed.currentSongId)
+        assertEquals("枫", progressed.title)
+        assertEquals("周杰伦", progressed.artist)
         assertEquals(previous.queueIds, progressed.queueIds)
         assertEquals(previous.currentIndex, progressed.currentIndex)
         assertEquals(RepeatMode.One, progressed.repeatMode)

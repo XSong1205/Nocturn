@@ -27,8 +27,10 @@ import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SplitButtonDefaults
@@ -98,6 +100,7 @@ fun PlaylistScreen(
     onLoadMore: () -> Unit = {},
     onRetry: () -> Unit = {},
     onSubscribeToggle: () -> Unit = {},
+    onSearchClick: () -> Unit = {},
 ) {
     val detail = state.detail
     if (detail == null) {
@@ -106,6 +109,21 @@ fun PlaylistScreen(
             topBar = {
                 GlassTopBar(scrolled = false) {
                     BarBackButton(onBack = onBack, testTag = "playlist-back")
+                    Spacer(Modifier.weight(1f))
+                    val haptics = rememberHaptics()
+                    IconButton(
+                        onClick = {
+                            haptics.tap()
+                            onSearchClick()
+                        },
+                        modifier = Modifier.testTag("playlist-search"),
+                    ) {
+                        Icon(
+                            Icons.Rounded.Search,
+                            contentDescription = "搜索",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
                 }
             },
         ) { topPadding ->
@@ -140,6 +158,7 @@ fun PlaylistScreen(
         onLoadMore = onLoadMore,
         onRetry = onRetry,
         onSubscribeToggle = onSubscribeToggle,
+        onSearchClick = onSearchClick,
     )
 }
 
@@ -155,6 +174,7 @@ private fun PlaylistContent(
     onLoadMore: () -> Unit,
     onRetry: () -> Unit,
     onSubscribeToggle: () -> Unit,
+    onSearchClick: () -> Unit,
 ) {
     val listState = rememberLazyListState()
     var descriptionExpanded by rememberSaveable { mutableStateOf(false) }
@@ -178,6 +198,20 @@ private fun PlaylistContent(
             GlassTopBar(scrolled = heroScrolledAway) {
                 BarBackButton(onBack = onBack, testTag = "playlist-back")
                 BarTitle(text = detail.name, visible = heroScrolledAway)
+                val haptics = rememberHaptics()
+                IconButton(
+                    onClick = {
+                        haptics.tap()
+                        onSearchClick()
+                    },
+                    modifier = Modifier.testTag("playlist-search"),
+                ) {
+                    Icon(
+                        Icons.Rounded.Search,
+                        contentDescription = "搜索",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
             }
         },
     ) { topPadding ->

@@ -22,7 +22,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -67,6 +71,10 @@ fun LikedSongsScreen(
 ) {
     val listState = rememberLazyListState()
     val collapsed by listState.scrolledPast(200)
+    var interactive by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        interactive = true
+    }
     GlassScaffold(
         modifier = modifier,
         topBar = {
@@ -108,12 +116,15 @@ fun LikedSongsScreen(
                 contentPadding = PaddingValues(top = topPadding, bottom = bottomContentPadding()),
             ) {
                 item(key = "hero") {
-                    LikedHero(count = state.songs.size, onPlayAll = onPlayAll)
+                    LikedHero(
+                        count = state.songs.size,
+                        onPlayAll = { if (interactive) onPlayAll() },
+                    )
                 }
                 itemsIndexed(state.songs, key = { _, song -> song.id }) { index, song ->
                     SongRow(
                         song = song,
-                        onClick = { onSongClick(song, state.songs) },
+                        onClick = { if (interactive) onSongClick(song, state.songs) },
                         modifier = Modifier
                             .padding(horizontal = 8.dp)
                             .testTag("liked-song-row-${song.id}"),

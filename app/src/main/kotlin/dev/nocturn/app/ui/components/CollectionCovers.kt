@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -20,6 +21,9 @@ import androidx.compose.ui.unit.dp
 
 /** Warm red-to-magenta used by the "我喜欢的音乐" collection in every theme. */
 private val LikedGradient = listOf(Color(0xFFFF5F6D), Color(0xFFE5326F), Color(0xFFB2246B))
+
+/** Sky cyan to azure gradient used by the "最近播放" collection in every theme. */
+private val RecentGradient = listOf(Color(0xFF4FACFE), Color(0xFF0099FF), Color(0xFF0066CC))
 
 /**
  * Cover for the liked-songs collection: an app-icon style tile with a deep gradient, a soft top
@@ -62,6 +66,50 @@ fun LikedCollectionCover(
             contentDescription = null,
             tint = Color.White,
             modifier = Modifier.size(size * 0.46f),
+        )
+    }
+}
+
+/**
+ * Cover for the recent-songs collection: an app-icon style tile with a deep cyan/azure gradient,
+ * a soft top light and a white history icon, sized by [size].
+ */
+@Composable
+fun RecentCollectionCover(
+    modifier: Modifier = Modifier,
+    size: Dp = 56.dp,
+) {
+    val shape = RoundedCornerShape(size * 0.28f)
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(shape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            drawRect(
+                Brush.linearGradient(
+                    RecentGradient,
+                    start = Offset(0f, 0f),
+                    end = Offset(this.size.width, this.size.height),
+                ),
+            )
+            // Top light: a broad, faint highlight that gives the tile some depth.
+            drawCircle(
+                brush = Brush.radialGradient(
+                    listOf(Color.White.copy(alpha = 0.32f), Color.Transparent),
+                    center = Offset(this.size.width * 0.28f, this.size.height * 0.12f),
+                    radius = this.size.width * 0.75f,
+                ),
+                radius = this.size.width * 0.75f,
+                center = Offset(this.size.width * 0.28f, this.size.height * 0.12f),
+            )
+        }
+        Icon(
+            imageVector = Icons.Rounded.History,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(size * 0.48f),
         )
     }
 }

@@ -1,4 +1,4 @@
-# BRIEFING — 2026-11-07T13:10:50Z
+# BRIEFING — 2026-11-07T13:17:40Z
 
 ## Mission
 Extract complete Lyricon Provider SDK specifications and API contracts from authoritative documentation and sources.
@@ -18,7 +18,7 @@ Extract complete Lyricon Provider SDK specifications and API contracts from auth
 
 ## Current Parent
 - Conversation ID: 7c985a65-7d83-475c-933c-cc1d23728416
-- Updated: 2026-11-07T13:10:50Z
+- Updated: 2026-11-07T13:17:40Z
 
 ## Task Summary
 - **What to build**: Specification report on Lyricon Provider SDK for Android
@@ -27,7 +27,11 @@ Extract complete Lyricon Provider SDK specifications and API contracts from auth
 - **Code layout**: Documentation in `handoff.md` within `.agents/teamwork/spec_miner_survey_1/`.
 
 ## Key Decisions Made
-- Initializing survey of Lyricon developer docs and related resources.
+- Fully probed 8 Lyricon developer doc pages (quick-start, manifest, connection, player-control, lyrics-model, local-testing, faq, app/providers).
+- Verified Maven coordinates `io.github.proify.lyricon:provider:0.1.70` hosted on Maven Central; Nocturn already configures `mavenCentral()`.
+- Verified required and optional AndroidManifest `<meta-data>` tags: `lyricon_module`, `lyricon_module_author`, `lyricon_module_description`, `lyricon_module_tags` (`$syllable`, `$translation`).
+- Documented complete `LyriconFactory`, `LyriconProvider`, `RemotePlayer` API contracts and parameter types.
+- Analyzed mapping between Nocturn's domain models (`Song`, `Lyrics`, `LyricLine`, `LyricWord`) and Lyricon's models (`Song`, `RichLyricLine`, `LyricWord`). Noted type collision requiring import aliases.
 
 ## Artifact Index
 - `DISPATCH.md` — Assigned task and requirements

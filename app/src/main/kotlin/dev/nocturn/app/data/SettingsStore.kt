@@ -40,6 +40,13 @@ class SettingsStore(context: Context) {
             preferences.edit().putBoolean(KEY_HAPTICS, value).apply()
         }
 
+    /** Status bar lyric provider integration (Lyricon); on by default. */
+    var lyriconEnabled: Boolean
+        get() = preferences.getBoolean(KEY_LYRICON_ENABLED, true)
+        set(value) {
+            preferences.edit().putBoolean(KEY_LYRICON_ENABLED, value).apply()
+        }
+
     fun searchHistory(limit: Int = 10): List<String> {
         val raw = preferences.getString(KEY_HISTORY, null) ?: return emptyList()
         return raw.split('\n').map { it.trim() }.filter { it.isNotEmpty() }.take(limit)
@@ -57,11 +64,12 @@ class SettingsStore(context: Context) {
         preferences.edit().remove(KEY_HISTORY).apply()
     }
 
-    private companion object {
+    internal companion object {
         const val KEY_THEME = "theme-mode"
         const val KEY_DYNAMIC_COLOR = "dynamic-color"
         const val KEY_QUALITY = "audio-quality"
         const val KEY_HAPTICS = "haptics-enabled"
+        const val KEY_LYRICON_ENABLED = "lyricon-enabled"
         const val KEY_HISTORY = "search-history"
     }
 }

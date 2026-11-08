@@ -10,6 +10,7 @@ import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import dev.nocturn.app.MainActivity
+import dev.nocturn.app.NocturnApplication
 import dev.nocturn.app.R
 
 /**
@@ -64,6 +65,7 @@ class PlaybackService : MediaSessionService() {
         mediaSession = MediaSession.Builder(this, exoPlayer)
             .setSessionActivity(sessionActivity)
             .build()
+        (application as NocturnApplication).container.lyriconManager.start()
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
@@ -81,6 +83,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        (application as NocturnApplication).container.lyriconManager.stop()
         mediaSession?.let { session ->
             player?.release()
             player = null

@@ -23,3 +23,7 @@
 
 # AndroidX / Media3 / ExoPlayer
 -dontwarn androidx.media3.**
+
+# Lyricon Provider SDK
+-keep class io.github.proify.lyricon.** { *; }
+-dontwarn io.github.proify.lyricon.**

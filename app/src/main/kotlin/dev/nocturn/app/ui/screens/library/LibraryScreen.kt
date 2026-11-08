@@ -1,15 +1,14 @@
 @file:OptIn(
-    androidx.compose.foundation.layout.ExperimentalLayoutApi::class,
     androidx.compose.material3.ExperimentalMaterial3Api::class,
     androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class,
 )
 
 package dev.nocturn.app.ui.screens.library
 
+import android.os.SystemClock
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -19,7 +18,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -27,32 +25,26 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -68,38 +60,31 @@ import dev.nocturn.app.data.model.AccountProfile
 import dev.nocturn.app.data.model.AccountStats
 import dev.nocturn.app.data.model.Song
 import dev.nocturn.app.data.model.ThemeMode
-import dev.nocturn.app.data.model.displayName
-import dev.nocturn.app.data.model.selectableQualities
-import dev.nocturn.app.ui.components.BlurBehindWindow
 import dev.nocturn.app.ui.components.CoverArt
 import dev.nocturn.app.ui.components.GlassScaffold
 import dev.nocturn.app.ui.components.GlassTopBar
 import dev.nocturn.app.ui.components.LikedCollectionCover
 import dev.nocturn.app.ui.components.MetricLabel
 import dev.nocturn.app.ui.components.PlaylistCard
+import dev.nocturn.app.ui.components.RecentCollectionCover
 import dev.nocturn.app.ui.components.ScreenError
 import dev.nocturn.app.ui.components.ScreenLoading
 import dev.nocturn.app.ui.components.SectionHeader
-import dev.nocturn.app.ui.components.SongRow
 import dev.nocturn.app.ui.components.VipTag
 import dev.nocturn.app.ui.components.bottomContentPadding
 import dev.nocturn.app.ui.components.pressScale
 import dev.nocturn.app.ui.components.rememberHaptics
-import dev.nocturn.app.ui.components.rememberUnfilteredHaptics
 import dev.nocturn.app.ui.preview.PreviewData
 import dev.nocturn.app.ui.state.LibraryUiState
 import dev.nocturn.app.ui.theme.NocturnTheme
-import dev.nocturn.app.ui.theme.isDynamicColorSupported
 import dev.nocturn.app.ui.util.formatCount
-import dev.nocturn.localapi.client.AudioQuality
 
 /**
  * "我的" tab: a single expressive scroll surface that adapts to the session.
  *
  * Signed out it is an invitation: big brand hero, an explicit "third-party client" disclosure and
- * the QR login button, followed by recently played songs and playback/appearance settings that
- * work without an account. Signed in the hero becomes the profile card (avatar, nickname,
- * signature, stats), followed by the liked-songs entry, recent plays, the account's playlists and a
+ * the QR login button, followed by the recent plays entry. Signed in the hero becomes the profile card (avatar, nickname,
+ * signature, stats), followed by the liked-songs entry, recent plays entry, the account's playlists and a
  * guarded logout action. Loading, error and retry reuse the shared components so every state looks
  * the same as the rest of the app.
  */
@@ -115,13 +100,25 @@ fun LibraryScreen(
     onSettingsClick: () -> Unit = {},
     onSongClick: (Song, List<Song>) -> Unit = { _, _ -> },
     onLikeClick: (Song) -> Unit = {},
-    onQualityChange: (AudioQuality) -> Unit = {},
-    onThemeModeChange: (ThemeMode) -> Unit = {},
-    onDynamicColorChange: (Boolean) -> Unit = {},
-    onHapticsChange: (Boolean) -> Unit = {},
     onRetry: () -> Unit = {},
 ) {
     var showLogoutDialog by rememberSaveable { mutableStateOf(false) }
+    var lastLikedClickTime by remember { mutableLongStateOf(0L) }
+    var lastRecentClickTime by remember { mutableLongStateOf(0L) }
+    val onDebouncedLikedClick = {
+        val now = SystemClock.elapsedRealtime()
+        if (lastLikedClickTime == 0L || now - lastLikedClickTime >= 500L) {
+            lastLikedClickTime = now
+            onLikedSongsClick()
+        }
+    }
+    val onDebouncedRecentClick = {
+        val now = SystemClock.elapsedRealtime()
+        if (lastRecentClickTime == 0L || now - lastRecentClickTime >= 500L) {
+            lastRecentClickTime = now
+            onRecentSongsClick()
+        }
+    }
     val listState = rememberLazyListState()
     val scrolled by remember { derivedStateOf { listState.canScrollBackward } }
     val haptics = rememberHaptics()
@@ -181,34 +178,18 @@ fun LibraryScreen(
                     item(key = "liked-entry") {
                         LikedSongsEntry(
                             likedCount = state.likedCount,
-                            onClick = onLikedSongsClick,
+                            onClick = onDebouncedLikedClick,
                         )
                     }
                 } else {
                     item(key = "signed-out") { SignedOutHero(onLoginClick = onLoginClick) }
                 }
 
-                if (state.recentSongs.isNotEmpty()) {
-                    item(key = "recent-header") {
-                        Spacer(Modifier.height(8.dp))
-                        SectionHeader(
-                            title = "最近播放",
-                            subtitle = "刚刚听过的 ${state.recentSongs.size} 首歌",
-                            modifier = Modifier.testTag("library-recent"),
-                        )
-                    }
-                    items(state.recentSongs, key = { "recent-${it.id}" }) { song ->
-                        SongRow(
-                            song = song,
-                            onClick = { onSongClick(song, state.recentSongs) },
-                            modifier = Modifier
-                                .padding(horizontal = 12.dp)
-                                .testTag("library-recent-song"),
-                            isPlaying = song.id == state.nowPlayingSongId,
-                            isLiked = state.likedSongIds.contains(song.id),
-                            onLikeClick = { onLikeClick(song) },
-                        )
-                    }
+                item(key = "recent-entry") {
+                    RecentSongsEntry(
+                        recentCount = state.recentSongs.size,
+                        onClick = onDebouncedRecentClick,
+                    )
                 }
 
                 if (state.loggedIn && state.playlists.isNotEmpty()) {
@@ -248,22 +229,9 @@ fun LibraryScreen(
                 }
             }
 
-            item(key = "settings") {
-                LibrarySettingsSection(
-                    quality = state.quality,
-                    themeMode = state.themeMode,
-                    dynamicColor = state.dynamicColor,
-                    hapticsEnabled = state.hapticsEnabled,
-                    onQualityChange = onQualityChange,
-                    onThemeModeChange = onThemeModeChange,
-                    onDynamicColorChange = onDynamicColorChange,
-                    onHapticsChange = onHapticsChange,
-                )
-            }
-
             if (state.loggedIn) {
                 item(key = "logout") {
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(16.dp))
                     OutlinedButton(
                         onClick = {
                             haptics.tap()
@@ -276,7 +244,7 @@ fun LibraryScreen(
                             .testTag("library-logout-button"),
                     ) {
                         Icon(
-                            Icons.Filled.Logout,
+                            Icons.AutoMirrored.Filled.Logout,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp),
                         )
@@ -291,14 +259,11 @@ fun LibraryScreen(
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
-            icon = { Icon(Icons.Filled.Logout, contentDescription = null) },
-            title = { Text("退出登录？") },
-            text = {
-                BlurBehindWindow()
-                Text("退出后本地播放仍可使用，但歌单、收藏与播放记录将不再同步到这台设备。")
-            },
+            icon = { Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null) },
+            title = { Text("退出登录") },
+            text = { Text("退出后将清除保存在本机的加密会话。确定要退出登录吗？") },
             confirmButton = {
-                TextButton(
+                Button(
                     onClick = {
                         haptics.confirm()
                         showLogoutDialog = false
@@ -535,7 +500,7 @@ private fun LikedSongsEntry(
         },
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp)
+            .padding(horizontal = 20.dp, vertical = 6.dp)
             .pressScale(0.97f)
             .testTag("library-liked-entry"),
         shape = MaterialTheme.shapes.large,
@@ -573,175 +538,56 @@ private fun LikedSongsEntry(
     }
 }
 
-// ---------------------------------------------------------------------------------------------
-// Settings: audio quality + appearance
-// ---------------------------------------------------------------------------------------------
-
 @Composable
-private fun LibrarySettingsSection(
-    quality: AudioQuality,
-    themeMode: ThemeMode,
-    dynamicColor: Boolean,
-    hapticsEnabled: Boolean,
-    onQualityChange: (AudioQuality) -> Unit,
-    onThemeModeChange: (ThemeMode) -> Unit,
-    onDynamicColorChange: (Boolean) -> Unit,
-    onHapticsChange: (Boolean) -> Unit,
+private fun RecentSongsEntry(
+    recentCount: Int,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val haptics = rememberHaptics()
-    // Switching the layer on must still be felt, so that one pulse ignores the preference.
-    val switchHaptics = rememberUnfilteredHaptics()
-    Column(
+    Surface(
+        onClick = {
+            haptics.tap()
+            onClick()
+        },
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .testTag("library-settings"),
+            .padding(horizontal = 20.dp, vertical = 6.dp)
+            .pressScale(0.97f)
+            .testTag("library-recent-entry"),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
-        Spacer(Modifier.height(16.dp))
-        SectionHeader(
-            title = "设置",
-            subtitle = "音质、外观与触感",
-            modifier = Modifier.padding(horizontal = 0.dp),
-        )
-        Spacer(Modifier.height(10.dp))
-        Surface(
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            RecentCollectionCover(size = 56.dp)
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "音质",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    text = "最近播放",
+                    style = MaterialTheme.typography.titleMedium,
                 )
+                Spacer(Modifier.height(2.dp))
                 Text(
-                    text = "不同音质消耗的流量与会员权益不同",
+                    text = if (recentCount > 0) {
+                        "$recentCount 首歌曲"
+                    } else {
+                        "听过的每一首都在这里"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(Modifier.height(10.dp))
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    selectableQualities.forEach { option ->
-                        val selected = option == quality
-                        FilterChip(
-                            selected = selected,
-                            onClick = {
-                                haptics.step()
-                                onQualityChange(option)
-                            },
-                            label = { Text(option.displayName()) },
-                            leadingIcon = if (selected) {
-                                {
-                                    Icon(
-                                        Icons.Filled.Check,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp),
-                                    )
-                                }
-                            } else {
-                                null
-                            },
-                            modifier = Modifier.testTag("library-quality-${option.name}"),
-                        )
-                    }
-                }
-                Spacer(Modifier.height(20.dp))
-                Text(
-                    text = "外观",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Spacer(Modifier.height(10.dp))
-                val modes = ThemeMode.entries
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    modes.forEachIndexed { index, mode ->
-                        SegmentedButton(
-                            selected = themeMode == mode,
-                            onClick = {
-                                haptics.step()
-                                onThemeModeChange(mode)
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(
-                                index = index,
-                                count = modes.size,
-                            ),
-                            icon = {},
-                            label = { Text(themeModeLabel(mode), maxLines = 1) },
-                            modifier = Modifier.testTag("library-theme-${mode.name.lowercase()}"),
-                        )
-                    }
-                }
-                Spacer(Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "动态取色",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Text(
-                            text = if (isDynamicColorSupported()) {
-                                "基于系统壁纸与主题提取配色"
-                            } else {
-                                "基于系统壁纸提取配色（需 Android 12+）"
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Switch(
-                        checked = dynamicColor && isDynamicColorSupported(),
-                        onCheckedChange = { enabled ->
-                            switchHaptics.toggle(enabled)
-                            onDynamicColorChange(enabled)
-                        },
-                        enabled = isDynamicColorSupported(),
-                        modifier = Modifier.testTag("library-dynamic-color-switch"),
-                    )
-                }
-                Spacer(Modifier.height(20.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "触感反馈",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Text(
-                            text = "点击、切换与手势的震动脉冲",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Switch(
-                        checked = hapticsEnabled,
-                        onCheckedChange = { enabled ->
-                            switchHaptics.toggle(enabled)
-                            onHapticsChange(enabled)
-                        },
-                        modifier = Modifier.testTag("library-haptics-switch"),
-                    )
-                }
             }
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
-}
-
-/** Local mapping so the screen does not depend on a shared ThemeMode display extension. */
-private fun themeModeLabel(mode: ThemeMode): String = when (mode) {
-    ThemeMode.System -> "跟随系统"
-    ThemeMode.Light -> "浅色"
-    ThemeMode.Dark -> "深色"
 }
 
 // ---------------------------------------------------------------------------------------------

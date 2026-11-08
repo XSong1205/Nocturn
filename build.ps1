@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Nocturn Android 客户端编译脚本 (Release / Debug)
 

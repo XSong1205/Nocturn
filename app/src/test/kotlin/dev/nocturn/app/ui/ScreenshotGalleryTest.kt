@@ -23,12 +23,19 @@ import dev.nocturn.app.ui.screens.home.DailySongsScreen
 import dev.nocturn.app.ui.screens.home.HomeScreen
 import dev.nocturn.app.ui.screens.library.LibraryScreen
 import dev.nocturn.app.ui.screens.library.LikedSongsScreen
+import dev.nocturn.app.ui.screens.library.RecentSongsScreen
 import dev.nocturn.app.ui.screens.library.LoginSheetContent
 import dev.nocturn.app.ui.screens.player.PlayerScreen
 import dev.nocturn.app.ui.screens.playlist.AlbumScreen
 import dev.nocturn.app.ui.screens.playlist.ArtistScreen
 import dev.nocturn.app.ui.screens.playlist.PlaylistScreen
 import dev.nocturn.app.ui.screens.search.SearchScreen
+import dev.nocturn.app.ui.screens.settings.SettingsAboutScreen
+import dev.nocturn.app.ui.screens.settings.SettingsAppearanceScreen
+import dev.nocturn.app.ui.screens.settings.SettingsGeneralScreen
+import dev.nocturn.app.ui.screens.settings.SettingsPlaybackScreen
+import dev.nocturn.app.ui.screens.settings.SettingsScreen
+import dev.nocturn.app.ui.screens.settings.SettingsStorageScreen
 import dev.nocturn.app.ui.state.LoginUiState
 import dev.nocturn.app.ui.theme.NocturnTheme
 import java.io.ByteArrayOutputStream
@@ -76,13 +83,11 @@ class ScreenshotGalleryTest {
                             )
                             GalleryTarget.Library -> LibraryScreen(state = PreviewData.libraryLoggedIn)
                             GalleryTarget.LibraryAnonymous -> LibraryScreen(state = PreviewData.libraryAnonymous)
-                            GalleryTarget.LibrarySettings -> LibraryScreen(
-                                state = PreviewData.libraryAnonymous.copy(hapticsEnabled = true),
-                            )
                             GalleryTarget.Playlist -> PlaylistScreen(state = PreviewData.playlistState)
                             GalleryTarget.Album -> AlbumScreen(state = PreviewData.albumState)
                             GalleryTarget.Artist -> ArtistScreen(state = PreviewData.artistState)
                             GalleryTarget.LikedSongs -> LikedSongsScreen(state = PreviewData.likedSongsState)
+                            GalleryTarget.RecentSongs -> RecentSongsScreen(state = PreviewData.libraryLoggedIn)
                             GalleryTarget.DailySongs -> DailySongsScreen(state = PreviewData.homeState)
                             GalleryTarget.PlayerCover -> PlayerScreen(state = PreviewData.playerState)
                             GalleryTarget.PlayerLyrics -> PlayerScreen(
@@ -99,6 +104,12 @@ class ScreenshotGalleryTest {
                                     onRefresh = {},
                                 )
                             }
+                            GalleryTarget.Settings -> SettingsScreen(state = PreviewData.settingsState)
+                            GalleryTarget.SettingsPlayback -> SettingsPlaybackScreen(state = PreviewData.settingsState)
+                            GalleryTarget.SettingsAppearance -> SettingsAppearanceScreen(state = PreviewData.settingsState)
+                            GalleryTarget.SettingsGeneral -> SettingsGeneralScreen(state = PreviewData.settingsState)
+                            GalleryTarget.SettingsStorage -> SettingsStorageScreen(state = PreviewData.settingsState)
+                            GalleryTarget.SettingsAbout -> SettingsAboutScreen(state = PreviewData.settingsState)
                         }
                     }
                 }
@@ -112,13 +123,6 @@ class ScreenshotGalleryTest {
             }
             compose.waitForIdle()
             if (entry == GalleryTarget.PlayerLyrics) waitForLyricRow(compose, 6)
-            if (entry == GalleryTarget.LibrarySettings) {
-                // The settings block lives below the fold; scroll it into view so the screenshot
-                // shows the quality chips, appearance toggle and the haptics switch.
-                compose.onNodeWithTag("library-screen")
-                    .performScrollToNode(hasTestTag("library-haptics-switch"))
-                compose.waitForIdle()
-            }
             capture(entry.fileName)
         }
     }
@@ -142,15 +146,21 @@ class ScreenshotGalleryTest {
         SearchResults("search-results-light", false),
         Library("library-light", false),
         LibraryAnonymous("library-anonymous-light", false),
-        LibrarySettings("library-settings-light", false),
         Playlist("playlist-light", false),
         Album("album-light", false),
         Artist("artist-light", false),
         LikedSongs("liked-songs-light", false),
+        RecentSongs("recent-songs-light", false),
         DailySongs("daily-songs-light", false),
         PlayerCover("player-cover-dark", true),
         PlayerLyrics("player-lyrics-dark", true),
         LoginQr("login-qr-light", false),
+        Settings("settings-light", false),
+        SettingsPlayback("settings-playback-light", false),
+        SettingsAppearance("settings-appearance-light", false),
+        SettingsGeneral("settings-general-light", false),
+        SettingsStorage("settings-storage-light", false),
+        SettingsAbout("settings-about-light", false),
     }
 
     /** Generates a deterministic placeholder QR bitmap so the login sheet render needs no network. */

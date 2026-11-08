@@ -11,7 +11,9 @@ data class SettingsUiState(
     val themeMode: ThemeMode = ThemeMode.System,
     val dynamicColor: Boolean = true,
     val hapticsEnabled: Boolean = true,
+    val lyriconEnabled: Boolean = true,
     val searchHistoryCount: Int = 0,
     val cacheSizeBytes: Long = 0L,
+    val isClearing: Boolean = false,
     val version: String = "0.1.28",
 )

@@ -328,6 +328,21 @@ class DiscoverScreensTest {
 
         compose.onNodeWithText("重试").assertExists()
         compose.onNodeWithTag("playlist-back").assertExists()
+        compose.onNodeWithTag("playlist-search").assertExists()
+    }
+
+    @Test
+    fun playlistSearchButtonInvokesCallback() {
+        var searchClicked = false
+        setScreen {
+            PlaylistScreen(
+                state = PreviewData.playlistState,
+                onSearchClick = { searchClicked = true },
+            )
+        }
+
+        compose.onNodeWithTag("playlist-search").assertExists().performClick()
+        assertEquals(true, searchClicked)
     }
 
     // -----------------------------------------------------------------------------------------

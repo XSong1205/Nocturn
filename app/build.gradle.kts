@@ -1,5 +1,6 @@
 import java.io.RandomAccessFile
 import java.util.Properties
+import com.android.build.api.variant.impl.VariantOutputImpl
 
 plugins {
     id("com.android.application")
@@ -67,9 +68,19 @@ androidComponents {
         val version = versionText.map { text ->
             Properties().apply { text.reader().use { load(it) } }
         }
+        val variantName = variant.name
         variant.outputs.forEach { output ->
             output.versionCode.set(version.map { it.getProperty("versionCode").toInt() })
             output.versionName.set(version.map { it.getProperty("versionName") })
+            val abi = output.filters.find {
+                it.filterType == com.android.build.api.variant.FilterConfiguration.FilterType.ABI
+            }?.identifier ?: "universal"
+            val sanitizedAbi = abi.replace('-', '_')
+            if (output is VariantOutputImpl) {
+                output.outputFileName.set(version.map {
+                    "Nocturn_${it.getProperty("versionName")}_${sanitizedAbi}_$variantName.apk"
+                })
+            }
         }
     }
 }
@@ -145,6 +156,7 @@ dependencies {
     implementation("androidx.media3:media3-session:1.11.1")
     implementation("com.mocharealm.accompanist:lyrics-ui:2.0.0-rc.3")
     implementation("com.mocharealm.accompanist:lyrics-core:0.5.0")
+    implementation("io.github.proify.lyricon:provider:0.1.70")
     implementation("io.coil-kt.coil3:coil-compose:3.6.3")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.3")
     // Backdrop / progressive blur materials (HyperOS style). Effects need API 33+ (RuntimeShader);

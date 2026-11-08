@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Headphones
@@ -34,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -45,6 +47,8 @@ import dev.nocturn.app.ui.components.GlassTopBar
 import dev.nocturn.app.ui.components.MetaChip
 import dev.nocturn.app.ui.components.SectionHeader
 import dev.nocturn.app.ui.components.bottomContentPadding
+import dev.nocturn.app.ui.components.pressScale
+import dev.nocturn.app.ui.components.rememberHaptics
 import dev.nocturn.app.ui.components.scrolledPast
 import dev.nocturn.app.ui.preview.PreviewData
 import dev.nocturn.app.ui.state.SettingsUiState
@@ -61,6 +65,8 @@ fun SettingsAboutScreen(
 ) {
     val listState = rememberLazyListState()
     val collapsed by listState.scrolledPast(140)
+    val uriHandler = LocalUriHandler.current
+    val haptics = rememberHaptics()
 
     GlassScaffold(
         modifier = modifier,
@@ -149,6 +155,7 @@ fun SettingsAboutScreen(
                                 "Media3 ExoPlayer",
                                 "Coil 3",
                                 "Node.js Mobile",
+                                "Lyricon",
                                 "Predictive Back",
                             ).forEach { tag ->
                                 MetaChip(
@@ -198,6 +205,62 @@ fun SettingsAboutScreen(
                                 text = "本应用为第三方开源客户端，与网易云音乐官方无商业关联。音频版权、歌单及相关商标权归网易云音乐及其版权方所有。应用仅在本地加密保存会话凭据，不采集或转存任何用户个人数据。",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+
+            item(key = "project-section") {
+                Spacer(Modifier.height(24.dp))
+                SectionHeader(
+                    title = "开源项目",
+                    subtitle = "代码仓库与技术实现",
+                )
+                Spacer(Modifier.height(10.dp))
+                Surface(
+                    onClick = {
+                        haptics.tap()
+                        runCatching { uriHandler.openUri("https://github.com/Nocturn-App/Nocturn") }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp)
+                        .pressScale(0.98f)
+                        .testTag("settings-about-github-card"),
+                    shape = MaterialTheme.shapes.large,
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Filled.Code,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "GitHub 开源仓库",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = "https://github.com/Nocturn-App/Nocturn",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
                             )
                         }
                     }

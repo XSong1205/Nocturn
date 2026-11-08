@@ -16,8 +16,8 @@ import dev.nocturn.app.ui.components.LikeButton
 import dev.nocturn.app.ui.components.LocalHapticsEnabled
 import dev.nocturn.app.ui.components.NocturnHaptics
 import dev.nocturn.app.ui.preview.PreviewData
-import dev.nocturn.app.ui.screens.library.LibraryScreen
-import dev.nocturn.app.ui.state.LibraryUiState
+import dev.nocturn.app.ui.screens.settings.SettingsGeneralScreen
+import dev.nocturn.app.ui.state.SettingsUiState
 import dev.nocturn.app.ui.theme.NocturnTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -133,20 +133,20 @@ class HapticsTest {
     }
 
     @Test
-    fun librarySettingsSwitchReportsTheNewValue() {
+    fun settingsGeneralHapticsSwitchReportsTheNewValue() {
         var reported: Boolean? = null
         compose.setContent {
             NocturnTheme(themeMode = ThemeMode.Dark) {
-                LibraryScreen(
-                    state = PreviewData.libraryAnonymous.copy(hapticsEnabled = false),
+                SettingsGeneralScreen(
+                    state = PreviewData.settingsState.copy(hapticsEnabled = false),
                     onHapticsChange = { reported = it },
                 )
             }
         }
         compose.waitForIdle()
 
-        compose.onNodeWithTag("library-screen").performScrollToNode(hasTestTag("library-haptics-switch"))
-        compose.onNodeWithTag("library-haptics-switch").performClick()
+        compose.onNodeWithTag("settings-general-screen").performScrollToNode(hasTestTag("settings-haptics-switch"))
+        compose.onNodeWithTag("settings-haptics-switch").performClick()
 
         assertEquals(true, reported)
     }
@@ -162,8 +162,8 @@ class HapticsTest {
                     LocalHapticFeedback provides recorder,
                     LocalHapticsEnabled provides false,
                 ) {
-                    LibraryScreen(
-                        state = PreviewData.libraryAnonymous.copy(hapticsEnabled = false),
+                    SettingsGeneralScreen(
+                        state = PreviewData.settingsState.copy(hapticsEnabled = false),
                         onHapticsChange = {},
                     )
                 }
@@ -171,8 +171,8 @@ class HapticsTest {
         }
         compose.waitForIdle()
 
-        compose.onNodeWithTag("library-screen").performScrollToNode(hasTestTag("library-haptics-switch"))
-        compose.onNodeWithTag("library-haptics-switch").performClick()
+        compose.onNodeWithTag("settings-general-screen").performScrollToNode(hasTestTag("settings-haptics-switch"))
+        compose.onNodeWithTag("settings-haptics-switch").performClick()
 
         assertEquals(listOf(HapticFeedbackType.ToggleOn), recorder.performed)
     }

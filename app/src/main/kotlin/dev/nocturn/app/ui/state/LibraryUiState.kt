@@ -38,6 +38,7 @@ data class LibraryUiState(
     val themeMode: ThemeMode = ThemeMode.System,
     val dynamicColor: Boolean = true,
     val hapticsEnabled: Boolean = true,
+    val lyriconEnabled: Boolean = true,
     val login: LoginUiState = LoginUiState(),
 )
 

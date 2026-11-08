@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Gesture
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -50,6 +51,7 @@ fun SettingsGeneralScreen(
     modifier: Modifier = Modifier,
     onBack: () -> Unit = {},
     onHapticsChange: (Boolean) -> Unit = {},
+    onLyriconChange: (Boolean) -> Unit = {},
 ) {
     val listState = rememberLazyListState()
     val collapsed by listState.scrolledPast(140)
@@ -139,6 +141,73 @@ fun SettingsGeneralScreen(
                                 onHapticsChange(enabled)
                             },
                             modifier = Modifier.testTag("settings-haptics-switch"),
+                        )
+                    }
+                }
+            }
+
+            item(key = "lyricon-header") {
+                Spacer(Modifier.height(24.dp))
+                SectionHeader(
+                    title = "词幕状态栏歌词",
+                    subtitle = "系统状态栏与浮窗歌词服务",
+                )
+                Spacer(Modifier.height(10.dp))
+            }
+
+            item(key = "lyricon-card") {
+                Surface(
+                    shape = MaterialTheme.shapes.large,
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Surface(
+                            shape = MaterialTheme.shapes.medium,
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+                            ) {
+                                Icon(
+                                    Icons.Filled.GraphicEq,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "词幕服务同步",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = "向系统词幕服务同步播放信息与逐字/逐行歌词",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Switch(
+                            checked = state.lyriconEnabled,
+                            onCheckedChange = { enabled ->
+                                switchHaptics.toggle(enabled)
+                                onLyriconChange(enabled)
+                            },
+                            modifier = Modifier.testTag("settings-lyricon-switch"),
                         )
                     }
                 }

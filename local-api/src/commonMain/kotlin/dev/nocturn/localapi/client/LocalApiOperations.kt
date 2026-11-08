@@ -34,15 +34,28 @@ suspend fun LocalApiClient.search(
     })
 }
 
-suspend fun LocalApiClient.searchSuggestions(keywords: String, mobile: Boolean = true): JsonObject {
+suspend fun LocalApiClient.searchSuggestions(
+    keywords: String,
+    mobile: Boolean = true,
+    cookie: String? = null,
+): JsonObject {
     requireKeywords(keywords)
     return request(LocalApiEndpoint.SearchSuggest, buildJsonObject {
         put("keywords", keywords)
         put("type", if (mobile) "mobile" else "web")
+        cookie?.let { put("cookie", it) }
     })
 }
 
-suspend fun LocalApiClient.defaultSearch(): JsonObject = request(LocalApiEndpoint.SearchDefault)
+suspend fun LocalApiClient.defaultSearch(cookie: String? = null): JsonObject =
+    request(LocalApiEndpoint.SearchDefault, buildJsonObject {
+        cookie?.let { put("cookie", it) }
+    })
+
+suspend fun LocalApiClient.searchHotDetail(cookie: String? = null): JsonObject =
+    request(LocalApiEndpoint.SearchHotDetail, buildJsonObject {
+        cookie?.let { put("cookie", it) }
+    })
 
 suspend fun LocalApiClient.songUrls(
     ids: List<Long>,

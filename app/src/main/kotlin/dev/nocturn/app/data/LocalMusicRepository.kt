@@ -64,20 +64,26 @@ class LocalMusicRepository(private val context: Context) : MusicRepository {
     override suspend fun homeFeed(): HomeFeed = withContext(Dispatchers.IO) {
         guarded {
             val cookie = cookieOrNull()
-            val loggedIn = cookie != null && session.value != null
+            val sessionActive = session.value != null
+            val loggedIn = cookie != null && sessionActive
             coroutineScope {
                 val playlistJob = async { attempt { fetchRecommendedPlaylists(cookie, loggedIn) } }
                 val chartJob = async { attempt { fetchToplists() } }
-                val songJob = async { attempt { fetchPersonalizedSongs(cookie) } }
-                val dailyJob = if (loggedIn && cookie != null) {
+                val dailyJob = if (cookie != null && sessionActive) {
                     async { attempt { fetchDailySongs(cookie) } }
                 } else {
                     null
                 }
+                val songJob = async {
+                    attempt {
+                        val dailyResult = dailyJob?.await()?.getOrNull()
+                        fetchPersonalizedSongs(cookie, loggedIn, dailyResult)
+                    }
+                }
                 val playlists = playlistJob.await()
                 val charts = chartJob.await()
-                val songs = songJob.await()
                 val daily = dailyJob?.await()
+                val songs = songJob.await()
                 // Degrade block by block, but never show an empty home page as "success".
                 val attempted = listOfNotNull(
                     playlists.isSuccess,
@@ -147,8 +153,33 @@ class LocalMusicRepository(private val context: Context) : MusicRepository {
     private suspend fun fetchToplists(): List<Toplist> =
         NeteaseJson.parseToplists(requestOk(LocalApiEndpoint.Toplist))
 
-    private suspend fun fetchPersonalizedSongs(cookie: String?): List<Song> =
-        NeteaseJson.parsePersonalizedSongs(
+    /**
+     * "根据你喜爱的歌曲推荐" / "新歌推荐" songs.
+     *
+     * `/personalized/newsong` is a public shelf that returns static editorial new songs ("hot_server")
+     * whether signed in or not. For signed-in listeners, the account's daily personalized recommendations
+     * (`recommend/songs`) are used so the grid actually reflects the user's taste; `/personalized/newsong`
+     * remains the fallback for anonymous listeners or when account recommendations are unavailable.
+     */
+    private suspend fun fetchPersonalizedSongs(
+        cookie: String?,
+        loggedIn: Boolean = false,
+        dailyAccountSongs: List<Song>? = null,
+    ): List<Song> {
+        if (loggedIn && cookie != null) {
+            if (!dailyAccountSongs.isNullOrEmpty()) {
+                return dailyAccountSongs
+            }
+            val accountSongs = try {
+                fetchDailySongs(cookie)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                emptyList()
+            }
+            if (accountSongs.isNotEmpty()) return accountSongs
+        }
+        return NeteaseJson.parsePersonalizedSongs(
             requestOk(
                 LocalApiEndpoint.PersonalizedNewSongs,
                 buildJsonObject {
@@ -157,6 +188,7 @@ class LocalMusicRepository(private val context: Context) : MusicRepository {
                 },
             ),
         )
+    }
 
     private suspend fun fetchDailySongs(cookie: String): List<Song> =
         NeteaseJson.parseRecommendSongs(
@@ -318,12 +350,14 @@ class LocalMusicRepository(private val context: Context) : MusicRepository {
                 if (value.isEmpty()) {
                     emptyList()
                 } else {
+                    val cookie = cookieOrNull()
                     NeteaseJson.parseSearchSuggestions(
                         requestOk(
                             LocalApiEndpoint.SearchSuggest,
                             buildJsonObject {
                                 put("keywords", value)
                                 put("type", "mobile")
+                                cookie?.let { put("cookie", it) }
                             },
                         ),
                     )
@@ -332,11 +366,23 @@ class LocalMusicRepository(private val context: Context) : MusicRepository {
         }
 
     override suspend fun hotSearches(): List<String> = withContext(Dispatchers.IO) {
-        guarded { NeteaseJson.parseHotSearches(requestOk(LocalApiEndpoint.SearchHotDetail)) }
+        guarded {
+            val cookie = cookieOrNull()
+            val parameters = buildJsonObject {
+                cookie?.let { put("cookie", it) }
+            }
+            NeteaseJson.parseHotSearches(requestOk(LocalApiEndpoint.SearchHotDetail, parameters))
+        }
     }
 
     override suspend fun defaultKeyword(): String? = withContext(Dispatchers.IO) {
-        guarded { NeteaseJson.parseDefaultKeyword(requestOk(LocalApiEndpoint.SearchDefault)) }
+        guarded {
+            val cookie = cookieOrNull()
+            val parameters = buildJsonObject {
+                cookie?.let { put("cookie", it) }
+            }
+            NeteaseJson.parseDefaultKeyword(requestOk(LocalApiEndpoint.SearchDefault, parameters))
+        }
     }
 
     // ---------------------------------------------------------------------------------------
@@ -627,7 +673,11 @@ class LocalMusicRepository(private val context: Context) : MusicRepository {
     }
 
     override suspend fun personalizedSongs(): List<Song> = withContext(Dispatchers.IO) {
-        guarded { fetchPersonalizedSongs(cookieOrNull()) }
+        guarded {
+            val cookie = cookieOrNull()
+            val loggedIn = cookie != null && session.value != null
+            fetchPersonalizedSongs(cookie, loggedIn)
+        }
     }
 
     override suspend fun recentSongs(): List<Song> = withContext(Dispatchers.IO) {

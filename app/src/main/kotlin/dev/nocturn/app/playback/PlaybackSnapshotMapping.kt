@@ -54,13 +54,19 @@ internal object PlaybackSnapshotMapping {
         positionSampledAtNanos: Long = 0L,
         positionDiscontinuity: Long = previous.positionDiscontinuity,
         playbackSpeed: Float = 1f,
+        title: String? = null,
+        artist: String? = null,
     ): PlaybackSnapshot {
         val queueIds = mediaIds.mapNotNull { mediaId -> MediaItemMapping.songIdOf(mediaId) }
         val currentSongId = mediaIds.getOrNull(currentIndex)?.let { mediaId ->
             MediaItemMapping.songIdOf(mediaId)
         }
+        val effectiveTitle = title ?: if (currentSongId != null && currentSongId == previous.currentSongId) previous.title else null
+        val effectiveArtist = artist ?: if (currentSongId != null && currentSongId == previous.currentSongId) previous.artist else null
         return PlaybackSnapshot(
             currentSongId = currentSongId,
+            title = effectiveTitle,
+            artist = effectiveArtist,
             playing = isPlaying,
             buffering = isBuffering(playbackState),
             positionMs = normalizePositionMs(positionMs),

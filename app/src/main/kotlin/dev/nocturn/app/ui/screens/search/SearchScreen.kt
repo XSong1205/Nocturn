@@ -6,10 +6,24 @@
 
 package dev.nocturn.app.ui.screens.search
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -23,7 +37,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -32,20 +48,21 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.NorthWest
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularWavyProgressIndicator
-import androidx.compose.material3.ExpandedFullScreenSearchBar
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -57,8 +74,8 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopSearchBar
 import androidx.compose.material3.rememberSearchBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -66,50 +83,68 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import dev.nocturn.app.data.model.AlbumSummary
 import dev.nocturn.app.data.model.ArtistSummary
 import dev.nocturn.app.data.model.Song
 import dev.nocturn.app.data.model.ThemeMode
 import dev.nocturn.app.ui.components.CoverArt
 import dev.nocturn.app.ui.components.EmptyState
-import dev.nocturn.app.ui.components.GlassScaffold
-import dev.nocturn.app.ui.components.GlassTopBar
+import dev.nocturn.app.ui.components.GlassMaterials
 import dev.nocturn.app.ui.components.LocalBottomChromePadding
 import dev.nocturn.app.ui.components.PlaylistCard
 import dev.nocturn.app.ui.components.ScreenError
 import dev.nocturn.app.ui.components.ScreenLoading
 import dev.nocturn.app.ui.components.SongRow
+import dev.nocturn.app.ui.components.blurAvailable
 import dev.nocturn.app.ui.components.bottomContentPadding
+import dev.nocturn.app.ui.components.drawNocturnBackdrop
+import dev.nocturn.app.ui.components.glass
 import dev.nocturn.app.ui.components.rememberHaptics
 import dev.nocturn.app.ui.preview.PreviewData
 import dev.nocturn.app.ui.state.SearchTab
 import dev.nocturn.app.ui.state.SearchUiState
+import dev.nocturn.app.ui.theme.LocalIsDarkTheme
 import dev.nocturn.app.ui.theme.NocturnTheme
 import dev.nocturn.app.ui.util.formatCount
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
+
+/** Material 3 Expressive non-linear physical spring specs. */
+private val M3SpringSpatialFloat = spring<Float>(
+    dampingRatio = Spring.DampingRatioLowBouncy,
+    stiffness = Spring.StiffnessMediumLow,
+)
+
+private val M3SpringSpatialDp = spring<Dp>(
+    dampingRatio = Spring.DampingRatioLowBouncy,
+    stiffness = Spring.StiffnessMediumLow,
+)
 
 /**
- * Search tab: an expressive two-state search surface.
+ * Search screen: Material 3 Expressive floating expandable search surface.
  *
- * The collapsed state is a landing page with a large welcome title, the M3 [TopSearchBar], hot
- * keywords, local history and the service default keyword. Tapping the field expands the bar into
- * the real Material 3 Expressive [ExpandedFullScreenSearchBar], which hosts suggestions, the four
- * result tabs and their paginated lists.
- *
- * Expansion animation is owned by a locally remembered [SearchBarState] and mirrored to the
- * hoisted [SearchUiState.expanded] flag: when the local bar expands or collapses the optional
- * [onExpand] / [onCollapse] callbacks fire, while the other direction replays the same animation
- * when the model's flag changes. That keeps the screen stateless with respect to business data
- * while still using the real component state required by the M3 search API.
+ * The collapsed state presents an organic floating search capsule resting over a welcoming
+ * discover landing page with hot keywords and local history. Tapping the search bar triggers
+ * a physics-based Material 3 non-linear spring animation that smoothly morphs the capsule
+ * geometry (corner radius, elevation, horizontal margins and height) into an elevated floating
+ * search sheet. Suggestions, exploration items, and tabbed search results animate within this
+ * floating window with natural spatial continuity, retracting seamlessly on dismiss.
  */
 @Composable
 fun SearchScreen(
@@ -132,14 +167,15 @@ fun SearchScreen(
     onExpand: () -> Unit = {},
     onCollapse: () -> Unit = {},
 ) {
+    val haptics = rememberHaptics()
+    val scope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
     val textFieldState = rememberTextFieldState(state.query)
     val searchBarState = rememberSearchBarState(
         initialValue = if (state.expanded) SearchBarValue.Expanded else SearchBarValue.Collapsed,
     )
-    val expanded = searchBarState.currentValue == SearchBarValue.Expanded
 
-    // Hoisted state -> M3 component state. Covers external expansion (home search button, back
-    // handling, a submitted keyword) and keeps the dialog in sync when the model collapses it.
+    // Hoisted state -> M3 component state.
     LaunchedEffect(state.expanded) {
         if (state.expanded) {
             searchBarState.animateToExpanded()
@@ -148,9 +184,7 @@ fun SearchScreen(
         }
     }
 
-    // M3 component state -> hoisted state. Observing the *target* value reports focus-driven
-    // expansion to the shell immediately; comparing against the hoisted flag makes the two
-    // effects converge instead of ping-ponging.
+    // M3 component state -> hoisted state.
     LaunchedEffect(searchBarState, state.expanded) {
         val hoistedExpanded = state.expanded
         snapshotFlow { searchBarState.targetValue }.collect { target ->
@@ -161,14 +195,14 @@ fun SearchScreen(
         }
     }
 
-    // Hoisted query -> text field. A submitted search or a history chip replaces the whole query.
+    // Hoisted query -> text field.
     LaunchedEffect(state.query) {
         if (textFieldState.text.toString() != state.query) {
             textFieldState.setTextAndPlaceCursorAtEnd(state.query)
         }
     }
 
-    // Text field -> hoisted query. The view model fetches suggestions as the user types.
+    // Text field -> hoisted query.
     val currentQuery by rememberUpdatedState(state.query)
     LaunchedEffect(textFieldState) {
         snapshotFlow { textFieldState.text.toString() }.collect { value ->
@@ -176,230 +210,518 @@ fun SearchScreen(
         }
     }
 
-    Box(modifier.fillMaxSize()) {
-        SearchCollapsedSurface(
-            state = state,
-            expanded = expanded,
-            textFieldState = textFieldState,
-            searchBarState = searchBarState,
-            onQueryChange = onQueryChange,
-            onSearch = onSearch,
-            onSuggestionClick = onSuggestionClick,
-            onHotClick = onHotClick,
-            onClearHistory = onClearHistory,
-            onTabChange = onTabChange,
-            onLoadMore = onLoadMore,
-            onSongClick = onSongClick,
-            onLikeClick = onLikeClick,
-            onPlaylistClick = onPlaylistClick,
-            onAlbumClick = onAlbumClick,
-            onArtistClick = onArtistClick,
-            onRetry = onRetry,
-            onBack = onBack,
-            onExpand = onExpand,
+    val isExpanded = state.expanded || searchBarState.currentValue == SearchBarValue.Expanded ||
+        searchBarState.targetValue == SearchBarValue.Expanded || state.submittedKeyword != null
+
+    // Material 3 Expressive Non-linear Spring Physics
+    val expansionProgress by animateFloatAsState(
+        targetValue = if (isExpanded) 1f else 0f,
+        animationSpec = M3SpringSpatialFloat,
+        label = "search-expansion-progress",
+    )
+    val animatedCornerRadius by animateDpAsState(
+        targetValue = if (isExpanded) 24.dp else 28.dp,
+        animationSpec = M3SpringSpatialDp,
+        label = "search-corner-radius",
+    )
+    val animatedElevation by animateDpAsState(
+        targetValue = if (isExpanded) 10.dp else 4.dp,
+        animationSpec = M3SpringSpatialDp,
+        label = "search-elevation",
+    )
+    val animatedHorizontalPadding by animateDpAsState(
+        targetValue = if (isExpanded) 8.dp else 16.dp,
+        animationSpec = M3SpringSpatialDp,
+        label = "search-horizontal-padding",
+    )
+
+    val colors = MaterialTheme.colorScheme
+    val dark = LocalIsDarkTheme.current
+    val searchBackdrop = if (blurAvailable) {
+        rememberLayerBackdrop {
+            drawNocturnBackdrop(colors, dark)
+            drawContent()
+        }
+    } else {
+        null
+    }
+    val baseContainer = MaterialTheme.colorScheme.surfaceContainerHighest
+    val fallbackContainer = MaterialTheme.colorScheme.surfaceContainerHigh
+    val glassMaterial = remember(dark, baseContainer, fallbackContainer) {
+        dev.nocturn.app.ui.components.GlassMaterial(
+            blurRadius = 32f,
+            colors = top.yukonga.miuix.kmp.blur.BlurColors(
+                blendColors = listOf(top.yukonga.miuix.kmp.blur.BlendColorEntry(baseContainer.copy(alpha = if (dark) 0.75f else 0.82f))),
+                saturation = if (dark) 1.25f else 1.45f,
+            ),
+            fallback = fallbackContainer,
+            highlight = null,
+        )
+    }
+
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxSize()
+            .testTag("search-screen-root"),
+    ) {
+        val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+        val bottomChromePadding = LocalBottomChromePadding.current
+        val bottomPadding = maxOf(bottomChromePadding, navBarBottom) + 8.dp
+
+        val animatedTopPadding by animateDpAsState(
+            targetValue = if (isExpanded) (statusBarTop + 4.dp) else (statusBarTop + 8.dp),
+            animationSpec = M3SpringSpatialDp,
+            label = "search-top-padding",
         )
 
-        // The expanded surface is a full-screen dialog. It renders itself only while the shared
-        // SearchBarState is expanded, so it can stay in the composition unconditionally.
-        ExpandedFullScreenSearchBar(
-            state = searchBarState,
-            inputField = {
-                SearchInputField(
-                    textFieldState = textFieldState,
-                    searchBarState = searchBarState,
-                    onSearch = onSearch,
-                    trailing = {
-                        IconButton(
-                            onClick = onBack,
-                            modifier = Modifier.testTag("search-expanded-close"),
-                        ) {
-                            Icon(Icons.Filled.Close, contentDescription = "退出搜索")
-                        }
-                    },                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("search-input-expanded"),
-                )
-            },
+        val targetExpandedHeight = (maxHeight - statusBarTop - 6.dp - bottomPadding).coerceAtLeast(56.dp)
+        val animatedHeight by animateDpAsState(
+            targetValue = if (isExpanded) targetExpandedHeight else 56.dp,
+            animationSpec = M3SpringSpatialDp,
+            label = "search-animated-height",
+        )
+
+        val floatingShape = RoundedCornerShape(animatedCornerRadius)
+
+        // -----------------------------------------------------------------------------------------
+        // Background Page: recorded into searchBackdrop so the floating window can frost it
+        // -----------------------------------------------------------------------------------------
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(if (searchBackdrop != null) Modifier.layerBackdrop(searchBackdrop) else Modifier),
         ) {
-            // The dialog covers the shell chrome, so lists only need to clear the gesture area.
-            CompositionLocalProvider(
-                LocalBottomChromePadding provides
-                    WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
-            ) {
-                if (state.submittedKeyword == null) {
-                    SearchExploreContent(
-                        state = state,
+            // Layer 1: Collapsed Landing Explore Surface (Underneath Floating Search Bar)
+            val exploreScroll = rememberScrollState()
+            SearchExploreContent(
+                state = state,
+                modifier = Modifier.fillMaxSize(),
+                topPadding = statusBarTop + 76.dp,
+                scrollState = exploreScroll,
+                onSuggestionClick = onSuggestionClick,
+                onHotClick = onHotClick,
+                onClearHistory = onClearHistory,
+                onQueryPicked = onExpand,
+            )
+
+            // Layer 2: Expressive Scrim Fade Behind the Floating Window
+            if (expansionProgress > 0.001f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { alpha = (expansionProgress * 0.42f).coerceIn(0f, 0.42f) }
+                        .background(Color.Black)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) {
+                            if (state.submittedKeyword == null) {
+                                haptics.tap()
+                                focusManager.clearFocus()
+                                onCollapse()
+                                scope.launch { searchBarState.animateToCollapsed() }
+                            }
+                        },
+                )
+            }
+        }
+
+        // -----------------------------------------------------------------------------------------
+        // Layer 3: Floating Search Bar / Window (Expands & Retracts with M3 Non-Linear Spring & Frosted Glass)
+        // -----------------------------------------------------------------------------------------
+        Surface(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = animatedTopPadding)
+                .padding(horizontal = animatedHorizontalPadding)
+                .widthIn(max = 720.dp)
+                .fillMaxWidth()
+                .height(animatedHeight)
+                .shadow(
+                    elevation = animatedElevation,
+                    shape = floatingShape,
+                    ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                    spotColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.32f),
+                )
+                .then(
+                    if (searchBackdrop != null) {
+                        Modifier.glass(searchBackdrop, floatingShape, glassMaterial)
+                    } else {
+                        Modifier
+                    },
+                )
+                .testTag("search-top-bar"),
+            shape = floatingShape,
+            color = if (searchBackdrop != null) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            tonalElevation = animatedElevation,
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Top Search Bar Row (Input + Trailing Actions)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .then(
+                            if (!isExpanded) {
+                                Modifier.clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                ) {
+                                    haptics.tap()
+                                    onExpand()
+                                    scope.launch { searchBarState.animateToExpanded() }
+                                }
+                            } else {
+                                Modifier
+                            },
+                        ),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    SearchInputField(
+                        textFieldState = textFieldState,
+                        searchBarState = searchBarState,
+                        defaultKeyword = state.defaultKeyword,
+                        onSearch = onSearch,
+                        trailing = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (textFieldState.text.isNotEmpty()) {
+                                    IconButton(
+                                        onClick = {
+                                            haptics.tap()
+                                            onQueryChange("")
+                                        },
+                                        modifier = Modifier.testTag("search-clear-query"),
+                                    ) {
+                                        Icon(Icons.Filled.Close, contentDescription = "清除搜索内容")
+                                    }
+                                }
+                                AnimatedVisibility(
+                                    visible = isExpanded,
+                                    enter = fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) +
+                                        scaleIn(spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)),
+                                    exit = fadeOut(spring(stiffness = Spring.StiffnessHigh)) +
+                                        scaleOut(spring(stiffness = Spring.StiffnessHigh)),
+                                ) {
+                                    IconButton(
+                                        onClick = {
+                                            haptics.tap()
+                                            focusManager.clearFocus()
+                                            onBack()
+                                        },
+                                        modifier = Modifier.testTag("search-expanded-close"),
+                                    ) {
+                                        Icon(Icons.Filled.Close, contentDescription = "退出搜索")
+                                    }
+                                }
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f),
-                        onSuggestionClick = onSuggestionClick,
-                        onHotClick = onHotClick,
-                        onClearHistory = onClearHistory,
+                            .testTag("search-input"),
                     )
-                } else {
-                    SearchResultsContent(
-                        state = state,
+                }
+
+                // Divider separating the input bar from the expanded body
+                if (expansionProgress > 0.01f) {
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(
+                            alpha = (expansionProgress * 0.7f).coerceIn(0f, 1f),
+                        ),
+                    )
+                }
+
+                // Expanded Floating Body
+                if (expansionProgress > 0.05f) {
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f),
-                        onTabChange = onTabChange,
-                        onLoadMore = onLoadMore,
-                        onRetry = onRetry,
-                        onSongClick = onSongClick,
-                        onLikeClick = onLikeClick,
-                        onPlaylistClick = onPlaylistClick,
-                        onAlbumClick = onAlbumClick,
-                        onArtistClick = onArtistClick,
-                    )
+                            .weight(1f)
+                            .graphicsLayer { alpha = expansionProgress },
+                    ) {
+                        CompositionLocalProvider(LocalBottomChromePadding provides 16.dp) {
+                            if (state.submittedKeyword == null) {
+                                SearchFloatingExploreContent(
+                                    state = state,
+                                    onSuggestionClick = onSuggestionClick,
+                                    onHotClick = onHotClick,
+                                    onClearHistory = onClearHistory,
+                                    onQueryChange = onQueryChange,
+                                )
+                            } else {
+                                SearchResultsContent(
+                                    state = state,
+                                    modifier = Modifier.fillMaxSize(),
+                                    onTabChange = onTabChange,
+                                    onLoadMore = onLoadMore,
+                                    onRetry = onRetry,
+                                    onSongClick = onSongClick,
+                                    onLikeClick = onLikeClick,
+                                    onPlaylistClick = onPlaylistClick,
+                                    onAlbumClick = onAlbumClick,
+                                    onArtistClick = onArtistClick,
+                                    onBack = onBack,
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 }
 
-// ---------------------------------------------------------------------------------------------
-// Collapsed landing surface
-// ---------------------------------------------------------------------------------------------
-
 @Composable
-private fun SearchCollapsedSurface(
+private fun SearchFloatingExploreContent(
     state: SearchUiState,
-    expanded: Boolean,
-    textFieldState: TextFieldState,
-    searchBarState: SearchBarState,
-    onQueryChange: (String) -> Unit,
-    onSearch: (String) -> Unit,
+    modifier: Modifier = Modifier,
     onSuggestionClick: (String) -> Unit,
     onHotClick: (String) -> Unit,
     onClearHistory: () -> Unit,
-    onTabChange: (SearchTab) -> Unit,
-    onLoadMore: () -> Unit,
-    onSongClick: (Song, List<Song>) -> Unit,
-    onLikeClick: (Song) -> Unit,
-    onPlaylistClick: (Long) -> Unit,
-    onAlbumClick: (Long) -> Unit,
-    onArtistClick: (Long) -> Unit,
-    onRetry: () -> Unit,
-    onBack: () -> Unit,
-    onExpand: () -> Unit,
+    onQueryChange: (String) -> Unit = {},
 ) {
-    val exploreScroll = rememberScrollState()
-    val exploreScrolled by remember(exploreScroll) { derivedStateOf { exploreScroll.value > 0 } }
-    val barScrolled = state.submittedKeyword != null || exploreScrolled
-    GlassScaffold(
-        topBar = {
-            GlassTopBar(scrolled = barScrolled) {
-                SearchTopBar(
-                    query = state.query,
-                    textFieldState = textFieldState,
-                    searchBarState = searchBarState,
-                    onSearch = onSearch,
-                    onClearQuery = { onQueryChange("") },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        },
-    ) { topPadding ->
-        // While the full-screen dialog is open it covers this surface. Keeping the lists out of
-        // the composition avoids duplicated test tags and paging effects behind the dialog.
-        if (!expanded) {
-            if (state.submittedKeyword == null) {
-                // The landing page scrolls under the frosted bar, title included.
-                SearchExploreContent(
-                    state = state,
-                    modifier = Modifier.fillMaxSize(),
-                    topPadding = topPadding,
-                    scrollState = exploreScroll,
-                    header = { SearchWelcomeHeader() },
-                    onSuggestionClick = onSuggestionClick,
-                    onHotClick = onHotClick,
-                    onClearHistory = onClearHistory,
-                    onQueryPicked = onExpand,
-                )
-            } else {
-                SearchResultsContent(
-                    state = state,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(top = topPadding),
-                    onTabChange = onTabChange,
-                    onLoadMore = onLoadMore,
-                    onRetry = onRetry,
-                    onSongClick = onSongClick,
-                    onLikeClick = onLikeClick,
-                    onPlaylistClick = onPlaylistClick,
-                    onAlbumClick = onAlbumClick,
-                    onArtistClick = onArtistClick,
-                    onBack = onBack,
-                )
-            }
-        }
-    }
-}
+    val haptics = rememberHaptics()
+    val scrollState = rememberScrollState()
+    val isQueryActive = state.query.trim().isNotEmpty()
 
-@Composable
-private fun SearchWelcomeHeader(modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
-            .fillMaxWidth()
-            .padding(top = 10.dp, bottom = 18.dp),
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
-        Text(
-            text = "搜索",
-            style = MaterialTheme.typography.displaySmallEmphasized,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = "网易云音乐曲库，一搜即达",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
+        if (isQueryActive) {
+            SearchSectionTitle(title = "搜索建议")
+            Spacer(Modifier.height(4.dp))
 
-/** The real Material 3 Expressive top search bar. */
-@Suppress("DEPRECATION")
-@Composable
-private fun SearchTopBar(
-    query: String,
-    textFieldState: TextFieldState,
-    searchBarState: SearchBarState,
-    onSearch: (String) -> Unit,
-    onClearQuery: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    // Upstream renamed this composable to AppBarWithSearch in material3 1.5; the deprecated alias
-    // is kept because the app contract names TopSearchBar and both draw the same component.
-    val haptics = rememberHaptics()
-    TopSearchBar(
-        state = searchBarState,
-        inputField = {
-            SearchInputField(
-                textFieldState = textFieldState,
-                searchBarState = searchBarState,
-                onSearch = onSearch,
-                trailing = {
-                    if (query.isNotEmpty()) {
+            val trimmedQuery = state.query.trim()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.medium)
+                    .clickable {
+                        haptics.tap()
+                        onSuggestionClick(trimmedQuery)
+                    }
+                    .padding(horizontal = 4.dp, vertical = 12.dp)
+                    .testTag("search-direct-query"),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    Icons.Filled.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(Modifier.width(14.dp))
+                Text(
+                    text = "搜索 \"$trimmedQuery\"",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+
+            state.suggestions.forEach { keyword ->
+                SuggestionRow(
+                    keyword = keyword,
+                    onClick = {
+                        haptics.tap()
+                        onSuggestionClick(keyword)
+                    },
+                    onFillQuery = {
+                        haptics.tap()
+                        onQueryChange(keyword)
+                    },
+                )
+            }
+
+            val matchingHistory = state.history.filter {
+                it.contains(trimmedQuery, ignoreCase = true) &&
+                    it != trimmedQuery &&
+                    it !in state.suggestions
+            }
+            if (matchingHistory.isNotEmpty()) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 12.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                )
+                SearchSectionTitle(title = "历史匹配")
+                Spacer(Modifier.height(4.dp))
+                matchingHistory.forEach { keyword ->
+                    SuggestionRow(
+                        keyword = keyword,
+                        icon = Icons.Filled.History,
+                        onClick = {
+                            haptics.tap()
+                            onSuggestionClick(keyword)
+                        },
+                        onFillQuery = {
+                            haptics.tap()
+                            onQueryChange(keyword)
+                        },
+                    )
+                }
+            }
+        } else {
+            val defaultKeyword = state.defaultKeyword?.takeIf { it.isNotBlank() }
+            if (defaultKeyword != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(MaterialTheme.shapes.medium)
+                        .clickable {
+                            haptics.tap()
+                            onSuggestionClick(defaultKeyword)
+                        }
+                        .padding(horizontal = 4.dp, vertical = 10.dp)
+                        .testTag("search-default-keyword"),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.TrendingUp,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = defaultKeyword,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = "默认推荐 · 点击立即搜索",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            haptics.tap()
+                            onQueryChange(defaultKeyword)
+                        },
+                        modifier = Modifier.size(36.dp),
+                    ) {
+                        Icon(
+                            Icons.Filled.NorthWest,
+                            contentDescription = "填入搜索框",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            haptics.tap()
+                            onSuggestionClick(defaultKeyword)
+                        },
+                        modifier = Modifier.size(36.dp),
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = "立即搜索",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                )
+            }
+
+            if (state.hotKeywords.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                SearchSectionTitle(title = "热门搜索")
+                Spacer(Modifier.height(8.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    state.hotKeywords.forEachIndexed { index, keyword ->
+                        SuggestionChip(
+                            onClick = {
+                                haptics.tap()
+                                onHotClick(keyword)
+                            },
+                            label = { Text(keyword, style = MaterialTheme.typography.labelLarge) },
+                            icon = if (index == 0) {
+                                {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.TrendingUp,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                }
+                            } else {
+                                null
+                            },
+                            modifier = Modifier.testTag("search-hot"),
+                        )
+                    }
+                }
+            }
+
+            if (state.history.isNotEmpty()) {
+                Spacer(Modifier.height(20.dp))
+                SearchSectionTitle(
+                    title = "搜索历史",
+                    trailing = {
                         IconButton(
                             onClick = {
                                 haptics.tap()
-                                onClearQuery()
+                                onClearHistory()
                             },
-                            modifier = Modifier.testTag("search-clear-query"),
+                            modifier = Modifier.testTag("search-clear-history"),
                         ) {
-                            Icon(Icons.Filled.Close, contentDescription = "清除搜索内容")
+                            Icon(
+                                Icons.Filled.DeleteSweep,
+                                contentDescription = "清空搜索历史",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
+                    },
+                )
+                Spacer(Modifier.height(4.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    state.history.forEach { keyword ->
+                        SuggestionChip(
+                            onClick = {
+                                haptics.tap()
+                                onHotClick(keyword)
+                            },
+                            label = { Text(keyword, style = MaterialTheme.typography.labelLarge) },
+                            icon = {
+                                Icon(
+                                    Icons.Filled.History,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            },
+                            modifier = Modifier.testTag("search-history"),
+                        )
                     }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("search-input"),
-            )
-        },
-        modifier = modifier.testTag("search-top-bar"),
-        windowInsets = WindowInsets(0, 0, 0, 0),
-    )
+                }
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+    }
 }
 
 @Composable
@@ -409,15 +731,20 @@ private fun SearchInputField(
     onSearch: (String) -> Unit,
     trailing: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    defaultKeyword: String? = null,
 ) {
+    val placeholderText = defaultKeyword?.takeIf { it.isNotBlank() } ?: "搜索歌曲、歌手、歌单"
     SearchBarDefaults.InputField(
         textFieldState = textFieldState,
         searchBarState = searchBarState,
-        onSearch = { keyword -> if (keyword.isNotBlank()) onSearch(keyword.trim()) },
+        onSearch = { keyword ->
+            val effective = keyword.trim().ifEmpty { defaultKeyword?.trim().orEmpty() }
+            if (effective.isNotBlank()) onSearch(effective)
+        },
         modifier = modifier,
         placeholder = {
             Text(
-                text = "搜索歌曲、歌手、歌单",
+                text = placeholderText,
                 style = MaterialTheme.typography.bodyLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -486,7 +813,7 @@ private fun SearchExploreContent(
                 label = { Text(defaultKeyword, style = MaterialTheme.typography.labelLarge) },
                 leadingIcon = {
                     Icon(
-                        Icons.Filled.TrendingUp,
+                        Icons.AutoMirrored.Filled.TrendingUp,
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
                     )
@@ -510,7 +837,7 @@ private fun SearchExploreContent(
                         icon = if (index == 0) {
                             {
                                 Icon(
-                                    Icons.Filled.TrendingUp,
+                                    Icons.AutoMirrored.Filled.TrendingUp,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp),
                                 )
@@ -575,6 +902,8 @@ private fun SuggestionRow(
     keyword: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    icon: androidx.compose.ui.graphics.vector.ImageVector = Icons.Filled.Search,
+    onFillQuery: (() -> Unit)? = null,
 ) {
     val haptics = rememberHaptics()
     Row(
@@ -585,12 +914,12 @@ private fun SuggestionRow(
                 haptics.tap()
                 onClick()
             }
-            .padding(horizontal = 4.dp, vertical = 12.dp)
+            .padding(horizontal = 4.dp, vertical = 10.dp)
             .testTag("search-suggestion"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
-            Icons.Filled.Search,
+            icon,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(20.dp),
@@ -604,12 +933,36 @@ private fun SuggestionRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        Icon(
-            Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp),
-        )
+        if (onFillQuery != null) {
+            IconButton(
+                onClick = {
+                    haptics.tap()
+                    onFillQuery()
+                },
+                modifier = Modifier.size(36.dp),
+            ) {
+                Icon(
+                    Icons.Filled.NorthWest,
+                    contentDescription = "填入搜索框",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+        IconButton(
+            onClick = {
+                haptics.tap()
+                onClick()
+            },
+            modifier = Modifier.size(36.dp),
+        ) {
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = "立即搜索",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.size(20.dp),
+            )
+        }
     }
 }
 

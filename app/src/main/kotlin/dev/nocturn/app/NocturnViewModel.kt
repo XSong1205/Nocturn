@@ -41,6 +41,9 @@ import dev.nocturn.app.ui.state.PlaylistUiState
 import dev.nocturn.app.ui.state.Screen
 import dev.nocturn.app.ui.state.SearchTab
 import dev.nocturn.app.ui.state.SearchUiState
+import dev.nocturn.app.ui.state.SettingsUiState
+import java.io.File
+import kotlinx.coroutines.Dispatchers
 import dev.nocturn.app.ui.util.greetingForHour
 import dev.nocturn.localapi.client.AudioQuality
 import kotlinx.coroutines.CancellationException
@@ -83,9 +86,23 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
             dynamicColor = settings.dynamicColor,
             quality = settings.quality,
             hapticsEnabled = settings.hapticsEnabled,
+            lyriconEnabled = settings.lyriconEnabled,
         ),
     )
     val library: StateFlow<LibraryUiState> = mutableLibrary.asStateFlow()
+
+    private val mutableSettings = MutableStateFlow(
+        SettingsUiState(
+            quality = settings.quality,
+            themeMode = settings.themeMode,
+            dynamicColor = settings.dynamicColor,
+            hapticsEnabled = settings.hapticsEnabled,
+            lyriconEnabled = settings.lyriconEnabled,
+            searchHistoryCount = settings.searchHistory().size,
+            version = appVersionName(),
+        ),
+    )
+    val settingsUi: StateFlow<SettingsUiState> = mutableSettings.asStateFlow()
 
     // Detail routes keep one state per back-stack entry, keyed by id, so stacked pages of the same
     // kind (album -> artist -> album) never overwrite each other.
@@ -133,7 +150,12 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             repository.session.collect { profile ->
                 if (profile != null) {
+                    val wasLoggedIn = mutableLibrary.value.loggedIn
                     mutableLibrary.update { it.copy(loggedIn = true, profile = profile) }
+                    if (!wasLoggedIn) {
+                        loadHome(refresh = true)
+                        loadSearchLanding()
+                    }
                 } else if (mutableLibrary.value.loggedIn || mutableLibrary.value.profile != null) {
                     likedSongIds.clear()
                     mutableLibrary.update {
@@ -148,6 +170,8 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
                     }
                     mutableHome.update { it.copy(isLoggedIn = false, dailySongs = emptyList()) }
                     applyLikedState()
+                    loadHome(refresh = true)
+                    loadSearchLanding()
                 }
             }
         }
@@ -158,6 +182,7 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
     // ---------------------------------------------------------------------------------------
 
     fun selectTab(tab: AppTab) {
+        if (mutableNavigation.value.tab == tab && mutableNavigation.value.stack.isEmpty()) return
         mutableNavigation.update { it.copy(tab = tab, stack = emptyList()) }
         pruneDetailStates()
         when (tab) {
@@ -170,19 +195,25 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
     // Re-opening a page that is still on the stack reuses its loaded state; a failed or missing
     // entry is fetched again.
     fun openPlaylist(playlistId: Long) {
-        mutableNavigation.update { it.copy(stack = it.stack + Screen.Playlist(playlistId)) }
+        val target = Screen.Playlist(playlistId)
+        if (mutableNavigation.value.stack.lastOrNull() == target) return
+        mutableNavigation.update { it.copy(stack = it.stack + target) }
         pruneDetailStates()
         if (playlistStates[playlistId]?.detail == null) loadPlaylist(playlistId)
     }
 
     fun openAlbum(albumId: Long) {
-        mutableNavigation.update { it.copy(stack = it.stack + Screen.Album(albumId)) }
+        val target = Screen.Album(albumId)
+        if (mutableNavigation.value.stack.lastOrNull() == target) return
+        mutableNavigation.update { it.copy(stack = it.stack + target) }
         pruneDetailStates()
         if (albumStates[albumId]?.detail == null) loadAlbum(albumId)
     }
 
     fun openArtist(artistId: Long) {
-        mutableNavigation.update { it.copy(stack = it.stack + Screen.Artist(artistId)) }
+        val target = Screen.Artist(artistId)
+        if (mutableNavigation.value.stack.lastOrNull() == target) return
+        mutableNavigation.update { it.copy(stack = it.stack + target) }
         pruneDetailStates()
         if (artistStates[artistId]?.detail == null) loadArtist(artistId)
     }
@@ -199,17 +230,68 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun openRecentSongs() {
-        mutableNavigation.update { it.copy(stack = it.stack + Screen.RecentSongs) }
+        mutableNavigation.update {
+            if (it.stack.lastOrNull() == Screen.RecentSongs) it
+            else it.copy(stack = it.stack + Screen.RecentSongs)
+        }
     }
 
     fun openLikedSongs() {
+        if (mutableNavigation.value.stack.lastOrNull() == Screen.LikedSongs) return
         mutableNavigation.update { it.copy(stack = it.stack + Screen.LikedSongs) }
         loadLikedSongs()
     }
 
     /** Daily recommendations are part of the home feed, so their page needs no extra request. */
     fun openDailySongs() {
-        mutableNavigation.update { it.copy(stack = it.stack + Screen.DailySongs) }
+        mutableNavigation.update {
+            if (it.stack.lastOrNull() == Screen.DailySongs) it
+            else it.copy(stack = it.stack + Screen.DailySongs)
+        }
+    }
+
+    fun openSettings() {
+        mutableNavigation.update {
+            if (it.stack.lastOrNull() == Screen.Settings) it
+            else it.copy(stack = it.stack + Screen.Settings)
+        }
+        refreshCacheSize()
+    }
+
+    fun openSettingsPlayback() {
+        mutableNavigation.update {
+            if (it.stack.lastOrNull() == Screen.SettingsPlayback) it
+            else it.copy(stack = it.stack + Screen.SettingsPlayback)
+        }
+    }
+
+    fun openSettingsAppearance() {
+        mutableNavigation.update {
+            if (it.stack.lastOrNull() == Screen.SettingsAppearance) it
+            else it.copy(stack = it.stack + Screen.SettingsAppearance)
+        }
+    }
+
+    fun openSettingsGeneral() {
+        mutableNavigation.update {
+            if (it.stack.lastOrNull() == Screen.SettingsGeneral) it
+            else it.copy(stack = it.stack + Screen.SettingsGeneral)
+        }
+    }
+
+    fun openSettingsStorage() {
+        mutableNavigation.update {
+            if (it.stack.lastOrNull() == Screen.SettingsStorage) it
+            else it.copy(stack = it.stack + Screen.SettingsStorage)
+        }
+        refreshCacheSize()
+    }
+
+    fun openSettingsAbout() {
+        mutableNavigation.update {
+            if (it.stack.lastOrNull() == Screen.SettingsAbout) it
+            else it.copy(stack = it.stack + Screen.SettingsAbout)
+        }
     }
 
     fun openPlayer() {
@@ -295,7 +377,9 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
 
     private fun loadSearchLanding() {
         viewModelScope.launch {
-            mutableSearch.update { it.copy(history = settings.searchHistory()) }
+            val history = settings.searchHistory()
+            mutableSearch.update { it.copy(history = history) }
+            mutableSettings.update { it.copy(searchHistoryCount = history.size) }
             val hot = runCatching { repository.hotSearches() }.getOrDefault(emptyList())
             val default = runCatching { repository.defaultKeyword() }.getOrNull()
             mutableSearch.update {
@@ -305,23 +389,29 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun updateSearchQuery(query: String) {
-        mutableSearch.update { it.copy(query = query.take(80)) }
+        mutableSearch.update { it.copy(query = query.take(80), submittedKeyword = null) }
         suggestionRequest?.cancel()
         if (query.isBlank()) {
             mutableSearch.update { it.copy(suggestions = emptyList()) }
             return
         }
         suggestionRequest = viewModelScope.launch {
-            delay(250)
+            delay(150)
             runCatching { repository.searchSuggestions(query.trim()) }
                 .onSuccess { suggestions ->
-                    mutableSearch.update { it.copy(suggestions = suggestions.take(8)) }
+                    if (mutableSearch.value.query.trim() == query.trim()) {
+                        mutableSearch.update { it.copy(suggestions = suggestions.take(10)) }
+                    }
                 }
         }
     }
 
     fun expandSearch() {
         mutableSearch.update { it.copy(expanded = true) }
+        val current = mutableSearch.value.query.trim()
+        if (current.isNotEmpty() && mutableSearch.value.suggestions.isEmpty()) {
+            updateSearchQuery(current)
+        }
     }
 
     fun collapseSearch() {
@@ -329,9 +419,11 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun submitSearch(keyword: String = mutableSearch.value.query) {
-        val value = keyword.trim()
+        val value = keyword.trim().ifEmpty { mutableSearch.value.defaultKeyword?.trim().orEmpty() }
         if (value.isEmpty()) return
         settings.recordSearch(value)
+        val history = settings.searchHistory()
+        mutableSettings.update { it.copy(searchHistoryCount = history.size) }
         mutableSearch.update {
             it.copy(
                 query = value,
@@ -373,6 +465,8 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
     fun clearSearchHistory() {
         settings.clearSearchHistory()
         mutableSearch.update { it.copy(history = emptyList()) }
+        mutableSettings.update { it.copy(searchHistoryCount = 0) }
+        notify("搜索历史已清除")
     }
 
     fun onSearchBack(): Boolean {
@@ -666,7 +760,8 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
                     )
                 }
                 applyLikedState()
-                if (mutableHome.value.dailySongs.isEmpty()) loadHome()
+                loadHome(refresh = true)
+                loadSearchLanding()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -768,7 +863,8 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
                     it.copy(loggedIn = true, profile = profile, login = LoginUiState())
                 }
                 refreshLibrary()
-                loadHome()
+                loadHome(refresh = true)
+                loadSearchLanding()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -857,7 +953,8 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
                     delay(700)
                     mutableLibrary.update { it.copy(login = LoginUiState()) }
                     refreshLibrary()
-                    loadHome()
+                    loadHome(refresh = true)
+                    loadSearchLanding()
                     return
                 }
                 QrLoginState.Expired, QrLoginState.Rejected -> return
@@ -888,8 +985,10 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
                     error = null,
                 )
             }
-            mutableHome.update { it.copy(isLoggedIn = false) }
+            mutableHome.update { it.copy(isLoggedIn = false, dailySongs = emptyList()) }
             applyLikedState()
+            loadHome(refresh = true)
+            loadSearchLanding()
             notify("已退出登录")
         }
     }
@@ -897,6 +996,7 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
     fun setQuality(quality: AudioQuality) {
         settings.quality = quality
         mutableLibrary.update { it.copy(quality = quality) }
+        mutableSettings.update { it.copy(quality = quality) }
         mutablePlayer.update { it.copy(qualityLabel = quality.displayName()) }
         notify("音质已切换为${quality.displayName()}")
     }
@@ -904,18 +1004,77 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
     fun setThemeMode(mode: ThemeMode) {
         settings.themeMode = mode
         mutableLibrary.update { it.copy(themeMode = mode) }
+        mutableSettings.update { it.copy(themeMode = mode) }
     }
 
     fun setDynamicColor(enabled: Boolean) {
         settings.dynamicColor = enabled
         mutableLibrary.update { it.copy(dynamicColor = enabled) }
+        mutableSettings.update { it.copy(dynamicColor = enabled) }
     }
 
     /** Turns the app-wide tactile layer on or off and persists the choice. */
     fun setHapticsEnabled(enabled: Boolean) {
         settings.hapticsEnabled = enabled
         mutableLibrary.update { it.copy(hapticsEnabled = enabled) }
+        mutableSettings.update { it.copy(hapticsEnabled = enabled) }
     }
+
+    fun setLyriconEnabled(enabled: Boolean) {
+        settings.lyriconEnabled = enabled
+        mutableLibrary.update { it.copy(lyriconEnabled = enabled) }
+        mutableSettings.update { it.copy(lyriconEnabled = enabled) }
+    }
+
+    @Volatile
+    private var clearCacheJob: Job? = null
+
+    fun refreshCacheSize(): Job = viewModelScope.launch(Dispatchers.IO) {
+        val context = getApplication<Application>()
+        val size = computeCacheDirSize(context.cacheDir) + computeCacheDirSize(context.externalCacheDir)
+        val historyCount = settings.searchHistory().size
+        mutableSettings.update {
+            it.copy(
+                cacheSizeBytes = size,
+                searchHistoryCount = historyCount,
+            )
+        }
+    }
+
+    fun clearCache(): Job {
+        val existing = clearCacheJob
+        if (existing != null && existing.isActive) return existing
+        val job = viewModelScope.launch(Dispatchers.IO) {
+            mutableSettings.update { it.copy(isClearing = true) }
+            val context = getApplication<Application>()
+            deleteDirectoryContents(context.cacheDir)
+            deleteDirectoryContents(context.externalCacheDir)
+            val size = computeCacheDirSize(context.cacheDir) + computeCacheDirSize(context.externalCacheDir)
+            mutableSettings.update { it.copy(cacheSizeBytes = size, isClearing = false) }
+            notify("缓存已清除")
+        }
+        clearCacheJob = job
+        return job
+    }
+
+    private fun computeCacheDirSize(dir: File?): Long {
+        if (dir == null || !dir.exists()) return 0L
+        return runCatching {
+            dir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+        }.getOrDefault(0L)
+    }
+
+    private fun deleteDirectoryContents(dir: File?) {
+        if (dir == null || !dir.exists()) return
+        runCatching {
+            dir.listFiles()?.forEach { it.deleteRecursively() }
+        }
+    }
+
+    private fun appVersionName(): String = runCatching {
+        val context = getApplication<Application>()
+        context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.1.28"
+    }.getOrDefault("0.1.28")
 
     // ---------------------------------------------------------------------------------------
     // Playback

@@ -17,28 +17,38 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.History
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.nocturn.app.data.model.Song
+import dev.nocturn.app.data.model.ThemeMode
 import dev.nocturn.app.ui.components.BarBackButton
 import dev.nocturn.app.ui.components.BarTitle
 import dev.nocturn.app.ui.components.EmptyState
 import dev.nocturn.app.ui.components.GlassScaffold
 import dev.nocturn.app.ui.components.GlassTopBar
+import dev.nocturn.app.ui.components.RecentCollectionCover
 import dev.nocturn.app.ui.components.SongRow
 import dev.nocturn.app.ui.components.bottomContentPadding
 import dev.nocturn.app.ui.components.rememberHaptics
 import dev.nocturn.app.ui.components.scrolledPast
+import dev.nocturn.app.ui.preview.PreviewData
 import dev.nocturn.app.ui.state.LibraryUiState
+import dev.nocturn.app.ui.theme.NocturnTheme
 
 /** Recently played songs, opened from the library entry. */
 @Composable
@@ -52,6 +62,10 @@ fun RecentSongsScreen(
 ) {
     val listState = rememberLazyListState()
     val collapsed by listState.scrolledPast(200)
+    var interactive by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        interactive = true
+    }
     GlassScaffold(
         modifier = modifier,
         topBar = {
@@ -79,12 +93,15 @@ fun RecentSongsScreen(
                 contentPadding = PaddingValues(top = topPadding, bottom = bottomContentPadding()),
             ) {
                 item(key = "hero") {
-                    RecentHero(count = state.recentSongs.size, onPlayAll = onPlayAll)
+                    RecentHero(
+                        count = state.recentSongs.size,
+                        onPlayAll = { if (interactive) onPlayAll() },
+                    )
                 }
                 itemsIndexed(state.recentSongs, key = { _, song -> song.id }) { index, song ->
                     SongRow(
                         song = song,
-                        onClick = { onSongClick(song, state.recentSongs) },
+                        onClick = { if (interactive) onSongClick(song, state.recentSongs) },
                         modifier = Modifier
                             .padding(horizontal = 8.dp)
                             .testTag("recent-song-row-${song.id}"),
@@ -109,11 +126,14 @@ private fun RecentHero(count: Int, onPlayAll: (() -> Unit)?) {
             .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 16.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                Icons.Rounded.History,
-                contentDescription = null,
-                modifier = Modifier.size(80.dp),
-                tint = MaterialTheme.colorScheme.primary,
+            RecentCollectionCover(
+                size = 104.dp,
+                modifier = Modifier.shadow(
+                    elevation = 16.dp,
+                    shape = MaterialTheme.shapes.large,
+                    ambientColor = Color(0xFF0099FF).copy(alpha = 0.5f),
+                    spotColor = Color(0xFF0099FF).copy(alpha = 0.6f),
+                ),
             )
             Spacer(Modifier.width(18.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -150,3 +170,22 @@ private fun RecentHero(count: Int, onPlayAll: (() -> Unit)?) {
     }
 }
 
+// ---------------------------------------------------------------------------------------------
+// Previews
+// ---------------------------------------------------------------------------------------------
+
+@Preview(name = "最近播放 · 深色", showBackground = true)
+@Composable
+private fun RecentSongsPreviewDark() {
+    NocturnTheme(themeMode = ThemeMode.Dark) {
+        RecentSongsScreen(state = PreviewData.libraryLoggedIn)
+    }
+}
+
+@Preview(name = "最近播放 · 空 · 浅色", showBackground = true)
+@Composable
+private fun RecentSongsEmptyPreviewLight() {
+    NocturnTheme(themeMode = ThemeMode.Light) {
+        RecentSongsScreen(state = PreviewData.libraryLoggedIn.copy(recentSongs = emptyList()))
+    }
+}

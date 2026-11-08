@@ -121,7 +121,7 @@ fun SettingsScreen(
                     iconContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
                     iconContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
                     title = "通用与交互",
-                    subtitle = "触感反馈（${if (state.hapticsEnabled) "已开启" else "已关闭"}）、手势与转场",
+                    subtitle = "触感反馈（${if (state.hapticsEnabled) "已开启" else "已关闭"}）、词幕歌词（${if (state.lyriconEnabled) "已开启" else "已关闭"}）、手势与转场",
                     testTag = "settings-menu-general",
                     onClick = onNavigateGeneral,
                 )

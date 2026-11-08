@@ -118,7 +118,7 @@ fun HomeScreen(
     onAccountClick: () -> Unit = {},
 ) {
     if (state.loading && !state.hasContent) {
-        CenteredStatus(modifier) { ScreenLoading(label = "正在为你准备今晚的歌单") }
+        CenteredStatus(modifier) { ScreenLoading(label = "正在加载") }
         return
     }
     val error = state.error
@@ -129,7 +129,7 @@ fun HomeScreen(
     if (!state.hasContent) {
         CenteredStatus(modifier) {
             EmptyState(
-                title = "今晚暂时没有内容",
+                title = "暂时没有内容",
                 message = "检查一下网络，或者下拉刷新再看看。",
                 actionLabel = "刷新",
                 onAction = onRefresh,

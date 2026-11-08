@@ -150,6 +150,10 @@ class MediaSessionPlaybackEngine(context: Context) : PlaybackEngine {
         for (index in 0 until player.mediaItemCount) {
             mediaIds += player.getMediaItemAt(index).mediaId
         }
+        val currentMediaItem = player.currentMediaItem
+        val metadata = currentMediaItem?.mediaMetadata ?: player.mediaMetadata
+        val title = metadata.title?.toString()?.takeIf { it.isNotBlank() }
+        val artist = metadata.artist?.toString()?.takeIf { it.isNotBlank() }
         mutableSnapshot.update { previous ->
             PlaybackSnapshotMapping.fromPlayer(
                 currentIndex = player.currentMediaItemIndex,
@@ -164,6 +168,8 @@ class MediaSessionPlaybackEngine(context: Context) : PlaybackEngine {
                 positionSampledAtNanos = sampledAtNanos,
                 positionDiscontinuity = positionDiscontinuity,
                 playbackSpeed = player.playbackParameters.speed,
+                title = title,
+                artist = artist,
             )
         }
     }
