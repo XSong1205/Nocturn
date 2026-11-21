@@ -30,8 +30,11 @@ import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialShapes
@@ -42,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -58,6 +62,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.nocturn.app.data.model.AccountProfile
 import dev.nocturn.app.data.model.AccountStats
+import dev.nocturn.app.data.model.PlaylistSummary
 import dev.nocturn.app.data.model.Song
 import dev.nocturn.app.data.model.ThemeMode
 import dev.nocturn.app.ui.components.CoverArt
@@ -96,11 +101,13 @@ fun LibraryScreen(
     onLogout: () -> Unit = {},
     onLikedSongsClick: () -> Unit = {},
     onPlaylistClick: (Long) -> Unit = {},
+    onHeartbeatClick: (PlaylistSummary) -> Unit = {},
     onRecentSongsClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onSongClick: (Song, List<Song>) -> Unit = { _, _ -> },
     onLikeClick: (Song) -> Unit = {},
     onRetry: () -> Unit = {},
+    reselectFlow: kotlinx.coroutines.flow.Flow<Unit>? = null,
 ) {
     var showLogoutDialog by rememberSaveable { mutableStateOf(false) }
     var lastLikedClickTime by remember { mutableLongStateOf(0L) }
@@ -120,6 +127,11 @@ fun LibraryScreen(
         }
     }
     val listState = rememberLazyListState()
+    LaunchedEffect(reselectFlow) {
+        reselectFlow?.collect {
+            listState.animateScrollToItem(0)
+        }
+    }
     val scrolled by remember { derivedStateOf { listState.canScrollBackward } }
     val haptics = rememberHaptics()
 
@@ -170,6 +182,14 @@ fun LibraryScreen(
                         )
                     }
                 }
+                val favoritePlaylist = state.playlists.firstOrNull {
+                    it.specialType == 5 || it.name == "我喜欢的音乐" || it.name.endsWith("喜欢的音乐")
+                }
+                val otherPlaylists = if (favoritePlaylist != null) {
+                    state.playlists.filter { it.id != favoritePlaylist.id }
+                } else {
+                    state.playlists
+                }
                 val profile = state.profile
                 if (state.loggedIn && profile != null) {
                     item(key = "profile") {
@@ -178,7 +198,16 @@ fun LibraryScreen(
                     item(key = "liked-entry") {
                         LikedSongsEntry(
                             likedCount = state.likedCount,
-                            onClick = onDebouncedLikedClick,
+                            favoritePlaylist = favoritePlaylist,
+                            onClick = {
+                                if (favoritePlaylist != null) {
+                                    onPlaylistClick(favoritePlaylist.id)
+                                }
+                                onDebouncedLikedClick()
+                            },
+                            onHeartbeatClick = favoritePlaylist?.let { fav ->
+                                { onHeartbeatClick(fav) }
+                            },
                         )
                     }
                 } else {
@@ -192,17 +221,17 @@ fun LibraryScreen(
                     )
                 }
 
-                if (state.loggedIn && state.playlists.isNotEmpty()) {
+                if (state.loggedIn && otherPlaylists.isNotEmpty()) {
                     item(key = "playlists-header") {
                         Spacer(Modifier.height(12.dp))
                         SectionHeader(
                             title = "我的歌单",
-                            subtitle = "${state.playlists.size} 个歌单",
+                            subtitle = "${otherPlaylists.size} 个歌单",
                             modifier = Modifier.testTag("library-playlists"),
                         )
                     }
                     items(
-                        state.playlists.chunked(2),
+                        otherPlaylists.chunked(2),
                         key = { row -> "playlists-${row.first().id}" },
                     ) { row ->
                         Row(
@@ -464,24 +493,65 @@ private fun SignedInHero(
                     }
                 }
             }
-            Spacer(Modifier.height(20.dp))
-            Row(
+            Spacer(Modifier.height(18.dp))
+            Surface(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.22f),
             ) {
-                MetricLabel(
-                    value = formatCount((stats?.playlistCount ?: 0).toLong()),
-                    label = "歌单",
-                )
-                MetricLabel(
-                    value = formatCount((stats?.followingCount ?: 0).toLong()),
-                    label = "关注",
-                )
-                MetricLabel(
-                    value = formatCount((stats?.followerCount ?: 0).toLong()),
-                    label = "粉丝",
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceAround,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AccountStatItem(
+                        value = formatCount((stats?.followingCount ?: 0).toLong()),
+                        label = "关注",
+                    )
+                    AccountStatItem(
+                        value = formatCount((stats?.followerCount ?: 0).toLong()),
+                        label = "粉丝",
+                    )
+                    AccountStatItem(
+                        value = "Lv.${stats?.level ?: 0}",
+                        label = "",
+                    )
+                    val hours = stats?.listenHours?.takeIf { it > 0 }
+                        ?: ((stats?.listenSongs ?: 0L) / 10).toInt()
+                    AccountStatItem(
+                        value = formatCount(hours.toLong()),
+                        label = "小时",
+                    )
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun AccountStatItem(
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMediumEmphasized,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+        if (label.isNotBlank()) {
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f),
+            )
         }
     }
 }
@@ -489,7 +559,9 @@ private fun SignedInHero(
 @Composable
 private fun LikedSongsEntry(
     likedCount: Int?,
+    favoritePlaylist: PlaylistSummary?,
     onClick: () -> Unit,
+    onHeartbeatClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val haptics = rememberHaptics()
@@ -511,7 +583,19 @@ private fun LikedSongsEntry(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            LikedCollectionCover(size = 56.dp)
+            val coverUrl = favoritePlaylist?.coverUrl
+            if (!coverUrl.isNullOrBlank()) {
+                CoverArt(
+                    imageUrl = coverUrl,
+                    modifier = Modifier.size(56.dp),
+                    shape = MaterialTheme.shapes.medium,
+                    seed = favoritePlaylist.id.hashCode(),
+                    contentDescription = "我喜欢的音乐",
+                    placeholderIcon = Icons.Rounded.Favorite,
+                )
+            } else {
+                LikedCollectionCover(size = 56.dp)
+            }
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -519,21 +603,52 @@ private fun LikedSongsEntry(
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Spacer(Modifier.height(2.dp))
-                Text(
-                    text = if (likedCount != null && likedCount > 0) {
+                val subtitle = when {
+                    favoritePlaylist != null -> {
+                        "${favoritePlaylist.trackCount}首 · ${favoritePlaylist.playCount}次播放"
+                    }
+                    likedCount != null && likedCount > 0 -> {
                         "$likedCount 首歌曲"
-                    } else {
-                        "收藏的每一首都在这里"
-                    },
+                    }
+                    else -> "收藏的每一首都在这里"
+                }
+                Text(
+                    text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (onHeartbeatClick != null) {
+                Spacer(Modifier.width(8.dp))
+                FilledTonalButton(
+                    onClick = {
+                        haptics.confirm()
+                        onHeartbeatClick()
+                    },
+                    modifier = Modifier
+                        .height(36.dp)
+                        .testTag("library-heartbeat-button"),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                    shape = CircleShape,
+                ) {
+                    Icon(
+                        Icons.Rounded.Favorite,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "心动模式",
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            } else {
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

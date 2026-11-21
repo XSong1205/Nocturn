@@ -6,6 +6,9 @@ import dev.nocturn.app.data.model.AccountProfile
 import dev.nocturn.app.data.model.AccountStats
 import dev.nocturn.app.data.model.AlbumDetail
 import dev.nocturn.app.data.model.ArtistDetail
+import dev.nocturn.app.data.model.DefaultSearchKeyword
+import dev.nocturn.app.data.model.FreeListenClaimResult
+import dev.nocturn.app.data.model.FreeListenRights
 import dev.nocturn.app.data.model.HomeFeed
 import dev.nocturn.app.data.model.Lyrics
 import dev.nocturn.app.data.model.PlaylistDetail
@@ -21,10 +24,14 @@ import dev.nocturn.app.data.model.SearchSongsPage
 import dev.nocturn.app.data.model.Song
 import dev.nocturn.app.data.model.Toplist
 import dev.nocturn.localapi.client.AudioQuality
+import dev.nocturn.localapi.client.ImmerseType
 import dev.nocturn.localapi.client.LocalApiClient
 import dev.nocturn.localapi.client.LocalApiEndpoint
 import dev.nocturn.localapi.client.LocalApiException
 import dev.nocturn.localapi.client.createLocalApi
+import dev.nocturn.localapi.client.relayPlayStateSubmit
+import dev.nocturn.localapi.client.scrobble
+import dev.nocturn.localapi.client.scrobbleV1
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -34,6 +41,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -74,16 +82,27 @@ class LocalMusicRepository(private val context: Context) : MusicRepository {
                 } else {
                     null
                 }
+                val homepageJob = async { attempt { fetchHomepageBlocks(cookie) } }
                 val songJob = async {
                     attempt {
-                        val dailyResult = dailyJob?.await()?.getOrNull()
-                        fetchPersonalizedSongs(cookie, loggedIn, dailyResult)
+                        val homepageResult = homepageJob.await().getOrNull()
+                        fetchPersonalizedSongs(cookie, loggedIn, homepageResult)
                     }
                 }
                 val playlists = playlistJob.await()
                 val charts = chartJob.await()
                 val daily = dailyJob?.await()
                 val songs = songJob.await()
+                val homepageBlocks = homepageJob.await().getOrNull()
+
+                // Resolve radar playlist:
+                // 1) From recommended playlists whose name contains "雷达"
+                // 2) From homepage block HOMEPAGE_BLOCK_MGC_PLAYLIST
+                val recommendedList = playlists.getOrElse { emptyList() }
+                val radarFromPlaylists = recommendedList.firstOrNull { it.name.contains("雷达") }
+                val radarPlaylist = radarFromPlaylists
+                    ?: homepageBlocks?.let { NeteaseJson.parseHomepageRadarPlaylists(it) }?.firstOrNull()
+
                 // Degrade block by block, but never show an empty home page as "success".
                 val attempted = listOfNotNull(
                     playlists.isSuccess,
@@ -100,15 +119,25 @@ class LocalMusicRepository(private val context: Context) : MusicRepository {
                     ).first()
                 }
                 HomeFeed(
-                    playlists = playlists.getOrElse { emptyList() },
+                    playlists = recommendedList,
                     charts = charts.getOrElse { emptyList() },
                     dailySongs = daily?.getOrElse { emptyList() } ?: emptyList(),
                     personalizedSongs = songs.getOrElse { emptyList() },
+                    radarPlaylist = radarPlaylist,
                     isLoggedIn = loggedIn,
                 )
             }
         }
     }
+
+    private suspend fun fetchHomepageBlocks(cookie: String?): JsonObject =
+        requestOk(
+            LocalApiEndpoint.Homepage,
+            buildJsonObject {
+                put("refresh", true)
+                cookie?.let { put("cookie", it) }
+            },
+        )
 
     /**
      * "为你推荐" playlists.
@@ -156,28 +185,20 @@ class LocalMusicRepository(private val context: Context) : MusicRepository {
     /**
      * "根据你喜爱的歌曲推荐" / "新歌推荐" songs.
      *
-     * `/personalized/newsong` is a public shelf that returns static editorial new songs ("hot_server")
-     * whether signed in or not. For signed-in listeners, the account's daily personalized recommendations
-     * (`recommend/songs`) are used so the grid actually reflects the user's taste; `/personalized/newsong`
-     * remains the fallback for anonymous listeners or when account recommendations are unavailable.
+     * In logged-in state, we parse the real personalized style recommendation block (`HOMEPAGE_BLOCK_STYLE_RCMD`)
+     * from `/homepage/block/page` so it NEVER duplicates `dailySongs`.
+     * If unavailable or logged out, it falls back to `/personalized/newsong` (推荐新音乐).
      */
     private suspend fun fetchPersonalizedSongs(
         cookie: String?,
         loggedIn: Boolean = false,
-        dailyAccountSongs: List<Song>? = null,
+        homepageBlocks: JsonObject? = null,
     ): List<Song> {
-        if (loggedIn && cookie != null) {
-            if (!dailyAccountSongs.isNullOrEmpty()) {
-                return dailyAccountSongs
+        if (homepageBlocks != null) {
+            val styleSongs = NeteaseJson.parseHomepageStyleSongs(homepageBlocks)
+            if (styleSongs.isNotEmpty()) {
+                return styleSongs.take(PERSONALIZED_SONG_LIMIT)
             }
-            val accountSongs = try {
-                fetchDailySongs(cookie)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                emptyList()
-            }
-            if (accountSongs.isNotEmpty()) return accountSongs
         }
         return NeteaseJson.parsePersonalizedSongs(
             requestOk(
@@ -187,7 +208,7 @@ class LocalMusicRepository(private val context: Context) : MusicRepository {
                     cookie?.let { put("cookie", it) }
                 },
             ),
-        )
+        ).take(PERSONALIZED_SONG_LIMIT)
     }
 
     private suspend fun fetchDailySongs(cookie: String): List<Song> =
@@ -375,7 +396,7 @@ class LocalMusicRepository(private val context: Context) : MusicRepository {
         }
     }
 
-    override suspend fun defaultKeyword(): String? = withContext(Dispatchers.IO) {
+    override suspend fun defaultKeyword(): DefaultSearchKeyword? = withContext(Dispatchers.IO) {
         guarded {
             val cookie = cookieOrNull()
             val parameters = buildJsonObject {
@@ -481,11 +502,16 @@ class LocalMusicRepository(private val context: Context) : MusicRepository {
     override suspend fun streamUrls(
         ids: List<Long>,
         quality: AudioQuality,
+        immerseType: ImmerseType?,
+        unblock: Boolean,
     ): Map<Long, String?> = withContext(Dispatchers.IO) {
         guarded {
             val requested = ids.filter { it > 0 }.distinct()
             if (requested.isEmpty()) return@guarded emptyMap()
-            val cookie = cookieOrNull()
+            var cookie = cookieOrNull()
+            if (quality == AudioQuality.Dolby) {
+                cookie = if (cookie.isNullOrBlank()) "os=pc" else if (!cookie.contains("os=")) "$cookie; os=pc" else cookie
+            }
             val resolved = LinkedHashMap<Long, String?>()
             for (chunk in requested.chunked(MAX_BATCH)) {
                 val body = requestOk(
@@ -493,6 +519,12 @@ class LocalMusicRepository(private val context: Context) : MusicRepository {
                     buildJsonObject {
                         put("id", chunk.joinToString(","))
                         put("level", quality.value)
+                        if (quality == AudioQuality.Sky && immerseType != null) {
+                            put("immerseType", immerseType.value)
+                        }
+                        if (unblock) {
+                            put("unblock", true)
+                        }
                         cookie?.let { put("cookie", it) }
                     },
                 )
@@ -567,18 +599,57 @@ class LocalMusicRepository(private val context: Context) : MusicRepository {
 
     override suspend fun accountStats(): AccountStats = withContext(Dispatchers.IO) {
         guarded {
-            val (cookie, _) = loginIdentity()
+            val (cookie, profile) = loginIdentity()
             val parameters = buildJsonObject { put("cookie", cookie) }
-            coroutineScope {
-                val accountJob = async { attempt { requestOk(LocalApiEndpoint.UserAccount, parameters) } }
-                val subcountJob = async { attempt { requestOk(LocalApiEndpoint.UserSubcount, parameters) } }
-                val account = accountJob.await()
-                val subcount = subcountJob.await()
-                if (account.isFailure && subcount.isFailure) {
-                    throw (account.exceptionOrNull() ?: subcount.exceptionOrNull()!!)
-                }
-                NeteaseJson.parseAccountStats(subcount.getOrNull(), account.getOrNull())
+            val detailParameters = buildJsonObject {
+                put("uid", profile.id.toString())
+                put("cookie", cookie)
             }
+            coroutineScope {
+                val detailJob = async { attempt { requestOk(LocalApiEndpoint.UserDetail, detailParameters) } }
+                val subcountJob = async { attempt { requestOk(LocalApiEndpoint.UserSubcount, parameters) } }
+                val levelJob = async { attempt { requestOk(LocalApiEndpoint.UserLevel, parameters) } }
+                val listenTotalJob = async { attempt { requestOk(LocalApiEndpoint.ListenDataTotal, parameters) } }
+                val accountJob = async { attempt { requestOk(LocalApiEndpoint.UserAccount, parameters) } }
+
+                val detail = detailJob.await()
+                val subcount = subcountJob.await()
+                val level = levelJob.await()
+                val listenTotal = listenTotalJob.await()
+                val account = accountJob.await()
+
+                if (detail.isFailure && subcount.isFailure && account.isFailure) {
+                    throw (detail.exceptionOrNull() ?: subcount.exceptionOrNull() ?: account.exceptionOrNull()!!)
+                }
+                NeteaseJson.parseAccountStats(
+                    subcountBody = subcount.getOrNull(),
+                    accountBody = account.getOrNull(),
+                    detailBody = detail.getOrNull(),
+                    levelBody = level.getOrNull(),
+                    listenTotalBody = listenTotal.getOrNull(),
+                )
+            }
+        }
+    }
+
+    override suspend fun intelligenceList(
+        songId: Long,
+        playlistId: Long,
+        startSongId: Long?,
+    ): List<Song> = withContext(Dispatchers.IO) {
+        guarded {
+            require(songId > 0) { "A positive song id is required." }
+            require(playlistId > 0) { "A positive playlist id is required." }
+            val cookie = cookieOrNull()
+            val parameters = buildJsonObject {
+                put("id", songId.toString())
+                put("pid", playlistId.toString())
+                startSongId?.takeIf { it > 0 }?.let { put("sid", it.toString()) }
+                put("count", 20)
+                cookie?.let { put("cookie", it) }
+            }
+            val body = requestOk(LocalApiEndpoint.PlaymodeIntelligence, parameters)
+            NeteaseJson.parseIntelligenceList(body)
         }
     }
 
@@ -676,7 +747,8 @@ class LocalMusicRepository(private val context: Context) : MusicRepository {
         guarded {
             val cookie = cookieOrNull()
             val loggedIn = cookie != null && session.value != null
-            fetchPersonalizedSongs(cookie, loggedIn)
+            val homepage = runCatching { fetchHomepageBlocks(cookie) }.getOrNull()
+            fetchPersonalizedSongs(cookie, loggedIn, homepage)
         }
     }
 
@@ -711,6 +783,149 @@ class LocalMusicRepository(private val context: Context) : MusicRepository {
                 },
             )
             subscribed
+        }
+    }
+
+    override suspend fun getFreeListenRights(): FreeListenRights = withContext(Dispatchers.IO) {
+        guarded {
+            var cookie = cookieOrNull()
+            if (cookie.isNullOrBlank() && session.value == null) {
+                // If unlogged and no guest cookie registered yet, obtain and persist one
+                runCatching {
+                    val guest = request(LocalApiEndpoint.GuestLogin)
+                    val guestCookie = guest.string("cookie")
+                    if (!guestCookie.isNullOrBlank()) {
+                        sessionStore.saveAnonymousCookie(guestCookie)
+                        cookie = guestCookie
+                    }
+                }
+            }
+            val parameters = buildJsonObject {
+                cookie?.takeIf { it.isNotBlank() }?.let { put("cookie", it) }
+            }
+            val response = request(LocalApiEndpoint.AdListeningRights, parameters)
+            NeteaseJson.parseFreeListenRights(response)
+        }
+    }
+
+    override suspend fun claimFreeListen(): FreeListenClaimResult = withContext(Dispatchers.IO) {
+        guarded {
+            var cookie = cookieOrNull()
+            if (cookie.isNullOrBlank()) {
+                // Try anonymous/guest registration if no active user session
+                val guest = request(LocalApiEndpoint.GuestLogin)
+                val guestCookie = guest.string("cookie")
+                if (!guestCookie.isNullOrBlank()) {
+                    sessionStore.saveAnonymousCookie(guestCookie)
+                    cookie = guestCookie
+                }
+            }
+
+            // Step 1: Pre-fetch anti-cheat token (best-effort)
+            runCatching {
+                request(
+                    LocalApiEndpoint.RegisterCheckToken,
+                    buildJsonObject { put("refresh", true) },
+                )
+            }
+
+            // Step 2 & 3: Claim listening rights (automatically fetches ad and reqId if omitted)
+            val parameters = buildJsonObject {
+                cookie?.takeIf { it.isNotBlank() }?.let { put("cookie", it) }
+            }
+            var response = request(LocalApiEndpoint.AdListeningRightsGain, parameters)
+            var code = response.int("code") ?: 200
+
+            // If unlogged and existing guest token expired or invalid (301), refresh guest token and retry once
+            if (session.value == null && code == 301) {
+                val guest = request(LocalApiEndpoint.GuestLogin)
+                val newGuestCookie = guest.string("cookie")
+                if (!newGuestCookie.isNullOrBlank()) {
+                    sessionStore.saveAnonymousCookie(newGuestCookie)
+                    cookie = newGuestCookie
+                    runCatching {
+                        request(
+                            LocalApiEndpoint.RegisterCheckToken,
+                            buildJsonObject { put("refresh", true) },
+                        )
+                    }
+                    response = request(
+                        LocalApiEndpoint.AdListeningRightsGain,
+                        buildJsonObject { put("cookie", newGuestCookie) },
+                    )
+                    code = response.int("code") ?: 200
+                }
+            }
+
+            if (code == 301 || (code != 200 && cookie == null)) {
+                throw MusicRepositoryException(Kind.Service, "请先登录网易云账号后再领取免费听歌时长。")
+            }
+            val result = NeteaseJson.parseFreeListenClaim(response)
+            if (!result.success && cookie == null) {
+                throw MusicRepositoryException(Kind.Service, "游客领取失败，请先登录网易云账号后再试。")
+            }
+            result
+        }
+    }
+
+    override suspend fun scrobble(
+        songId: Long,
+        timeSeconds: Int,
+        totalSeconds: Int?,
+        sourceId: Long?,
+        source: String,
+        songName: String?,
+        artistName: String?,
+        level: AudioQuality?,
+    ): Boolean = withContext(Dispatchers.IO) {
+        guarded {
+            require(songId > 0 && timeSeconds > 0) { "A positive song ID and positive played time are required." }
+            val cookie = cookieOrNull()
+            try {
+                val result = api().scrobbleV1(
+                    id = songId,
+                    time = timeSeconds,
+                    total = totalSeconds,
+                    sourceId = sourceId,
+                    source = source,
+                    name = songName,
+                    artist = artistName,
+                    level = level,
+                    vip = (session.value?.vipLevel ?: 0) > 0,
+                    cookie = cookie,
+                )
+                result["code"]?.jsonPrimitive?.content == "200"
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                val fallback = api().scrobble(
+                    id = songId,
+                    sourceId = sourceId,
+                    time = timeSeconds,
+                    cookie = cookie,
+                )
+                fallback["code"]?.jsonPrimitive?.content == "200"
+            }
+        }
+    }
+
+    override suspend fun submitPlayState(
+        songId: Long,
+        sessionId: String?,
+        progressSeconds: Int,
+        playMode: String,
+    ): Boolean = withContext(Dispatchers.IO) {
+        guarded {
+            require(songId > 0) { "A positive song ID is required." }
+            val cookie = cookieOrNull()
+            val result = api().relayPlayStateSubmit(
+                id = songId,
+                sessionId = sessionId,
+                progress = progressSeconds,
+                playMode = playMode,
+                cookie = cookie,
+            )
+            result["code"]?.jsonPrimitive?.content == "200"
         }
     }
 
@@ -756,7 +971,7 @@ class LocalMusicRepository(private val context: Context) : MusicRepository {
 
     private suspend fun loginIdentity(): Pair<String, AccountProfile> {
         val profile = session.value
-        val cookie = sessionStore.cookie()
+        val cookie = sessionStore.accountCookie()
         if (profile == null || cookie == null) {
             throw MusicRepositoryException(Kind.Service, "请先登录网易云账号后再使用此功能。")
         }

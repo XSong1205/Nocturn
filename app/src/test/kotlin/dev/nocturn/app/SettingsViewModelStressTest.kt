@@ -6,6 +6,7 @@ import dev.nocturn.app.data.model.AccountProfile
 import dev.nocturn.app.data.model.AccountStats
 import dev.nocturn.app.data.model.AlbumDetail
 import dev.nocturn.app.data.model.ArtistDetail
+import dev.nocturn.app.data.model.DefaultSearchKeyword
 import dev.nocturn.app.data.model.HomeFeed
 import dev.nocturn.app.data.model.Lyrics
 import dev.nocturn.app.data.model.PlaylistDetail
@@ -153,11 +154,16 @@ class SettingsViewModelStressTest {
         override suspend fun searchArtists(keyword: String, offset: Int, limit: Int): SearchArtistsPage = error("Not needed")
         override suspend fun searchSuggestions(keyword: String): List<String> = emptyList()
         override suspend fun hotSearches(): List<String> = emptyList()
-        override suspend fun defaultKeyword(): String? = null
+        override suspend fun defaultKeyword(): DefaultSearchKeyword? = null
         override suspend fun albumDetail(id: Long): AlbumDetail = error("Not needed")
         override suspend fun artistDetail(id: Long): ArtistDetail = error("Not needed")
         override suspend fun lyrics(songId: Long): Lyrics = error("Not needed")
-        override suspend fun streamUrls(ids: List<Long>, quality: AudioQuality): Map<Long, String?> = emptyMap()
+        override suspend fun streamUrls(
+            ids: List<Long>,
+            quality: AudioQuality,
+            immerseType: dev.nocturn.localapi.client.ImmerseType?,
+            unblock: Boolean,
+        ): Map<Long, String?> = emptyMap()
         override suspend fun createQrChallenge(): QrChallenge = error("Not needed")
         override suspend fun pollQrLogin(key: String): QrPollResult = error("Not needed")
         override suspend fun sendLoginCode(phone: String, countryCode: String) {}
@@ -174,6 +180,8 @@ class SettingsViewModelStressTest {
         override suspend fun personalizedSongs(): List<Song> = emptyList()
         override suspend fun recentSongs(): List<Song> = emptyList()
         override suspend fun setPlaylistSubscribed(playlistId: Long, subscribed: Boolean): Boolean = false
+        override suspend fun getFreeListenRights(): dev.nocturn.app.data.model.FreeListenRights = dev.nocturn.app.data.model.FreeListenRights()
+        override suspend fun claimFreeListen(): dev.nocturn.app.data.model.FreeListenClaimResult = dev.nocturn.app.data.model.FreeListenClaimResult(true, "ok")
         override fun close() {}
     }
 

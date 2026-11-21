@@ -37,6 +37,13 @@ import top.yukonga.miuix.kmp.blur.textureBlur
 val blurAvailable: Boolean = isRuntimeShaderSupported()
 
 /**
+ * Whether the platform is a legacy Android version (Android 9 / Pie or lower, API < 29).
+ * On legacy platforms, transparency and blur effects are completely disabled to guarantee
+ * smooth rendering on low-end hardware without GPU overdraw.
+ */
+val isLegacyPlatform: Boolean = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
+
+/**
  * The shell's captured page layer. Chrome that floats over the routed screens (status bar band,
  * bottom chrome, mini player) blurs this. `null` outside the shell or when [blurAvailable] is false,
  * so standalone renders and older devices take the opaque fallback.
@@ -109,7 +116,7 @@ object GlassMaterials {
                     blendColors = listOf(BlendColorEntry(base.copy(alpha = if (dark) 0.66f else 0.62f))),
                     saturation = if (dark) 1.3f else 1.6f,
                 ),
-                fallback = base.copy(alpha = 0.96f),
+                fallback = if (isLegacyPlatform) base else base.copy(alpha = 0.96f),
             )
         }
     }

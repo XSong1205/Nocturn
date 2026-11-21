@@ -107,7 +107,7 @@
 
 | 路径或章节 | 变化 | 当前 LocalAPI 影响 |
 | --- | --- | --- |
-| `/song/url/v1` | 新增 `vivid=臻音全景声`，`jyeffect` 更名“高清臻音”；新增 `immerseType=c512/ste2/aac2/c51/ste/aac`，只对 `level=sky` 生效，默认 `c51` | 当前九档枚举及参数白名单未开放 `vivid/immerseType`；安装的 4.41.1 模块已支持 |
+| `/song/url/v1` | 新增 `vivid=臻音全景声`，`jyeffect` 更名“高清臻音”；新增 `immerseType=c512/ste2/aac2/c51/ste/aac`，只对 `level=sky` 生效，默认 `c51`；新增 `unblock` 解锁支持 | 已对齐全栈支持：Node 白名单、类型归一化、Dolby os=pc 注入、Kotlin AudioQuality/ImmerseType 枚举与 Android 设置界面 |
 | `/login/cellphone` | 新增 `sca` 滑块验证 Token；验证码来源增加 `/captcha/sent/v1` | 当前未暴露 `sca`，上游源码将其映射为 `secureCaptcha`；旧短信接口仍可保留 |
 | `/playlist/subscribe` | 删除“必须传 timestamp”的专属警告 | 通用 HTTP 缓存／POST 时间戳说明仍保留；本地直接调用模块的协议无需照搬 HTTP 缓存参数 |
 | `/song/music/detail` | 更新音质名称，并明确杜比、臻音全景声等详情 | 原始 JSON 返回方式兼容；文档中的九档描述需要更正 |

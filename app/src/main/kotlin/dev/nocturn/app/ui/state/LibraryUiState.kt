@@ -2,6 +2,8 @@ package dev.nocturn.app.ui.state
 
 import dev.nocturn.app.data.model.AccountProfile
 import dev.nocturn.app.data.model.AccountStats
+import dev.nocturn.app.data.model.ColorSchemeKey
+import dev.nocturn.app.data.model.DynamicVariant
 import dev.nocturn.app.data.model.PlaylistSummary
 import dev.nocturn.app.data.model.QrChallenge
 import dev.nocturn.app.data.model.QrLoginState
@@ -36,6 +38,9 @@ data class LibraryUiState(
     val nowPlayingSongId: Long? = null,
     val quality: AudioQuality = AudioQuality.Exhigh,
     val themeMode: ThemeMode = ThemeMode.System,
+    val colorSchemeKey: ColorSchemeKey = ColorSchemeKey.M3eDynamic,
+    val customSeedColor: Long = 0xFF6750A4L,
+    val dynamicVariant: DynamicVariant = DynamicVariant.Expressive,
     val dynamicColor: Boolean = true,
     val hapticsEnabled: Boolean = true,
     val lyriconEnabled: Boolean = true,

@@ -37,4 +37,34 @@ class NavStateTest {
         assertFalse(Screen.LikedSongs.isTabRoot)
         assertFalse(Screen.Playlist(7).isTabRoot)
     }
+
+    @Test
+    fun multipleBackstacksPreservePerTabHistory() {
+        var nav = NavState(tab = AppTab.Library)
+        nav = nav.copy(stack = listOf(Screen.LikedSongs))
+        assertEquals(Screen.LikedSongs, nav.current)
+
+        // Switch to Search and push Album(42)
+        nav = nav.copy(tab = AppTab.Search)
+        assertTrue(nav.isTabRoot)
+        assertEquals(Screen.Search, nav.current)
+
+        nav = nav.copy(stack = listOf(Screen.Album(42)))
+        assertEquals(Screen.Album(42), nav.current)
+
+        // Switch back to Library - LikedSongs is preserved!
+        nav = nav.copy(tab = AppTab.Library)
+        assertFalse(nav.isTabRoot)
+        assertEquals(Screen.LikedSongs, nav.current)
+        assertEquals(listOf(Screen.LikedSongs), nav.stack)
+
+        // Switch back to Search - Album(42) is preserved!
+        nav = nav.copy(tab = AppTab.Search)
+        assertFalse(nav.isTabRoot)
+        assertEquals(Screen.Album(42), nav.current)
+        assertEquals(listOf(Screen.Album(42)), nav.stack)
+
+        // allScreens retains screens from both tabs
+        assertEquals(setOf(Screen.LikedSongs, Screen.Album(42)), nav.allScreens.toSet())
+    }
 }

@@ -11,8 +11,10 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import dev.nocturn.app.data.model.FreeListenRights
 import dev.nocturn.app.data.model.Song
 import dev.nocturn.app.data.model.ThemeMode
+import dev.nocturn.app.ui.components.FreeListenDialog
 import dev.nocturn.app.ui.preview.PreviewData
 import dev.nocturn.app.ui.screens.home.DailySongsScreen
 import dev.nocturn.app.ui.screens.home.HomeScreen
@@ -59,14 +61,76 @@ class DiscoverScreensTest {
 
         compose.onNodeWithTag("home-greeting").assertExists()
         compose.onNodeWithText("晚上好").assertExists()
-        // Daily recommendations are a single hero card, followed by one card per chart.
+        // Top banner retains daily, radar, and roaming hero cards.
         compose.onNodeWithTag("home-hero-daily").assertExists()
+        compose.onNodeWithTag("home-hero-radar").assertExists()
+        compose.onNodeWithTag("home-hero-roaming").assertExists()
+
+        // Charts are rendered in their own dedicated section further down.
+        compose.onNodeWithTag("home-feed").performScrollToNode(hasTestTag("home-charts-row"))
         compose.onNodeWithTag("home-hero-chart-${PreviewData.charts.first().id}").assertExists()
 
         // The editorial banner row was removed: the feed ends with the recommended playlists.
         compose.onNodeWithTag("home-feed").performScrollToNode(hasTestTag("home-playlists"))
         compose.onNodeWithTag("home-banner").assertDoesNotExist()
         compose.onNodeWithText("编辑精选").assertDoesNotExist()
+    }
+
+    @Test
+    fun homeFreeListenButtonShowsForNonVip() {
+        var clicked = false
+        setScreen {
+            HomeScreen(
+                state = PreviewData.homeState.copy(isVip = false),
+                onFreeListenClick = { clicked = true },
+            )
+        }
+        compose.onNodeWithTag("home-free-listen").assertExists().performClick()
+        assertTrue(clicked)
+    }
+
+    @Test
+    fun homeFreeListenButtonHidesForVip() {
+        setScreen {
+            HomeScreen(
+                state = PreviewData.homeState.copy(isVip = true),
+            )
+        }
+        compose.onNodeWithTag("home-free-listen").assertDoesNotExist()
+    }
+
+    @Test
+    fun freeListenDialogInteractionsWork() {
+        var claimed = false
+        var autoClaimChecked = false
+        var dismissed = false
+
+        setScreen {
+            FreeListenDialog(
+                visible = true,
+                rights = FreeListenRights(
+                    remainingMs = 1800000L,
+                    title = "免费听时长剩余",
+                    vipInfoContent = "已解锁今日时长",
+                    actionTitle = "领取30分钟",
+                ),
+                isLoading = false,
+                autoClaim = false,
+                onAutoClaimChange = { autoClaimChecked = it },
+                onClaim = { claimed = true },
+                onDismiss = { dismissed = true },
+            )
+        }
+
+        compose.onNodeWithTag("free-listen-dialog").assertExists()
+        compose.onNodeWithTag("free-listen-claim-button").performClick()
+        assertTrue(claimed)
+
+        compose.onNodeWithTag("free-listen-autoclaim-checkbox").performClick()
+        assertTrue(autoClaimChecked)
+
+        compose.onNodeWithTag("free-listen-dismiss-button").performClick()
+        assertTrue(dismissed)
     }
 
     @Test
@@ -112,9 +176,33 @@ class DiscoverScreensTest {
             )
         }
 
+        compose.onNodeWithTag("home-feed").performScrollToNode(hasTestTag("home-charts-row"))
         compose.onNodeWithTag("home-hero-chart-${chart.id}").performClick()
 
         compose.runOnIdle { assertEquals(chart.id, clicked) }
+    }
+
+    @Test
+    fun homeRadarAndRoamingCardsWork() {
+        var clickedPlaylist: Long? = null
+        var playedPlaylist: Long? = null
+        var roamingClicked = false
+        setScreen {
+            HomeScreen(
+                state = PreviewData.homeState,
+                onPlaylistClick = { clickedPlaylist = it },
+                onPlayPlaylist = { playedPlaylist = it },
+                onRoamingClick = { roamingClicked = true },
+            )
+        }
+
+        compose.onNodeWithTag("home-hero-radar").assertExists().performClick()
+        compose.onNodeWithTag("home-hero-roaming").assertExists().performClick()
+
+        compose.runOnIdle {
+            assertEquals(PreviewData.radarPlaylist.id, clickedPlaylist)
+            assertTrue(roamingClicked)
+        }
     }
 
     @Test

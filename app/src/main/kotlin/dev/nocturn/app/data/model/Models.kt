@@ -57,6 +57,7 @@ data class PlaylistSummary(
     val creatorName: String? = null,
     val description: String? = null,
     val updateFrequency: String? = null,
+    val specialType: Int = 0,
 )
 
 data class PlaylistDetail(
@@ -169,11 +170,17 @@ data class SearchArtistsPage(
     val hasMore: Boolean,
 )
 
+data class DefaultSearchKeyword(
+    val keyword: String,
+    val display: String = keyword,
+)
+
 data class HomeFeed(
     val playlists: List<PlaylistSummary> = emptyList(),
     val charts: List<Toplist> = emptyList(),
     val dailySongs: List<Song> = emptyList(),
     val personalizedSongs: List<Song> = emptyList(),
+    val radarPlaylist: PlaylistSummary? = null,
     val isLoggedIn: Boolean = false,
 )
 
@@ -233,6 +240,9 @@ data class AccountStats(
     val playlistCount: Int = 0,
     val followingCount: Int = 0,
     val followerCount: Int = 0,
+    val level: Int = 0,
+    val listenSongs: Long = 0,
+    val listenHours: Int = 0,
 )
 
 enum class QrLoginState { WaitingForScan, WaitingForConfirmation, Authorized, Expired, Rejected }
@@ -245,4 +255,24 @@ data class QrChallenge(
 data class QrPollResult(
     val state: QrLoginState,
     val profile: AccountProfile? = null,
+)
+
+data class FreeListenRights(
+    val remainingMs: Long = 0,
+    val endTimeMs: Long = 0,
+    val coverToday: Boolean = false,
+    val upperLimit: Boolean = false,
+    val status: String = "",
+    val title: String = "免费听时长剩余",
+    val vipInfoContent: String = "",
+    val actionTitle: String = "领取30分钟",
+) {
+    val isUnlocked: Boolean get() = remainingMs > 0
+}
+
+data class FreeListenClaimResult(
+    val success: Boolean,
+    val message: String,
+    val durationMs: Long = 0,
+    val upperLimit: Boolean = false,
 )

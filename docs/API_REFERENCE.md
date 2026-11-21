@@ -27,7 +27,7 @@
 
 文档说明 `/login/refresh` **不支持刷新二维码登录的 Cookie**，因此宿主应用不能假定所有会话都能通过 refresh 续期。
 
-游客接口为 `/register/anonimous`（上游路径使用此拼写），可获取游客 Cookie。手机号登录使用 `/captcha/sent`、`/captcha/verify`、`/login/cellphone`；`login/cellphone` 的 `captcha` 与 `password` 必须二选一，发送短信需要由用户操作触发。
+游客接口为 `/register/anonimous`（上游路径使用此拼写），可获取游客 Cookie。手机号登录使用 `/captcha/sent/v1`（新版，默认发送验证码路径）、`/captcha/sent`（旧版兼容）、`/captcha/verify`、`/login/cellphone`；`login/cellphone` 的 `captcha` 与 `password` 必须二选一，发送短信需要由用户操作触发。
 
 已封装二维码三接口、登录状态和退出，以及游客登录、刷新、短信验证码发送／验证／登录、手机号密码登录、`/user/account`、`/user/subcount`。短信方式需要显式调用。Android 默认 HTTP 引擎禁用连接失败自动重试，避免重复提交登录、短信和收藏操作。
 
@@ -43,14 +43,14 @@
 | `/search/default` | 默认关键词 | 已封装 |
 | `/search/hot/detail` | 详细热搜 | 已封装 |
 | `/song/detail` | `ids` 支持逗号分隔多个 ID | 已封装，客户端每批最多 200 个 |
-| `/song/url/v1` | `id`、`level`；支持多个 ID | 已支持 1–200 个 ID；Kotlin 使用字符串传输 ID，避免 JS 精度损失 |
+| `/song/url/v1` | `id`、`level`、可选 `immerseType` 与 `unblock`；支持多个 ID | 已支持 1–200 个 ID；Kotlin 使用字符串传输 ID；已完整支持十档音质（包含 `vivid`）、沉浸声类型 `immerseType`、第三方解锁 `unblock` 以及杜比音质时自动附加 `os=pc` Cookie |
 | `/check/music` | `id` 与可选码率 `br`，返回可用性结果 | 已封装 |
 | `/song/music/detail` | 各种音质的文件参数 | 已封装 |
 | `/song/download/url/v1` | 下载链接，与试听链接接口不同 | 尚未封装，下载功能留后续阶段 |
 
-最新文档列出十档音质：`standard`、`higher`、`exhigh`、`lossless`、`hires`、`jyeffect`、`dolby`、`vivid`、`jymaster`、`sky`，其中 `vivid` 为臻音全景声，`jyeffect` 更名高清臻音。文档还新增仅对 `level=sky` 生效的 `immerseType=c512/ste2/aac2/c51/ste/aac`，默认 `c51`。Dolby 仍涉及设备能力和 Cookie 中的 `os=pc`；不能只按用户选择的最高音质判断实际可用性。
+最新文档列出十档音质：`standard`、`higher`、`exhigh`、`lossless`、`hires`、`jyeffect`（高清臻音）、`dolby`（杜比全景声）、`vivid`（臻音全景声）、`jymaster`（超清母带）、`sky`（沉浸环绕声）。文档还新增仅对 `level=sky` 生效的 `immerseType=c512/ste2/aac2/c51/ste/aac`，默认 `c51`，以及 `unblock` 歌曲解锁支持。Dolby 涉及设备能力和 Cookie 中的 `os=pc`，LocalAPI 适配层在 `level=dolby` 时自动注入；`vivid` 音质由上游模块配置为 `os=android, appver=9.5.61`。
 
-当前 Kotlin `AudioQuality` 与 Node 白名单仍为上次文档的九档，尚未开放 `vivid` 和 `immerseType`。锁定 4.41.1 的上游模块已经支持二者，因此这是本次重抓发现的现有契约缺口。已有离线测试覆盖当前枚举，在线批量 URL 测试使用 standard；尚不能将这些测试解读为已覆盖最新十档约定。
+当前全栈（Node 适配层、Kotlin KMP 客户端、Android UI 与设置）已完整支持全部十档音质、`immerseType` 偏好与 `unblock` 歌曲解锁控制。各端参数白名单与离线/在线测试均已严格校验。
 
 搜索类型白名单已加入综合搜索 `1018`。共享 `Song` 模型统一 `artists/album/duration` 与 `ar/al/dt` 等字段，`searchSongPage` 返回类型化分页数据。原有 `searchSongs` 保留旧 search 调用行为。
 

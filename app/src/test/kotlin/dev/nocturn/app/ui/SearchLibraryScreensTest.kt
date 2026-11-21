@@ -18,6 +18,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performScrollToNode
 import dev.nocturn.app.data.model.ArtistSummary
+import dev.nocturn.app.data.model.DefaultSearchKeyword
 import dev.nocturn.app.data.model.QrLoginState
 import dev.nocturn.app.data.model.Song
 import dev.nocturn.app.data.model.ThemeMode
@@ -102,8 +103,24 @@ class SearchLibraryScreensTest {
         assertTrue(compose.onAllNodesWithTag("search-history").fetchSemanticsNodes().isNotEmpty())
         compose.onNodeWithText("热门搜索").assertExists()
         compose.onNodeWithText("搜索历史").assertExists()
-        compose.onNodeWithTag("search-default-keyword").assertExists()
+        compose.onNodeWithTag("search-default-keyword").assertDoesNotExist()
         compose.onNodeWithTag("search-clear-history").assertExists()
+    }
+
+    @Test
+    fun defaultKeywordCardDoesNotExistInExpandedSearch() {
+        setScreen {
+            SearchScreen(
+                state = PreviewData.searchIdle.copy(
+                    expanded = true,
+                    defaultKeyword = DefaultSearchKeyword(keyword = "全息恋人", display = "🔥大家都在搜 全息恋人"),
+                ),
+            )
+        }
+        compose.waitForIdle()
+
+        compose.onNodeWithTag("search-default-keyword").assertDoesNotExist()
+        assertTrue(compose.onAllNodesWithText("热门搜索").fetchSemanticsNodes().isNotEmpty())
     }
 
     @Test
@@ -162,13 +179,16 @@ class SearchLibraryScreensTest {
         var searched = ""
         setScreen {
             SearchScreen(
-                state = PreviewData.searchIdle.copy(defaultKeyword = "晴天", query = ""),
+                state = PreviewData.searchIdle.copy(
+                    defaultKeyword = DefaultSearchKeyword(keyword = "晴天", display = "🔥大家都在搜 晴天"),
+                    query = "",
+                ),
                 onSearch = { searched = it },
             )
         }
         compose.waitForIdle()
 
-        assertTrue(compose.onAllNodesWithText("晴天").fetchSemanticsNodes().isNotEmpty())
+        assertTrue(compose.onAllNodesWithText("🔥大家都在搜 晴天").fetchSemanticsNodes().isNotEmpty())
         compose.onNodeWithTag("search-input").performImeAction()
         compose.waitForIdle()
         assertEquals("晴天", searched)

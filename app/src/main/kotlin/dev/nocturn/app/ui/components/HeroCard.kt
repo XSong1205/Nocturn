@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListLayoutInfo
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -64,6 +65,7 @@ fun HeroCard(
             seed = seed,
             shape = RectangleShape,
             contentDescription = null,
+            placeholderIcon = Icons.Rounded.GraphicEq,
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {

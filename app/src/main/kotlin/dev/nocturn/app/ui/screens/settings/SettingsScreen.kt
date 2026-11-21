@@ -13,16 +13,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Headphones
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.TouchApp
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Headphones
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Storage
+import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -77,13 +78,18 @@ fun SettingsScreen(
             }
         },
     ) { topPadding ->
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxSize()
-                .testTag("settings-screen"),
-            contentPadding = PaddingValues(top = topPadding + 4.dp, bottom = bottomContentPadding()),
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.TopCenter,
         ) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .widthIn(max = 840.dp)
+                    .testTag("settings-screen"),
+                contentPadding = PaddingValues(top = topPadding + 4.dp, bottom = bottomContentPadding()),
+            ) {
             item(key = "hero") {
                 SettingsHero(
                     title = "设置",
@@ -93,7 +99,7 @@ fun SettingsScreen(
 
             item(key = "menu-playback") {
                 SettingsMenuItemCard(
-                    icon = Icons.Filled.Headphones,
+                    icon = Icons.Rounded.Headphones,
                     iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
                     iconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                     title = "播放与音质",
@@ -105,11 +111,11 @@ fun SettingsScreen(
 
             item(key = "menu-appearance") {
                 SettingsMenuItemCard(
-                    icon = Icons.Filled.Palette,
+                    icon = Icons.Rounded.Palette,
                     iconContainerColor = MaterialTheme.colorScheme.secondaryContainer,
                     iconContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    title = "外观与显示",
-                    subtitle = "主题（${state.themeMode.displayName()}）、动态取色",
+                    title = "个性化",
+                    subtitle = "主题（${state.themeMode.displayName()}）、色彩方案（${state.colorSchemeKey.displayName()}）",
                     testTag = "settings-menu-appearance",
                     onClick = onNavigateAppearance,
                 )
@@ -117,7 +123,7 @@ fun SettingsScreen(
 
             item(key = "menu-general") {
                 SettingsMenuItemCard(
-                    icon = Icons.Filled.TouchApp,
+                    icon = Icons.Rounded.TouchApp,
                     iconContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
                     iconContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
                     title = "通用与交互",
@@ -129,7 +135,7 @@ fun SettingsScreen(
 
             item(key = "menu-storage") {
                 SettingsMenuItemCard(
-                    icon = Icons.Filled.Storage,
+                    icon = Icons.Rounded.Storage,
                     iconContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                     iconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     title = "存储与缓存",
@@ -141,7 +147,7 @@ fun SettingsScreen(
 
             item(key = "menu-about") {
                 SettingsMenuItemCard(
-                    icon = Icons.Filled.Info,
+                    icon = Icons.Rounded.Info,
                     iconContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                     iconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     title = "关于",
@@ -152,6 +158,7 @@ fun SettingsScreen(
             }
         }
     }
+}
 }
 
 @Composable
@@ -238,7 +245,7 @@ internal fun SettingsMenuItemCard(
                 )
             }
             Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )

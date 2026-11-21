@@ -2,6 +2,7 @@ package dev.nocturn.app.ui.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,8 +13,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PageSize
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -46,24 +49,40 @@ fun SongGridPager(
 ) {
     val pages = remember(songs, rows) { songs.chunked(rows) }
     val pagerState = rememberPagerState { pages.size }
-    HorizontalPager(
-        state = pagerState,
-        modifier = modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(start = 16.dp, end = 44.dp),
-        pageSpacing = 12.dp,
-        verticalAlignment = Alignment.Top,
-    ) { page ->
-        Column(
-            modifier = Modifier.height(TileHeight * rows + TileGap * (rows - 1)),
-            verticalArrangement = Arrangement.spacedBy(TileGap),
-        ) {
-            pages[page].forEach { song ->
-                SongTile(
-                    song = song,
-                    onClick = { onSongClick(song) },
-                    playing = song.id == nowPlayingSongId,
-                    modifier = Modifier.testTag("song-tile-${song.id}"),
-                )
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val isWide = maxWidth >= 600.dp
+        val pageSize = if (maxWidth >= 840.dp) {
+            PageSize.Fixed(320.dp)
+        } else if (maxWidth >= 600.dp) {
+            PageSize.Fixed(280.dp)
+        } else {
+            PageSize.Fill
+        }
+        val contentPadding = if (isWide) {
+            PaddingValues(horizontal = 20.dp)
+        } else {
+            PaddingValues(start = 16.dp, end = 44.dp)
+        }
+        HorizontalPager(
+            state = pagerState,
+            pageSize = pageSize,
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = contentPadding,
+            pageSpacing = if (isWide) 16.dp else 12.dp,
+            verticalAlignment = Alignment.Top,
+        ) { page ->
+            Column(
+                modifier = Modifier.height(TileHeight * rows + TileGap * (rows - 1)),
+                verticalArrangement = Arrangement.spacedBy(TileGap),
+            ) {
+                pages[page].forEach { song ->
+                    SongTile(
+                        song = song,
+                        onClick = { onSongClick(song) },
+                        playing = song.id == nowPlayingSongId,
+                        modifier = Modifier.testTag("song-tile-${song.id}"),
+                    )
+                }
             }
         }
     }
@@ -96,6 +115,7 @@ fun SongTile(
             shape = MaterialTheme.shapes.small,
             seed = song.id.hashCode(),
             contentDescription = null,
+            placeholderIcon = Icons.Rounded.MusicNote,
         )
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {

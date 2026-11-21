@@ -116,6 +116,17 @@ class PlayerScreensTest {
     }
 
     @Test
+    fun playbackModeButtonDispatchesCallback() {
+        var cycleModeCount = 0
+        setPlayer(
+            onCycleRepeat = { cycleModeCount++ },
+        )
+
+        compose.onNodeWithTag("player-mode").performClick()
+        assertEquals(1, cycleModeCount)
+    }
+
+    @Test
     fun lyricsToggleShowsCurrentSyncedLine() {
         setPlayer()
 

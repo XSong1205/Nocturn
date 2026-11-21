@@ -25,12 +25,38 @@ class MusicDataTest {
             assertEquals("song/url/v1", route)
             assertEquals("9223372036854775807,347230", body["id"]?.jsonPrimitive?.content)
             assertTrue(body["id"]!!.jsonPrimitive.isString)
-            assertEquals("MUSIC_U=session", body["cookie"]?.jsonPrimitive?.content)
+            if (body["level"]?.jsonPrimitive?.content == "dolby") {
+                assertEquals("MUSIC_U=session; os=pc", body["cookie"]?.jsonPrimitive?.content)
+            } else {
+                assertEquals("MUSIC_U=session", body["cookie"]?.jsonPrimitive?.content)
+            }
             """{"code":200,"data":[]}"""
         }) { api ->
             for (quality in AudioQuality.entries) api.songUrls(listOf(Long.MAX_VALUE, 347230L), quality, "MUSIC_U=session")
         }
-        assertEquals(setOf("standard", "higher", "exhigh", "lossless", "hires", "jyeffect", "sky", "dolby", "jymaster"), AudioQuality.entries.map { it.value }.toSet())
+        assertEquals(
+            setOf("standard", "higher", "exhigh", "lossless", "hires", "jyeffect", "sky", "dolby", "vivid", "jymaster"),
+            AudioQuality.entries.map { it.value }.toSet()
+        )
+    }
+
+    @Test
+    fun songUrlsSupportImmerseTypeAndUnblockParameters() = runTest {
+        withApi({ route, body ->
+            assertEquals("song/url/v1", route)
+            assertEquals("sky", body["level"]?.jsonPrimitive?.content)
+            assertEquals("ste", body["immerseType"]?.jsonPrimitive?.content)
+            assertEquals("true", body["unblock"]?.jsonPrimitive?.content)
+            """{"code":200,"data":[]}"""
+        }) { api ->
+            api.songUrls(
+                listOf(347230L),
+                level = AudioQuality.Sky,
+                immerseType = ImmerseType.Ste,
+                unblock = true,
+                cookie = "MUSIC_U=session",
+            )
+        }
     }
 
     @Test

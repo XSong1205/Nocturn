@@ -39,9 +39,9 @@ android {
     compileSdk = 37
     ndkVersion = "28.2.13676358"
     defaultConfig {
-        minSdk = 29
+        minSdk = 24
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
         consumerProguardFiles("consumer-rules.pro")
         externalNativeBuild {
             cmake { arguments += "-DANDROID_STL=c++_shared" }

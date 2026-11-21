@@ -19,7 +19,7 @@ const archiveUrl = `https://github.com/nodejs-mobile/nodejs-mobile/releases/down
 const archiveSha256 = 'bd7321eaa1a7602fbe0bb87302df2d79d87835cf4363fbdd17c350dbb485c2af';
 const licenseUrl = `https://raw.githubusercontent.com/nodejs-mobile/nodejs-mobile/v${version}/LICENSE`;
 const licenseSha256 = '66233b87054d6bca9b0c2f23b027bb2caf1ebd961a6f981616d098dade33af34';
-const abis = ['arm64-v8a', 'x86_64'];
+const abis = ['arm64-v8a', 'armeabi-v7a', 'x86_64'];
 
 async function sha256(filename) {
   const hash = createHash('sha256');
@@ -124,14 +124,19 @@ function contents(archive, entry) {
 }
 
 function elfAlignment(binary) {
-  if (binary.readUInt32BE(0) !== 0x7f454c46 || binary[4] !== 2 || binary[5] !== 1) throw new Error('Expected a little-endian 64-bit ELF runtime.');
-  const table = Number(binary.readBigUInt64LE(32));
-  const entrySize = binary.readUInt16LE(54);
-  const count = binary.readUInt16LE(56);
+  if (binary.readUInt32BE(0) !== 0x7f454c46 || binary[5] !== 1) throw new Error('Expected a little-endian ELF runtime.');
+  const is64 = binary[4] === 2;
+  if (!is64 && binary[4] !== 1) throw new Error('Expected a 32-bit or 64-bit ELF runtime.');
+  const table = is64 ? Number(binary.readBigUInt64LE(32)) : binary.readUInt32LE(28);
+  const entrySize = is64 ? binary.readUInt16LE(54) : binary.readUInt16LE(42);
+  const count = is64 ? binary.readUInt16LE(56) : binary.readUInt16LE(44);
   const alignments = [];
   for (let index = 0; index < count; ++index) {
     const offset = table + index * entrySize;
-    if (binary.readUInt32LE(offset) === 1) alignments.push(Number(binary.readBigUInt64LE(offset + 48)));
+    if (binary.readUInt32LE(offset) === 1) {
+      const align = is64 ? Number(binary.readBigUInt64LE(offset + 48)) : binary.readUInt32LE(offset + 28);
+      alignments.push(align);
+    }
   }
   if (alignments.length === 0) throw new Error('ELF has no load segments.');
   return Math.min(...alignments);
@@ -168,7 +173,7 @@ async function main() {
     for (const entry of zipEntries(archive)) {
       if (entry.name.endsWith('/')) continue;
       const header = /(?:^|\/)include\/node\/(.+)$/.exec(entry.name);
-      const library = /(?:^|\/)bin\/(arm64-v8a|x86_64)\/libnode\.so$/.exec(entry.name);
+      const library = /(?:^|\/)bin\/(arm64-v8a|armeabi-v7a|x86_64)\/libnode\.so$/.exec(entry.name);
       const license = /(?:^|\/)(LICENSE(?:\.txt)?|LICENSES(?:\.txt)?|NOTICE(?:\.txt)?)$/i.exec(entry.name);
       const relative = header ? path.join('include', 'node', header[1])
         : library ? path.join('lib', library[1], 'libnode.so')

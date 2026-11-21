@@ -2,6 +2,7 @@
 
 package dev.nocturn.app.ui.screens.settings
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,12 +13,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Gesture
-import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Vibration
+import androidx.compose.material.icons.rounded.Gesture
+import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Vibration
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -66,13 +68,18 @@ fun SettingsGeneralScreen(
             }
         },
     ) { topPadding ->
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxSize()
-                .testTag("settings-general-screen"),
-            contentPadding = PaddingValues(top = topPadding + 4.dp, bottom = bottomContentPadding()),
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.TopCenter,
         ) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .widthIn(max = 840.dp)
+                    .testTag("settings-general-screen"),
+                contentPadding = PaddingValues(top = topPadding + 4.dp, bottom = bottomContentPadding()),
+            ) {
             item(key = "hero") {
                 SettingsHero(
                     title = "通用与交互",
@@ -113,7 +120,7 @@ fun SettingsGeneralScreen(
                                 horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
                             ) {
                                 Icon(
-                                    Icons.Filled.Vibration,
+                                    Icons.Rounded.Vibration,
                                     contentDescription = null,
                                     modifier = Modifier.size(20.dp),
                                 )
@@ -180,7 +187,7 @@ fun SettingsGeneralScreen(
                                 horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
                             ) {
                                 Icon(
-                                    Icons.Filled.GraphicEq,
+                                    Icons.Rounded.GraphicEq,
                                     contentDescription = null,
                                     modifier = Modifier.size(20.dp),
                                 )
@@ -233,7 +240,7 @@ fun SettingsGeneralScreen(
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                Icons.Filled.Gesture,
+                                Icons.Rounded.Gesture,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp),
@@ -259,6 +266,7 @@ fun SettingsGeneralScreen(
             }
         }
     }
+}
 }
 
 @Preview(name = "通用与交互 · 浅色", showBackground = true)

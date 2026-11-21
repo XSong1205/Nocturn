@@ -1,5 +1,6 @@
 package dev.nocturn.app.data
 
+import dev.nocturn.app.data.model.DefaultSearchKeyword
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -166,11 +167,21 @@ class NeteaseJsonSearchTest {
     @Test
     fun defaultKeywordReadsShowKeywordAndHandlesMissingData() {
         assertEquals(
-            "夜曲",
+            DefaultSearchKeyword(keyword = "全息恋人", display = "🔥大家都在搜 全息恋人"),
+            NeteaseJson.parseDefaultKeyword(
+                json("""{"code":200,"data":{"showKeyword":"🔥大家都在搜 全息恋人","realkeyword":"全息恋人"}}"""),
+            ),
+        )
+        assertEquals(
+            DefaultSearchKeyword(keyword = "夜曲", display = "夜曲"),
             NeteaseJson.parseDefaultKeyword(json("""{"code":200,"data":{"showKeyword":"夜曲"}}""")),
         )
         assertEquals(
-            "晴天",
+            DefaultSearchKeyword(keyword = "晴天", display = "🔥大家都在搜 晴天"),
+            NeteaseJson.parseDefaultKeyword(json("""{"code":200,"data":{"showKeyword":"🔥大家都在搜 晴天"}}""")),
+        )
+        assertEquals(
+            DefaultSearchKeyword(keyword = "晴天", display = "晴天"),
             NeteaseJson.parseDefaultKeyword(json("""{"code":200,"data":{"realkeyword":"晴天"}}""")),
         )
         assertNull(NeteaseJson.parseDefaultKeyword(json("""{"code":200,"data":{}}""")))

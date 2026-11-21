@@ -18,13 +18,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.Headphones
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.rounded.Headphones
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
@@ -77,13 +78,18 @@ fun SettingsAboutScreen(
             }
         },
     ) { topPadding ->
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxSize()
-                .testTag("settings-about-screen"),
-            contentPadding = PaddingValues(top = topPadding + 4.dp, bottom = bottomContentPadding()),
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.TopCenter,
         ) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .widthIn(max = 840.dp)
+                    .testTag("settings-about-screen"),
+                contentPadding = PaddingValues(top = topPadding + 4.dp, bottom = bottomContentPadding()),
+            ) {
             item(key = "hero") {
                 AboutAppHero(version = state.version)
             }
@@ -130,7 +136,7 @@ fun SettingsAboutScreen(
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                Icons.Filled.Code,
+                                Icons.Rounded.Code,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp),
@@ -188,7 +194,7 @@ fun SettingsAboutScreen(
                         verticalAlignment = Alignment.Top,
                     ) {
                         Icon(
-                            Icons.Filled.Info,
+                            Icons.Rounded.Info,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp),
@@ -243,7 +249,7 @@ fun SettingsAboutScreen(
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
-                                    Icons.Filled.Code,
+                                    Icons.Rounded.Code,
                                     contentDescription = null,
                                     modifier = Modifier.size(20.dp),
                                 )
@@ -269,6 +275,7 @@ fun SettingsAboutScreen(
         }
     }
 }
+}
 
 @Composable
 private fun AboutAppHero(
@@ -289,7 +296,7 @@ private fun AboutAppHero(
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
-                    Icons.Filled.Headphones,
+                    Icons.Rounded.Headphones,
                     contentDescription = null,
                     modifier = Modifier.size(44.dp),
                 )

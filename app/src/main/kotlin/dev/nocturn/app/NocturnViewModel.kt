@@ -9,7 +9,11 @@ import dev.nocturn.app.data.MusicRepositoryException
 import dev.nocturn.app.data.SettingsStore
 import dev.nocturn.app.data.model.AlbumDetail
 import dev.nocturn.app.data.model.ArtistDetail
+import dev.nocturn.app.data.model.FreeListenClaimResult
+import dev.nocturn.app.data.model.FreeListenRights
 import dev.nocturn.app.data.model.HomeFeed
+import dev.nocturn.app.data.model.ColorSchemeKey
+import dev.nocturn.app.data.model.DynamicVariant
 import dev.nocturn.app.data.model.Lyrics
 import dev.nocturn.app.data.model.PlaylistDetail
 import dev.nocturn.app.data.model.PlaylistSongsPage
@@ -21,6 +25,7 @@ import dev.nocturn.app.data.model.SearchSongsPage
 import dev.nocturn.app.data.model.Song
 import dev.nocturn.app.data.model.ThemeMode
 import dev.nocturn.app.data.model.displayName
+import dev.nocturn.app.data.model.isDynamic
 import dev.nocturn.app.playback.PlayableSong
 import dev.nocturn.app.playback.PlaybackEngine
 import dev.nocturn.app.playback.PlaybackSnapshot
@@ -36,6 +41,7 @@ import dev.nocturn.app.ui.state.LoginMode
 import dev.nocturn.app.ui.state.LoginUiState
 import dev.nocturn.app.ui.state.MiniPlayerUiState
 import dev.nocturn.app.ui.state.NavState
+import dev.nocturn.app.ui.state.PlaybackMode
 import dev.nocturn.app.ui.state.PlayerUiState
 import dev.nocturn.app.ui.state.PlaylistUiState
 import dev.nocturn.app.ui.state.Screen
@@ -46,6 +52,7 @@ import java.io.File
 import kotlinx.coroutines.Dispatchers
 import dev.nocturn.app.ui.util.greetingForHour
 import dev.nocturn.localapi.client.AudioQuality
+import dev.nocturn.localapi.client.ImmerseType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -83,6 +90,9 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
     private val mutableLibrary = MutableStateFlow(
         LibraryUiState(
             themeMode = settings.themeMode,
+            colorSchemeKey = settings.colorSchemeKey,
+            customSeedColor = settings.customSeedColor,
+            dynamicVariant = settings.dynamicVariant,
             dynamicColor = settings.dynamicColor,
             quality = settings.quality,
             hapticsEnabled = settings.hapticsEnabled,
@@ -94,10 +104,17 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
     private val mutableSettings = MutableStateFlow(
         SettingsUiState(
             quality = settings.quality,
+            immerseType = settings.immerseType,
+            unblockEnabled = settings.unblockEnabled,
             themeMode = settings.themeMode,
+            colorSchemeKey = settings.colorSchemeKey,
+            customSeedColor = settings.customSeedColor,
+            dynamicVariant = settings.dynamicVariant,
             dynamicColor = settings.dynamicColor,
             hapticsEnabled = settings.hapticsEnabled,
             lyriconEnabled = settings.lyriconEnabled,
+            scrobbleEnabled = settings.scrobbleEnabled,
+            relayPlayStateEnabled = settings.relayPlayStateEnabled,
             searchHistoryCount = settings.searchHistory().size,
             version = appVersionName(),
         ),
@@ -127,7 +144,27 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
     private val mutableMessages = MutableSharedFlow<String>(extraBufferCapacity = 8)
     val messages: SharedFlow<String> = mutableMessages.asSharedFlow()
 
+    private val mutableReselectEvents = MutableSharedFlow<AppTab>(extraBufferCapacity = 1)
+    val tabReselectEvents: SharedFlow<AppTab> = mutableReselectEvents.asSharedFlow()
+
+    private val mutableFreeListenRights = MutableStateFlow<FreeListenRights?>(null)
+    val freeListenRights: StateFlow<FreeListenRights?> = mutableFreeListenRights.asStateFlow()
+
+    private val mutableIsFreeListenLoading = MutableStateFlow(false)
+    val isFreeListenLoading: StateFlow<Boolean> = mutableIsFreeListenLoading.asStateFlow()
+
+    private val mutableAutoClaimFreeListen = MutableStateFlow(settings.autoClaimFreeListen)
+    val autoClaimFreeListen: StateFlow<Boolean> = mutableAutoClaimFreeListen.asStateFlow()
+
+    private val mutableShowFreeListenDialog = MutableStateFlow(false)
+    val showFreeListenDialog: StateFlow<Boolean> = mutableShowFreeListenDialog.asStateFlow()
+
+    private var freeListenMonitorJob: Job? = null
+
     private var queue: List<Song> = emptyList()
+    private var savedQueueBeforeHeartbeat: List<Song>? = null
+    private var currentPlaybackMode: PlaybackMode = PlaybackMode.Sequence
+    private var activePlaylistId: Long? = null
     private val likedSongIds = linkedSetOf<Long>()
     private var searchRequest: Job? = null
     private var suggestionRequest: Job? = null
@@ -142,16 +179,25 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
     private var homeLoaded = false
     private var libraryLoaded = false
 
+    private var currentSessionId: String = generatePlaybackSessionId()
+    private var trackedSong: Song? = null
+    private var trackedPlayedMs: Long = 0L
+    private var lastSnapshotNanos: Long = 0L
+    private var wasPlaying: Boolean = false
+    private var hasScrobbledCurrent: Boolean = false
+
     init {
         observePlayback()
         loadHome()
         refreshLibrary()
         loadSearchLanding()
+        startFreeListenMonitor()
         viewModelScope.launch {
             repository.session.collect { profile ->
                 if (profile != null) {
                     val wasLoggedIn = mutableLibrary.value.loggedIn
                     mutableLibrary.update { it.copy(loggedIn = true, profile = profile) }
+                    mutableHome.update { it.copy(isLoggedIn = true, isVip = profile.vipLevel > 0) }
                     if (!wasLoggedIn) {
                         loadHome(refresh = true)
                         loadSearchLanding()
@@ -168,7 +214,7 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
                             likedCount = null,
                         )
                     }
-                    mutableHome.update { it.copy(isLoggedIn = false, dailySongs = emptyList()) }
+                    mutableHome.update { it.copy(isLoggedIn = false, isVip = false, dailySongs = emptyList()) }
                     applyLikedState()
                     loadHome(refresh = true)
                     loadSearchLanding()
@@ -182,8 +228,19 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
     // ---------------------------------------------------------------------------------------
 
     fun selectTab(tab: AppTab) {
-        if (mutableNavigation.value.tab == tab && mutableNavigation.value.stack.isEmpty()) return
-        mutableNavigation.update { it.copy(tab = tab, stack = emptyList()) }
+        if (mutableNavigation.value.tab == tab) {
+            // Reselecting current tab: pop to root if currently on a sub-screen
+            if (mutableNavigation.value.stack.isNotEmpty()) {
+                mutableNavigation.update { it.copy(stack = emptyList()) }
+                pruneDetailStates()
+            } else {
+                // Already at root of active tab: notify reselect (e.g. scroll list to top)
+                mutableReselectEvents.tryEmit(tab)
+            }
+            return
+        }
+        // Switching tabs preserves existing back stacks for all tabs
+        mutableNavigation.update { it.copy(tab = tab) }
         pruneDetailStates()
         when (tab) {
             AppTab.Home -> if (!homeLoaded) loadHome()
@@ -195,6 +252,7 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
     // Re-opening a page that is still on the stack reuses its loaded state; a failed or missing
     // entry is fetched again.
     fun openPlaylist(playlistId: Long) {
+        activePlaylistId = playlistId
         val target = Screen.Playlist(playlistId)
         if (mutableNavigation.value.stack.lastOrNull() == target) return
         mutableNavigation.update { it.copy(stack = it.stack + target) }
@@ -219,14 +277,14 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
-     * Drops detail state for pages that are no longer on the stack. Called on pushes and tab
+     * Drops detail state for pages that are no longer on any tab stack. Called on pushes and tab
      * switches rather than on back, so a page that is animating out still has its content.
      */
     private fun pruneDetailStates() {
-        val stack = mutableNavigation.value.stack
-        playlistStates.retain(stack.filterIsInstance<Screen.Playlist>().map { it.id }.toSet())
-        albumStates.retain(stack.filterIsInstance<Screen.Album>().map { it.id }.toSet())
-        artistStates.retain(stack.filterIsInstance<Screen.Artist>().map { it.id }.toSet())
+        val allScreens = mutableNavigation.value.allScreens
+        playlistStates.retain(allScreens.filterIsInstance<Screen.Playlist>().map { it.id }.toSet())
+        albumStates.retain(allScreens.filterIsInstance<Screen.Album>().map { it.id }.toSet())
+        artistStates.retain(allScreens.filterIsInstance<Screen.Artist>().map { it.id }.toSet())
     }
 
     fun openRecentSongs() {
@@ -365,7 +423,9 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
                 charts = feed.charts,
                 dailySongs = feed.dailySongs,
                 personalizedSongs = feed.personalizedSongs,
+                radarPlaylist = feed.radarPlaylist,
                 isLoggedIn = feed.isLoggedIn,
+                isVip = (repository.session.value?.vipLevel ?: 0) > 0,
                 likedSongIds = likedSongIds.toSet(),
             )
         }
@@ -383,7 +443,11 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
             val hot = runCatching { repository.hotSearches() }.getOrDefault(emptyList())
             val default = runCatching { repository.defaultKeyword() }.getOrNull()
             mutableSearch.update {
-                it.copy(hotKeywords = hot, defaultKeyword = default, history = settings.searchHistory())
+                it.copy(
+                    hotKeywords = hot,
+                    defaultKeyword = default,
+                    history = settings.searchHistory(),
+                )
             }
         }
     }
@@ -419,7 +483,7 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun submitSearch(keyword: String = mutableSearch.value.query) {
-        val value = keyword.trim().ifEmpty { mutableSearch.value.defaultKeyword?.trim().orEmpty() }
+        val value = keyword.trim().ifEmpty { mutableSearch.value.defaultKeyword?.keyword?.trim().orEmpty() }
         if (value.isEmpty()) return
         settings.recordSearch(value)
         val history = settings.searchHistory()
@@ -1001,16 +1065,64 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
         notify("音质已切换为${quality.displayName()}")
     }
 
+    fun setImmerseType(type: ImmerseType) {
+        settings.immerseType = type
+        mutableSettings.update { it.copy(immerseType = type) }
+        notify("沉浸声类型已切换为${type.displayName()}")
+    }
+
+    fun setUnblockEnabled(enabled: Boolean) {
+        settings.unblockEnabled = enabled
+        mutableSettings.update { it.copy(unblockEnabled = enabled) }
+        notify(if (enabled) "已开启第三方歌曲解锁" else "已关闭第三方歌曲解锁")
+    }
+
     fun setThemeMode(mode: ThemeMode) {
         settings.themeMode = mode
         mutableLibrary.update { it.copy(themeMode = mode) }
         mutableSettings.update { it.copy(themeMode = mode) }
     }
 
+    fun setColorScheme(scheme: ColorSchemeKey, seed: Long? = null) {
+        settings.colorSchemeKey = scheme
+        if (seed != null) {
+            settings.customSeedColor = seed
+        }
+        val isDyn = scheme.isDynamic
+        settings.dynamicColor = isDyn
+        val currentSeed = settings.customSeedColor
+        mutableLibrary.update {
+            it.copy(
+                colorSchemeKey = scheme,
+                customSeedColor = currentSeed,
+                dynamicColor = isDyn,
+            )
+        }
+        mutableSettings.update {
+            it.copy(
+                colorSchemeKey = scheme,
+                customSeedColor = currentSeed,
+                dynamicColor = isDyn,
+            )
+        }
+    }
+
+    fun setDynamicVariant(variant: DynamicVariant) {
+        settings.dynamicVariant = variant
+        mutableLibrary.update { it.copy(dynamicVariant = variant) }
+        mutableSettings.update { it.copy(dynamicVariant = variant) }
+    }
+
+    fun resetColorScheme() {
+        setColorScheme(ColorSchemeKey.M3eDynamic)
+        setDynamicVariant(DynamicVariant.Expressive)
+    }
+
     fun setDynamicColor(enabled: Boolean) {
         settings.dynamicColor = enabled
-        mutableLibrary.update { it.copy(dynamicColor = enabled) }
-        mutableSettings.update { it.copy(dynamicColor = enabled) }
+        val scheme = settings.colorSchemeKey
+        mutableLibrary.update { it.copy(dynamicColor = enabled, colorSchemeKey = scheme) }
+        mutableSettings.update { it.copy(dynamicColor = enabled, colorSchemeKey = scheme) }
     }
 
     /** Turns the app-wide tactile layer on or off and persists the choice. */
@@ -1024,6 +1136,38 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
         settings.lyriconEnabled = enabled
         mutableLibrary.update { it.copy(lyriconEnabled = enabled) }
         mutableSettings.update { it.copy(lyriconEnabled = enabled) }
+    }
+
+    fun setScrobbleEnabled(enabled: Boolean) {
+        settings.scrobbleEnabled = enabled
+        mutableSettings.update { it.copy(scrobbleEnabled = enabled) }
+    }
+
+    fun setRelayPlayStateEnabled(enabled: Boolean) {
+        settings.relayPlayStateEnabled = enabled
+        mutableSettings.update { it.copy(relayPlayStateEnabled = enabled) }
+    }
+
+    fun openRoaming() {
+        notify("私人漫游功能正在开发中，敬请期待")
+    }
+
+    fun playPlaylist(playlistId: Long) {
+        viewModelScope.launch {
+            try {
+                val songs = playlistStates[playlistId]?.songs?.takeIf { it.isNotEmpty() }
+                    ?: repository.playlistSongs(playlistId, 0, 50).songs
+                if (songs.isNotEmpty()) {
+                    playSongs(songs, 0)
+                } else {
+                    notify("歌单为空或暂无可用歌曲")
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                notify("播放失败，请稍后重试")
+            }
+        }
     }
 
     @Volatile
@@ -1102,7 +1246,12 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
                     failPlayback("播放服务未就绪，请稍后重试。")
                     return@launch
                 }
-                val urls = repository.streamUrls(songs.map { it.id }, settings.quality)
+                val urls = repository.streamUrls(
+                    songs.map { it.id },
+                    settings.quality,
+                    settings.immerseType,
+                    settings.unblockEnabled,
+                )
                 val playable = songs.mapNotNull { song ->
                     urls[song.id]?.takeIf { it.isNotBlank() }?.let { PlayableSong.from(song, it) }
                 }
@@ -1113,6 +1262,13 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
                 val startSong = songs[startIndex]
                 val engineIndex = playable.indexOfFirst { it.id == startSong.id }
                     .takeIf { it >= 0 } ?: 0
+                if (currentPlaybackMode != PlaybackMode.Heartbeat) {
+                    currentPlaybackMode = when {
+                        engine.snapshot.value.shuffle -> PlaybackMode.Shuffle
+                        engine.snapshot.value.repeatMode == RepeatMode.One -> PlaybackMode.SingleCycle
+                        else -> PlaybackMode.Sequence
+                    }
+                }
                 queue = songs
                 engine.setQueue(playable, engineIndex)
                 engine.play()
@@ -1125,6 +1281,7 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
                         currentIndex = startIndex,
                         liked = startSong.id in likedSongIds,
                         qualityLabel = settings.quality.displayName(),
+                        playbackMode = currentPlaybackMode,
                     )
                 }
                 mutableMiniPlayer.update {
@@ -1178,7 +1335,8 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
     fun toggleShuffle() {
         val enabled = !engine.snapshot.value.shuffle
         engine.setShuffle(enabled)
-        mutablePlayer.update { it.copy(shuffle = enabled) }
+        currentPlaybackMode = if (enabled) PlaybackMode.Shuffle else PlaybackMode.Sequence
+        mutablePlayer.update { it.copy(shuffle = enabled, playbackMode = currentPlaybackMode) }
         notify(if (enabled) "随机播放已开启" else "随机播放已关闭")
     }
 
@@ -1189,7 +1347,190 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
             RepeatMode.One -> RepeatMode.Off
         }
         engine.setRepeatMode(next)
-        mutablePlayer.update { it.copy(repeatMode = next) }
+        currentPlaybackMode = when (next) {
+            RepeatMode.One -> PlaybackMode.SingleCycle
+            else -> if (engine.snapshot.value.shuffle) PlaybackMode.Shuffle else PlaybackMode.Sequence
+        }
+        mutablePlayer.update { it.copy(repeatMode = next, playbackMode = currentPlaybackMode) }
+    }
+
+    /**
+     * Cycles playback mode in order:
+     * 顺序播放(列表循环) -> 心动模式 -> 随机播放 -> 单曲循环
+     * Backs up current queue upon entering heartbeat mode, and restores it when leaving heartbeat mode.
+     */
+    fun cyclePlaybackMode() {
+        when (currentPlaybackMode) {
+            PlaybackMode.Sequence -> {
+                val current = mutablePlayer.value.song
+                if (current == null) {
+                    currentPlaybackMode = PlaybackMode.Shuffle
+                    engine.setShuffle(true)
+                    engine.setRepeatMode(RepeatMode.All)
+                    mutablePlayer.update {
+                        it.copy(playbackMode = PlaybackMode.Shuffle, shuffle = true, repeatMode = RepeatMode.All)
+                    }
+                    notify("已切换为随机播放")
+                    return
+                }
+                savedQueueBeforeHeartbeat = queue.toList()
+                viewModelScope.launch {
+                    try {
+                        val favoritePid = mutableLibrary.value.playlists.firstOrNull {
+                            it.specialType == 5 || it.name.contains("喜欢")
+                        }?.id ?: 0L
+                        val pid = if (activePlaylistId != null && activePlaylistId!! > 0) activePlaylistId!! else favoritePid
+                        val recs = repository.intelligenceList(
+                            songId = current.id,
+                            playlistId = if (pid > 0) pid else current.id,
+                        )
+                        if (recs.isNotEmpty()) {
+                            val newQueue = if (recs.any { it.id == current.id }) recs else listOf(current) + recs
+                            val urls = repository.streamUrls(
+                                newQueue.map { it.id },
+                                settings.quality,
+                                settings.immerseType,
+                                settings.unblockEnabled,
+                            )
+                            val playable = newQueue.mapNotNull { song ->
+                                urls[song.id]?.takeIf { it.isNotBlank() }?.let { PlayableSong.from(song, it) }
+                            }
+                            if (playable.isNotEmpty()) {
+                                val engineIndex = playable.indexOfFirst { it.id == current.id }.coerceAtLeast(0)
+                                queue = newQueue
+                                engine.setQueue(playable, engineIndex)
+                                engine.setShuffle(false)
+                                engine.setRepeatMode(RepeatMode.All)
+                                currentPlaybackMode = PlaybackMode.Heartbeat
+                                mutablePlayer.update {
+                                    it.copy(
+                                        playbackMode = PlaybackMode.Heartbeat,
+                                        shuffle = false,
+                                        repeatMode = RepeatMode.All,
+                                        queue = newQueue,
+                                    )
+                                }
+                                notify("已开启心动模式")
+                                return@launch
+                            }
+                        }
+                        notify("心动模式推荐失败，请稍后重试")
+                    } catch (e: Exception) {
+                        notify("开启心动模式失败：${e.userMessage()}")
+                    }
+                }
+            }
+            PlaybackMode.Heartbeat -> {
+                val saved = savedQueueBeforeHeartbeat
+                savedQueueBeforeHeartbeat = null
+                if (saved != null && saved.isNotEmpty()) {
+                    queue = saved
+                    val current = mutablePlayer.value.song
+                    viewModelScope.launch {
+                        val urls = repository.streamUrls(
+                            saved.map { it.id },
+                            settings.quality,
+                            settings.immerseType,
+                            settings.unblockEnabled,
+                        )
+                        val playable = saved.mapNotNull { song ->
+                            urls[song.id]?.takeIf { it.isNotBlank() }?.let { PlayableSong.from(song, it) }
+                        }
+                        if (playable.isNotEmpty()) {
+                            val idx = current?.let { c -> playable.indexOfFirst { it.id == c.id } }
+                                ?.takeIf { it >= 0 } ?: 0
+                            engine.setQueue(playable, idx)
+                        }
+                    }
+                }
+                currentPlaybackMode = PlaybackMode.Shuffle
+                engine.setShuffle(true)
+                engine.setRepeatMode(RepeatMode.All)
+                mutablePlayer.update {
+                    it.copy(
+                        playbackMode = PlaybackMode.Shuffle,
+                        shuffle = true,
+                        repeatMode = RepeatMode.All,
+                        queue = queue,
+                    )
+                }
+                notify("已切换为随机播放")
+            }
+            PlaybackMode.Shuffle -> {
+                currentPlaybackMode = PlaybackMode.SingleCycle
+                engine.setShuffle(false)
+                engine.setRepeatMode(RepeatMode.One)
+                mutablePlayer.update {
+                    it.copy(
+                        playbackMode = PlaybackMode.SingleCycle,
+                        shuffle = false,
+                        repeatMode = RepeatMode.One,
+                    )
+                }
+                notify("已切换为单曲循环")
+            }
+            PlaybackMode.SingleCycle -> {
+                currentPlaybackMode = PlaybackMode.Sequence
+                engine.setShuffle(false)
+                engine.setRepeatMode(RepeatMode.All)
+                mutablePlayer.update {
+                    it.copy(
+                        playbackMode = PlaybackMode.Sequence,
+                        shuffle = false,
+                        repeatMode = RepeatMode.All,
+                    )
+                }
+                notify("已切换为列表循环")
+            }
+        }
+    }
+
+    /**
+     * Starts heartbeat mode seeded from a specific playlist (e.g. "我喜欢的音乐").
+     */
+    fun startHeartbeatMode(playlist: dev.nocturn.app.data.model.PlaylistSummary? = null) {
+        viewModelScope.launch {
+            try {
+                val targetPlaylist = playlist ?: mutableLibrary.value.playlists.firstOrNull {
+                    it.specialType == 5 || it.name.contains("喜欢")
+                }
+                if (targetPlaylist == null) {
+                    notify("未找到红心歌单，无法开启心动模式")
+                    return@launch
+                }
+                savedQueueBeforeHeartbeat = queue.toList()
+                activePlaylistId = targetPlaylist.id
+
+                val songs = repository.playlistSongs(targetPlaylist.id, 0).songs
+                if (songs.isEmpty()) {
+                    notify("歌单为空，无法开启心动模式")
+                    return@launch
+                }
+                val current = mutablePlayer.value.song
+                val seedSong = if (current != null && songs.any { it.id == current.id }) current else songs.first()
+
+                val recs = repository.intelligenceList(songId = seedSong.id, playlistId = targetPlaylist.id)
+                val fullList = if (recs.isNotEmpty()) {
+                    if (recs.any { it.id == seedSong.id }) recs else listOf(seedSong) + recs
+                } else {
+                    songs
+                }
+                playSongs(fullList, 0)
+                currentPlaybackMode = PlaybackMode.Heartbeat
+                engine.setShuffle(false)
+                engine.setRepeatMode(RepeatMode.All)
+                mutablePlayer.update {
+                    it.copy(
+                        playbackMode = PlaybackMode.Heartbeat,
+                        shuffle = false,
+                        repeatMode = RepeatMode.All,
+                    )
+                }
+                notify("已开启心动模式")
+            } catch (e: Exception) {
+                notify("开启心动模式失败：${e.userMessage()}")
+            }
+        }
     }
 
     fun toggleLike(song: Song) {
@@ -1201,7 +1542,20 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
             val target = song.id !in likedSongIds
             try {
                 val liked = repository.setLiked(song.id, target)
-                if (liked) likedSongIds.add(song.id) else likedSongIds.remove(song.id)
+                if (liked) {
+                    val reordered = linkedSetOf(song.id).apply { addAll(likedSongIds) }
+                    likedSongIds.clear()
+                    likedSongIds.addAll(reordered)
+                    mutableLikedSongs.update { current ->
+                        if (current.songs.isNotEmpty() && current.songs.none { it.id == song.id }) {
+                            current.copy(songs = listOf(song) + current.songs)
+                        } else {
+                            current
+                        }
+                    }
+                } else {
+                    likedSongIds.remove(song.id)
+                }
                 applyLikedState()
                 mutableLibrary.update { it.copy(likedCount = likedSongIds.size) }
             } catch (cancelled: CancellationException) {
@@ -1227,7 +1581,9 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
             ?: queue.getOrNull(snapshot.currentIndex)
         val duration = snapshot.durationMs.takeIf { it > 0 } ?: song?.durationMs ?: 0
         val previousSong = mutablePlayer.value.song
+        val previousPlaying = mutablePlayer.value.playing
         val songChanged = song != null && song.id != previousSong?.id
+        val playingChanged = snapshot.playing != previousPlaying
         mutablePlayer.update {
             it.copy(
                 song = song ?: it.song,
@@ -1240,6 +1596,12 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
                 durationMs = duration,
                 shuffle = snapshot.shuffle,
                 repeatMode = snapshot.repeatMode,
+                playbackMode = when {
+                    currentPlaybackMode == PlaybackMode.Heartbeat -> PlaybackMode.Heartbeat
+                    snapshot.shuffle -> PlaybackMode.Shuffle
+                    snapshot.repeatMode == RepeatMode.One -> PlaybackMode.SingleCycle
+                    else -> PlaybackMode.Sequence
+                },
                 queue = queue,
                 currentIndex = queue.indexOfFirst { item -> item.id == song?.id }
                     .takeIf { index -> index >= 0 } ?: it.currentIndex,
@@ -1261,6 +1623,7 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
             )
         }
         applyNowPlaying(song?.id)
+        updatePlaybackTracking(song, snapshot, songChanged, playingChanged)
         if (song != null && (songChanged || currentLyricsSongId != song.id)) {
             rememberPlayed(song)
             loadLyrics(song)
@@ -1277,6 +1640,97 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
         artistStates.updateAll { it.copy(nowPlayingSongId = songId) }
         mutableLikedSongs.update { it.copy(nowPlayingSongId = songId) }
         mutableLibrary.update { it.copy(nowPlayingSongId = songId) }
+    }
+
+    private fun updatePlaybackTracking(
+        currentSong: Song?,
+        snapshot: PlaybackSnapshot,
+        songChanged: Boolean,
+        playingChanged: Boolean,
+    ) {
+        val now = System.nanoTime()
+        val currentTracked = trackedSong
+
+        if (songChanged || (currentSong == null && currentTracked != null)) {
+            if (currentTracked != null && !hasScrobbledCurrent && settings.scrobbleEnabled) {
+                val playedSec = (trackedPlayedMs / 1000).toInt()
+                val totalSec = ((currentTracked.durationMs) / 1000).toInt()
+                val meets30s = playedSec >= 30
+                val meets50pct = totalSec > 0 && playedSec >= (totalSec / 2)
+                if (meets30s || meets50pct) {
+                    hasScrobbledCurrent = true
+                    triggerScrobble(currentTracked, playedSec, totalSec)
+                }
+            }
+            trackedSong = currentSong
+            trackedPlayedMs = 0L
+            hasScrobbledCurrent = false
+            lastSnapshotNanos = now
+            wasPlaying = snapshot.playing
+
+            if (currentSong != null && settings.relayPlayStateEnabled) {
+                triggerPlayStateSubmit(currentSong.id, (snapshot.positionMs / 1000).toInt())
+            }
+        } else if (currentSong != null) {
+            if (wasPlaying && !snapshot.buffering && lastSnapshotNanos > 0L) {
+                val deltaMs = (now - lastSnapshotNanos) / 1_000_000L
+                if (deltaMs in 1..5000) {
+                    trackedPlayedMs += deltaMs
+                }
+            }
+            lastSnapshotNanos = now
+            wasPlaying = snapshot.playing
+
+            if (playingChanged && settings.relayPlayStateEnabled) {
+                triggerPlayStateSubmit(currentSong.id, (snapshot.positionMs / 1000).toInt())
+            }
+        }
+    }
+
+    private fun triggerScrobble(song: Song, playedSec: Int, totalSec: Int) {
+        val quality = settings.quality
+        viewModelScope.launch {
+            try {
+                repository.scrobble(
+                    songId = song.id,
+                    timeSeconds = playedSec,
+                    totalSeconds = totalSec.takeIf { it > 0 },
+                    sourceId = null,
+                    source = "list",
+                    songName = song.name,
+                    artistName = song.artists.joinToString("/") { it.name },
+                    level = quality,
+                )
+            } catch (_: Exception) {
+                // Background telemetry; best effort
+            }
+        }
+    }
+
+    private fun triggerPlayStateSubmit(songId: Long, progressSec: Int) {
+        val mode = when {
+            mutablePlayer.value.repeatMode == RepeatMode.One -> "single_cycle"
+            mutablePlayer.value.shuffle -> "random"
+            else -> "list_loop"
+        }
+        val sessionId = currentSessionId
+        viewModelScope.launch {
+            try {
+                repository.submitPlayState(
+                    songId = songId,
+                    sessionId = sessionId,
+                    progressSeconds = progressSec,
+                    playMode = mode,
+                )
+            } catch (_: Exception) {
+                // Background telemetry; best effort
+            }
+        }
+    }
+
+    private fun generatePlaybackSessionId(): String {
+        val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        return (1..12).map { chars.random() }.joinToString("")
     }
 
     private suspend fun connectEngine(): Boolean {
@@ -1332,6 +1786,117 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
 
     private fun notify(message: String) {
         mutableMessages.tryEmit(message)
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Free Listen
+    // ---------------------------------------------------------------------------------------
+
+    fun openFreeListenDialog() {
+        mutableShowFreeListenDialog.value = true
+        refreshFreeListenRights()
+    }
+
+    fun closeFreeListenDialog() {
+        mutableShowFreeListenDialog.value = false
+    }
+
+    fun setAutoClaimFreeListen(enabled: Boolean) {
+        settings.autoClaimFreeListen = enabled
+        mutableAutoClaimFreeListen.value = enabled
+        if (enabled) {
+            viewModelScope.launch {
+                checkAndAutoClaimFreeListen(isStartup = true)
+            }
+        }
+    }
+
+    fun refreshFreeListenRights() {
+        viewModelScope.launch {
+            mutableIsFreeListenLoading.value = true
+            try {
+                val rights = repository.getFreeListenRights()
+                mutableFreeListenRights.value = rights
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                // Ignore transient lookup failures
+            } finally {
+                mutableIsFreeListenLoading.value = false
+            }
+        }
+    }
+
+    fun claimFreeListen() {
+        if (mutableIsFreeListenLoading.value) return
+        viewModelScope.launch {
+            mutableIsFreeListenLoading.value = true
+            try {
+                val result = repository.claimFreeListen()
+                if (result.success) {
+                    val updatedRights = runCatching { repository.getFreeListenRights() }.getOrNull()
+                    if (updatedRights != null) {
+                        mutableFreeListenRights.value = updatedRights
+                    }
+                    notify(result.message.ifBlank { "免费听时长领取成功！" })
+                } else {
+                    notify(result.message.ifBlank { "领取失败，请稍后重试" })
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: MusicRepositoryException) {
+                notify(error.message ?: "领取失败")
+                if (!repository.isLoggedIn()) {
+                    closeFreeListenDialog()
+                    startLogin()
+                }
+            } catch (error: Exception) {
+                notify(error.message ?: "领取失败，请稍后重试")
+            } finally {
+                mutableIsFreeListenLoading.value = false
+            }
+        }
+    }
+
+    private fun startFreeListenMonitor() {
+        freeListenMonitorJob?.cancel()
+        freeListenMonitorJob = viewModelScope.launch {
+            delay(2000)
+            checkAndAutoClaimFreeListen(isStartup = true)
+            while (true) {
+                delay(5 * 60 * 1000L)
+                checkAndAutoClaimFreeListen(isStartup = false)
+            }
+        }
+    }
+
+    private suspend fun checkAndAutoClaimFreeListen(isStartup: Boolean) {
+        if (!settings.autoClaimFreeListen) return
+        val isVip = (repository.session.value?.vipLevel ?: 0) > 0
+        if (isVip) return
+
+        try {
+            val rights = repository.getFreeListenRights()
+            mutableFreeListenRights.value = rights
+            val remainingMs = rights.remainingMs
+            val shouldClaim = isStartup || remainingMs <= 15 * 60 * 1000L
+            if (shouldClaim && !rights.upperLimit) {
+                val result = repository.claimFreeListen()
+                if (result.success) {
+                    val updated = repository.getFreeListenRights()
+                    mutableFreeListenRights.value = updated
+                    notify("自动领取成功：${result.message}")
+                } else if (!isStartup) {
+                    notify("自动领取失败：${result.message}")
+                }
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            if (!isStartup && settings.autoClaimFreeListen) {
+                notify("自动领取异常：${error.message ?: "请检查网络"}")
+            }
+        }
     }
 
     private fun Throwable.userMessage(): String = when (this) {

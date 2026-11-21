@@ -1,9 +1,13 @@
 package dev.nocturn.app.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -15,14 +19,19 @@ import androidx.navigation3.scene.SinglePaneSceneStrategy
 import androidx.navigation3.scene.rememberNavigationEventState
 import androidx.navigation3.scene.rememberSceneState
 import androidx.navigation3.ui.NavDisplay
+import androidx.navigationevent.NavigationEvent
+import androidx.navigationevent.NavigationEventTransitionState
 import androidx.navigationevent.compose.NavigationBackHandler
+import dev.nocturn.app.ui.adaptive.LocalWindowWidthClass
 import dev.nocturn.app.ui.components.NocturnBackdrop
 import dev.nocturn.app.ui.state.AppTab
 import dev.nocturn.app.ui.state.NavState
 import dev.nocturn.app.ui.state.Screen
 import dev.nocturn.app.ui.state.tabRoot
+import kotlinx.coroutines.delay
 
 private const val TAB_METADATA = "dev.nocturn.page.tab"
+private const val DEPTH_METADATA = "dev.nocturn.page.depth"
 
 /** Stack position distinguishes repeated visits to the same album, artist or playlist. */
 private data class ScreenDestination(val tab: AppTab, val index: Int, val screen: Screen) {
@@ -47,6 +56,7 @@ internal fun ScreenNavigationHost(
         }
     }
     val direction = if (LocalLayoutDirection.current == LayoutDirection.Rtl) -1 else 1
+    val isWide = LocalWindowWidthClass.current.isAtLeastMedium
     val latestContent = rememberUpdatedState(content)
     val entries = rememberDecoratedNavEntries(
         backStack = backStack,
@@ -55,7 +65,10 @@ internal fun ScreenNavigationHost(
             NavEntry(
                 key = destination,
                 contentKey = destination.contentKey,
-                metadata = mapOf(TAB_METADATA to destination.tab),
+                metadata = mapOf(
+                    TAB_METADATA to destination.tab,
+                    DEPTH_METADATA to destination.index,
+                ),
             ) {
                 RoutedPage(destination.screen, latestContent)
             }
@@ -68,6 +81,23 @@ internal fun ScreenNavigationHost(
         onBack = onBack,
     )
     val navigationEventState = rememberNavigationEventState(sceneState)
+    val gestureTransition = navigationEventState.transitionState
+    var activeSwipeEdge by remember { mutableIntStateOf(NavigationEvent.EDGE_NONE) }
+
+    if (gestureTransition is NavigationEventTransitionState.InProgress) {
+        activeSwipeEdge = gestureTransition.latestEvent.swipeEdge
+    }
+
+    LaunchedEffect(gestureTransition) {
+        if (gestureTransition is NavigationEventTransitionState.Idle &&
+            activeSwipeEdge != NavigationEvent.EDGE_NONE
+        ) {
+            // Keep edge direction during settlement (~300ms spring), then reset for future actions.
+            delay(400)
+            activeSwipeEdge = NavigationEvent.EDGE_NONE
+        }
+    }
+
     // Use the explicit state overload only to disable page back while the player owns it.
     // NavDisplay handles seeking, cancellation, completion and entry lifecycle itself.
     NavigationBackHandler(
@@ -82,19 +112,41 @@ internal fun ScreenNavigationHost(
         transitionSpec = {
             if (initialState.metadata[TAB_METADATA] != targetState.metadata[TAB_METADATA]) {
                 PageTransitions.switchTab()
+            } else if (isWide) {
+                PageTransitions.fadeThrough()
             } else {
-                PageTransitions.push(direction)
+                val initialDepth = initialState.metadata[DEPTH_METADATA] as? Int ?: 0
+                val targetDepth = targetState.metadata[DEPTH_METADATA] as? Int ?: 0
+                if (initialDepth > targetDepth) {
+                    // Backwards movement (e.g. cancelled/interrupted predictive back returning to shallower page).
+                    // Preserve pop transform with negative targetContentZIndex so the top page stays on top
+                    // and underlying page does not jump over it or exclude it.
+                    val popDirection = if (activeSwipeEdge == NavigationEvent.EDGE_RIGHT) -direction else direction
+                    PageTransitions.pop(popDirection)
+                } else {
+                    PageTransitions.push(direction)
+                }
             }
         },
         popTransitionSpec = {
             if (initialState.metadata[TAB_METADATA] != targetState.metadata[TAB_METADATA]) {
                 PageTransitions.switchTab()
+            } else if (isWide) {
+                PageTransitions.fadeThrough()
             } else {
-                PageTransitions.pop(direction)
+                val popDirection = if (activeSwipeEdge == NavigationEvent.EDGE_RIGHT) -direction else direction
+                PageTransitions.pop(popDirection)
             }
         },
-        // Keep the same transform after release so commit/cancel cannot reverse direction.
-        predictivePopTransitionSpec = { PageTransitions.pop(direction) },
+        // Physical edge following: right-edge drag slides left with the finger; left-edge slides right.
+        predictivePopTransitionSpec = { swipeEdge ->
+            if (isWide) {
+                PageTransitions.fadeThrough()
+            } else {
+                val popDirection = if (swipeEdge == NavigationEvent.EDGE_RIGHT) -direction else direction
+                PageTransitions.pop(popDirection)
+            }
+        },
     )
 }
 

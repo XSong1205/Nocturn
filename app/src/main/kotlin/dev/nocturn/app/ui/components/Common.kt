@@ -36,13 +36,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.Icon
@@ -155,7 +155,7 @@ fun ScreenError(
             modifier = Modifier.size(72.dp),
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.CloudOff, contentDescription = null, modifier = Modifier.size(32.dp))
+                Icon(Icons.Rounded.CloudOff, contentDescription = null, modifier = Modifier.size(32.dp))
             }
         }
         Spacer(Modifier.height(20.dp))
@@ -178,7 +178,7 @@ fun ScreenError(
                 haptics.tap()
                 onRetry()
             }) {
-                Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("重试")
             }
@@ -207,7 +207,7 @@ fun EmptyState(
             modifier = Modifier.size(72.dp),
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.MusicNote, contentDescription = null, modifier = Modifier.size(32.dp))
+                Icon(Icons.Rounded.MusicNote, contentDescription = null, modifier = Modifier.size(32.dp))
             }
         }
         Spacer(Modifier.height(20.dp))
@@ -274,7 +274,7 @@ fun LikeButton(
         modifier = modifier,
     ) {
         Icon(
-            imageVector = if (liked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+            imageVector = if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
             contentDescription = if (liked) "取消喜欢" else "喜欢",
             tint = tint,
             modifier = Modifier.graphicsLayer {
@@ -329,7 +329,7 @@ fun PlayPauseButton(
                 label = "play-pause",
             ) { isPlaying ->
                 Icon(
-                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                     contentDescription = if (isPlaying) "暂停" else "播放",
                     modifier = Modifier.size(size * 0.46f),
                 )

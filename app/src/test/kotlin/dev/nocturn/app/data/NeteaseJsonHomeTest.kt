@@ -164,4 +164,84 @@ class NeteaseJsonHomeTest {
         assertEquals("https://example.test/i.jpg", artists.first().avatarUrl)
         assertFalse(artists.first().albumCount > 0)
     }
+
+    @Test
+    fun homepageStyleSongsExtractsPersonalizedBlock() {
+        val body = json(
+            """
+            {
+              "code": 200,
+              "data": {
+                "blocks": [
+                  {
+                    "blockCode": "HOMEPAGE_BLOCK_STYLE_RCMD",
+                    "creatives": [
+                      {
+                        "resources": [
+                          {
+                            "resourceType": "song",
+                            "resourceId": "27562048",
+                            "resourceExtInfo": {
+                              "song": {
+                                "id": 27562048,
+                                "name": "You Are All I Need",
+                                "ar": [{"id": 816008, "name": "FLY COAST"}],
+                                "al": {"id": 2639006, "name": "Flight Number 001", "picUrl": "https://example.test/c1.jpg"},
+                                "dt": 239813
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+            """.trimIndent(),
+        )
+        val songs = NeteaseJson.parseHomepageStyleSongs(body)
+        assertEquals(1, songs.size)
+        assertEquals(27562048L, songs[0].id)
+        assertEquals("You Are All I Need", songs[0].name)
+        assertEquals("FLY COAST", songs[0].artistText)
+        assertEquals("https://example.test/c1.jpg", songs[0].cover)
+    }
+
+    @Test
+    fun homepageRadarPlaylistsExtractsRadarBlock() {
+        val body = json(
+            """
+            {
+              "code": 200,
+              "data": {
+                "blocks": [
+                  {
+                    "blockCode": "HOMEPAGE_BLOCK_MGC_PLAYLIST",
+                    "creatives": [
+                      {
+                        "resources": [
+                          {
+                            "resourceId": "2829883282",
+                            "uiElement": {
+                              "mainTitle": {"title": "金玟岐的歌,总令人心动|华语私人雷达"},
+                              "subTitle": {"title": "华语流行精选"},
+                              "image": {"imageUrl": "https://example.test/radar.jpg"}
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+            """.trimIndent(),
+        )
+        val radars = NeteaseJson.parseHomepageRadarPlaylists(body)
+        assertEquals(1, radars.size)
+        assertEquals(2829883282L, radars[0].id)
+        assertEquals("华语私人雷达", radars[0].name)
+        assertEquals("https://example.test/radar.jpg", radars[0].coverUrl)
+    }
 }

@@ -23,10 +23,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularWavyProgressIndicator
@@ -157,7 +157,7 @@ internal fun LoginSheetContent(
                 enabled = state.mode == LoginMode.Qr || (!state.loading && !state.sendingCode),
                 modifier = Modifier.testTag("login-close"),
             ) {
-                Icon(Icons.Filled.Close, contentDescription = "关闭登录")
+                Icon(Icons.Rounded.Close, contentDescription = "关闭登录")
             }
         }
 
@@ -249,7 +249,7 @@ internal fun LoginSheetContent(
             ) {
                 Row(modifier = Modifier.padding(14.dp)) {
                     Icon(
-                        Icons.Filled.CloudOff,
+                        Icons.Rounded.CloudOff,
                         contentDescription = null,
                         modifier = Modifier.size(20.dp),
                     )
@@ -274,7 +274,7 @@ internal fun LoginSheetContent(
                     },
                     modifier = Modifier.fillMaxWidth().height(50.dp).testTag("login-refresh"),
                 ) {
-                    Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("刷新二维码")
                 }
@@ -286,7 +286,7 @@ internal fun LoginSheetContent(
                     },
                     modifier = Modifier.testTag("login-refresh"),
                 ) {
-                    Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("重新获取二维码")
                 }
@@ -352,7 +352,7 @@ private fun QrCodePanel(
                     modifier = Modifier.testTag("login-qr-failed"),
                 ) {
                     Icon(
-                        Icons.Filled.CloudOff,
+                        Icons.Rounded.CloudOff,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(32.dp),
@@ -412,7 +412,7 @@ private fun QrCodePanel(
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Icon(
-                            Icons.Filled.CheckCircle,
+                            Icons.Rounded.CheckCircle,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(40.dp),

@@ -19,18 +19,28 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.rounded.Headphones
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.LibraryMusic
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ShortNavigationBar
 import androidx.compose.material3.ShortNavigationBarItem
@@ -42,24 +52,39 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.dropUnlessResumed
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 import dev.nocturn.app.NocturnViewModel
+import dev.nocturn.app.ui.adaptive.LocalAppPlatform
+import dev.nocturn.app.ui.adaptive.LocalDesktopUiEnabled
+import dev.nocturn.app.ui.adaptive.LocalWindowWidthClass
+import dev.nocturn.app.ui.adaptive.WindowWidthClass
+import dev.nocturn.app.ui.adaptive.shouldUseDesktopUi
+import dev.nocturn.app.ui.adaptive.windowWidthClassOf
+import dev.nocturn.app.ui.desktop.DesktopScaffold
+import dev.nocturn.app.ui.components.FreeListenDialog
 import dev.nocturn.app.ui.components.GlassMaterials
 import dev.nocturn.app.ui.components.LocalBottomChromePadding
 import dev.nocturn.app.ui.components.LocalHapticsEnabled
 import dev.nocturn.app.ui.components.LocalShellBackdrop
 import dev.nocturn.app.ui.components.blurAvailable
 import dev.nocturn.app.ui.components.glass
-import dev.nocturn.app.ui.components.glassEdge
 import dev.nocturn.app.ui.components.rememberHaptics
 import dev.nocturn.app.ui.screens.home.DailySongsScreen
 import dev.nocturn.app.ui.screens.home.HomeScreen
@@ -70,6 +95,7 @@ import dev.nocturn.app.ui.screens.library.LoginSheet
 import dev.nocturn.app.ui.screens.player.MiniPlayer
 import dev.nocturn.app.ui.screens.player.PlayerScreen
 import dev.nocturn.app.ui.screens.player.PlayerSheetDrag
+import dev.nocturn.app.ui.screens.player.PlayerQueueSheet
 import dev.nocturn.app.ui.screens.playlist.AlbumScreen
 import dev.nocturn.app.ui.screens.playlist.ArtistScreen
 import dev.nocturn.app.ui.screens.playlist.PlaylistScreen
@@ -87,7 +113,6 @@ import dev.nocturn.app.ui.state.MiniPlayerUiState
 import dev.nocturn.app.ui.state.PlaylistUiState
 import dev.nocturn.app.ui.state.Screen
 import dev.nocturn.app.ui.theme.NocturnTheme
-import top.yukonga.miuix.kmp.blur.ProgressiveBlur
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 
@@ -111,6 +136,7 @@ fun NocturnApp(model: NocturnViewModel) {
         derivedStateOf { searchState.value.let { it.expanded || it.submittedKeyword != null } }
     }
     val snackbarHostState = remember { SnackbarHostState() }
+    var currentBottomPadding by remember { mutableStateOf(0.dp) }
     val playerSheet = rememberPlayerSheetState()
     val routedContent: @Composable (Screen) -> Unit = remember(model) {
         { screen -> ScreenContent(screen = screen, model = model) }
@@ -133,7 +159,12 @@ fun NocturnApp(model: NocturnViewModel) {
         model.onSearchBack()
     }
 
-    NocturnTheme(themeMode = library.themeMode, dynamicColor = library.dynamicColor) {
+    NocturnTheme(
+        themeMode = library.themeMode,
+        colorSchemeKey = library.colorSchemeKey,
+        customSeedColor = library.customSeedColor,
+        dynamicVariant = library.dynamicVariant,
+    ) {
         // Routed pages are recorded once into a layer; the floating chrome blurs that capture.
         val pageBackdrop = if (blurAvailable) rememberLayerBackdrop() else null
         // The global tactile switch: every `rememberHaptics()` below this point reads it, so the
@@ -143,54 +174,173 @@ fun NocturnApp(model: NocturnViewModel) {
             LocalShellBackdrop provides pageBackdrop,
         ) {
             // The window surface is visible underneath the library's predictive back transition.
-            Box(
+            BoxWithConstraints(
                 Modifier
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.surfaceContainerLowest),
             ) {
-                PlayerNavigationHost(
-                    visible = playerVisible,
-                    onCollapse = model::collapsePlayer,
-                    onExpand = model::openPlayer,
-                    state = playerSheet,
-                    shell = {
-                        Scaffold(
-                            containerColor = Color.Transparent,
-                            contentWindowInsets = WindowInsets(0, 0, 0, 0),
-                            snackbarHost = { SnackbarHost(snackbarHostState) },
-                            bottomBar = {
-                                val miniPlayer by model.miniPlayer.collectAsStateWithLifecycle()
-                                BottomChrome(
-                                    miniPlayer = miniPlayer,
-                                    showNavigationBar = navigation.isTabRoot,
+                val widthClass = windowWidthClassOf(maxWidth)
+                val isWide = widthClass.isAtLeastMedium
+                val platform = LocalAppPlatform.current
+                val desktopUi = LocalDesktopUiEnabled.current ?: shouldUseDesktopUi(platform, widthClass)
+                CompositionLocalProvider(LocalWindowWidthClass provides widthClass) {
+                    PlayerNavigationHost(
+                        visible = playerVisible,
+                        onCollapse = model::collapsePlayer,
+                        onExpand = model::openPlayer,
+                        state = playerSheet,
+                        shell = {
+                            if (desktopUi) {
+                                var desktopLyricsOpen by rememberSaveable { mutableStateOf(false) }
+                                var desktopQueueOpen by rememberSaveable { mutableStateOf(false) }
+                                var desktopVolume by rememberSaveable { mutableFloatStateOf(1f) }
+
+                                DesktopScaffold(
                                     selectedTab = navigation.tab,
                                     onSelectTab = model::selectTab,
-                                    onExpandPlayer = model::openPlayer,
+                                    onOpenLikedSongs = { model.openLikedSongs() },
+                                    onOpenRecentSongs = { model.openRecentSongs() },
+                                    onOpenSettings = { model.openSettings() },
+                                    onOpenLogin = { model.startLogin() },
+                                    userProfile = library.profile,
+                                    playerState = playerState.value,
                                     onTogglePlay = model::togglePlayback,
-                                    onNext = model::next,
                                     onPrevious = model::previous,
-                                    sheetDrag = playerSheet,
-                                    miniPlayerModifier = Modifier.onGloballyPositioned {
-                                        playerSheet.miniBounds = it.boundsInRoot()
+                                    onNext = model::next,
+                                    onSeek = model::seek,
+                                    onToggleLike = model::toggleLikeCurrent,
+                                    onToggleShuffle = model::toggleShuffle,
+                                    onCycleRepeat = model::cycleRepeatMode,
+                                    onOpenPlayer = model::openPlayer,
+                                    lyricsPanelOpen = desktopLyricsOpen,
+                                    onToggleLyricsPanel = { desktopLyricsOpen = !desktopLyricsOpen },
+                                    queuePanelOpen = desktopQueueOpen,
+                                    onToggleQueuePanel = { desktopQueueOpen = !desktopQueueOpen },
+                                    volume = desktopVolume,
+                                    onVolumeChange = { desktopVolume = it },
+                                    isCurrentScreenSettings = navigation.current is Screen.Settings ||
+                                        navigation.current is Screen.SettingsPlayback ||
+                                        navigation.current is Screen.SettingsAppearance ||
+                                        navigation.current is Screen.SettingsGeneral ||
+                                        navigation.current is Screen.SettingsStorage ||
+                                        navigation.current is Screen.SettingsAbout,
+                                ) {
+                                    CompositionLocalProvider(
+                                        LocalBottomChromePadding provides 0.dp,
+                                    ) {
+                                        ScreenNavigationHost(
+                                            navigation = navigation,
+                                            backEnabled = !playerVisible,
+                                            onBack = { model.back() },
+                                            modifier = if (pageBackdrop != null) Modifier.layerBackdrop(pageBackdrop) else Modifier,
+                                            content = routedContent,
+                                        )
+                                    }
+                                    if (desktopQueueOpen) {
+                                        PlayerQueueSheet(
+                                            state = playerState.value,
+                                            onDismiss = { desktopQueueOpen = false },
+                                            onSongClick = model::playQueueIndex,
+                                        )
+                                    }
+                                }
+                            } else if (isWide) {
+                                Row(Modifier.fillMaxSize()) {
+                                    ClientNavigationRail(
+                                        selectedTab = navigation.tab,
+                                        onSelect = model::selectTab,
+                                    )
+                                    Box(
+                                        Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight(),
+                                    ) {
+                                        val miniPlayer by model.miniPlayer.collectAsStateWithLifecycle()
+                                        val hasSong = miniPlayer.song != null
+                                        val bottomPadding = if (hasSong) 92.dp else (WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp)
+                                        currentBottomPadding = bottomPadding
+
+                                        CompositionLocalProvider(
+                                            LocalBottomChromePadding provides bottomPadding,
+                                        ) {
+                                            ScreenNavigationHost(
+                                                navigation = navigation,
+                                                backEnabled = !playerVisible,
+                                                onBack = { model.back() },
+                                                modifier = if (pageBackdrop != null) Modifier.layerBackdrop(pageBackdrop) else Modifier,
+                                                content = routedContent,
+                                            )
+                                        }
+
+                                        if (hasSong) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .align(Alignment.BottomCenter)
+                                                    .padding(horizontal = 24.dp, vertical = 12.dp)
+                                                    .windowInsetsPadding(WindowInsets.navigationBars),
+                                                contentAlignment = Alignment.Center,
+                                            ) {
+                                                MiniPlayer(
+                                                    state = miniPlayer,
+                                                    modifier = Modifier
+                                                        .widthIn(max = 760.dp)
+                                                        .fillMaxWidth()
+                                                        .then(
+                                                            Modifier.onGloballyPositioned {
+                                                                playerSheet.miniBounds = it.boundsInRoot()
+                                                            },
+                                                        ),
+                                                    onExpand = model::openPlayer,
+                                                    onTogglePlay = model::togglePlayback,
+                                                    onNext = model::next,
+                                                    onPrevious = model::previous,
+                                                    sheetDrag = playerSheet,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                Scaffold(
+                                    containerColor = Color.Transparent,
+                                    contentWindowInsets = WindowInsets(0, 0, 0, 0),
+
+                                    bottomBar = {
+                                        val miniPlayer by model.miniPlayer.collectAsStateWithLifecycle()
+                                        BottomChrome(
+                                            miniPlayer = miniPlayer,
+                                            showNavigationBar = navigation.isTabRoot,
+                                            selectedTab = navigation.tab,
+                                            onSelectTab = model::selectTab,
+                                            onExpandPlayer = model::openPlayer,
+                                            onTogglePlay = model::togglePlayback,
+                                            onNext = model::next,
+                                            onPrevious = model::previous,
+                                            sheetDrag = playerSheet,
+                                            miniPlayerModifier = Modifier.onGloballyPositioned {
+                                                playerSheet.miniBounds = it.boundsInRoot()
+                                            },
+                                        )
                                     },
-                                )
-                            },
-                        ) { innerPadding ->
-                            // Screens draw edge-to-edge behind the floating chrome; scroll containers read
-                            // the chrome height from LocalBottomChromePadding for their content padding.
-                            CompositionLocalProvider(
-                                LocalBottomChromePadding provides innerPadding.calculateBottomPadding(),
-                            ) {
-                                ScreenNavigationHost(
-                                    navigation = navigation,
-                                    backEnabled = !playerVisible,
-                                    onBack = { model.back() },
-                                    modifier = if (pageBackdrop != null) Modifier.layerBackdrop(pageBackdrop) else Modifier,
-                                    content = routedContent,
-                                )
+                                ) { innerPadding ->
+                                    // Screens draw edge-to-edge behind the floating chrome; scroll containers read
+                                    // the chrome height from LocalBottomChromePadding for their content padding.
+                                    currentBottomPadding = innerPadding.calculateBottomPadding()
+                                    CompositionLocalProvider(
+                                        LocalBottomChromePadding provides innerPadding.calculateBottomPadding(),
+                                    ) {
+                                        ScreenNavigationHost(
+                                            navigation = navigation,
+                                            backEnabled = !playerVisible,
+                                            onBack = { model.back() },
+                                            modifier = if (pageBackdrop != null) Modifier.layerBackdrop(pageBackdrop) else Modifier,
+                                            content = routedContent,
+                                        )
+                                    }
+                                }
                             }
-                        }
-                    },
+                        },
                     player = {
                         val player by model.player.collectAsStateWithLifecycle()
                         PlayerScreen(
@@ -203,6 +353,7 @@ fun NocturnApp(model: NocturnViewModel) {
                             onToggleLike = model::toggleLikeCurrent,
                             onToggleShuffle = model::toggleShuffle,
                             onCycleRepeat = model::cycleRepeatMode,
+                            onCyclePlaybackMode = model::cyclePlaybackMode,
                             onQueueSongClick = model::playQueueIndex,
                             sheetDrag = playerSheet,
                         )
@@ -216,9 +367,35 @@ fun NocturnApp(model: NocturnViewModel) {
                     onSendCode = model::sendLoginCode,
                     onSubmitPhone = model::submitPhoneLogin,
                 )
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(
+                            bottom = if (playerVisible) {
+                                WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 84.dp
+                            } else {
+                                currentBottomPadding
+                            },
+                        ),
+                )
+                val showFreeListenDialog by model.showFreeListenDialog.collectAsStateWithLifecycle()
+                val freeListenRights by model.freeListenRights.collectAsStateWithLifecycle()
+                val isFreeListenLoading by model.isFreeListenLoading.collectAsStateWithLifecycle()
+                val autoClaimFreeListen by model.autoClaimFreeListen.collectAsStateWithLifecycle()
+                FreeListenDialog(
+                    visible = showFreeListenDialog,
+                    rights = freeListenRights,
+                    isLoading = isFreeListenLoading,
+                    autoClaim = autoClaimFreeListen,
+                    onAutoClaimChange = model::setAutoClaimFreeListen,
+                    onClaim = model::claimFreeListen,
+                    onDismiss = model::closeFreeListenDialog,
+                )
             }
         }
     }
+}
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -226,11 +403,11 @@ fun NocturnApp(model: NocturnViewModel) {
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Floating mini player plus navigation bar on one frosted strip. A progressive blur band on top
- * lets list content melt into the glass instead of ending at a hard edge, and the mini player is a
- * lighter glass capsule on that strip. When the navigation bar hides (detail routes) a spacer of
- * the system navigation inset grows in its place so the mini player stays clear of the gesture
- * handle. Without blur (API < 33 or standalone renders) the strip is an opaque surface.
+ * Floating mini player capsule above the navigation bar. The mini player uses its own miuix
+ * glass capsule to float over the underlying page content without any backing blur strip.
+ * The navigation bar below retains its frosted glass chrome. When the navigation bar hides
+ * (detail routes) a spacer of the system navigation inset grows in its place so the mini player
+ * stays clear of the gesture handle.
  */
 @Composable
 internal fun BottomChrome(
@@ -249,72 +426,49 @@ internal fun BottomChrome(
         dampingRatio = Spring.DampingRatioNoBouncy,
         stiffness = Spring.StiffnessMediumLow,
     )
-    val backdrop = LocalShellBackdrop.current
-    val material = GlassMaterials.chrome()
     val hasSong = miniPlayer.song != null
-    // The strip is glass only where something sits on it; with neither a song nor the navigation
-    // bar the gesture area stays truly edge-to-edge.
-    val frosted = hasSong || showNavigationBar
-    Column(Modifier.fillMaxWidth()) {
-        if (backdrop != null) {
-            AnimatedVisibility(
-                visible = frosted,
-                enter = fadeIn(),
-                exit = fadeOut(),
-            ) {
-                Spacer(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(20.dp)
-                        .glassEdge(backdrop, material, ProgressiveBlur.Bottom),
-                )
-            }
-        }
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .then(if (frosted) Modifier.glass(backdrop, RectangleShape, material) else Modifier),
+    Column(
+        Modifier.fillMaxWidth(),
+    ) {
+        AnimatedVisibility(
+            visible = hasSong,
+            enter = expandVertically(sizeSpec, expandFrom = Alignment.Top) +
+                slideInVertically(spring(stiffness = Spring.StiffnessMediumLow)) { it / 2 } +
+                fadeIn(),
+            exit = shrinkVertically(sizeSpec, shrinkTowards = Alignment.Top) + fadeOut(),
         ) {
-            AnimatedVisibility(
-                visible = hasSong,
-                enter = expandVertically(sizeSpec, expandFrom = Alignment.Top) +
-                    slideInVertically(spring(stiffness = Spring.StiffnessMediumLow)) { it / 2 } +
-                    fadeIn(),
-                exit = shrinkVertically(sizeSpec, shrinkTowards = Alignment.Top) + fadeOut(),
-            ) {
-                MiniPlayer(
-                    state = miniPlayer,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                        .then(miniPlayerModifier),
-                    onExpand = onExpandPlayer,
-                    onTogglePlay = onTogglePlay,
-                    onNext = onNext,
-                    onPrevious = onPrevious,
-                    sheetDrag = sheetDrag,
-                )
-            }
-            AnimatedVisibility(
-                visible = showNavigationBar,
-                enter = expandVertically(sizeSpec, expandFrom = Alignment.Top) + fadeIn(),
-                exit = shrinkVertically(sizeSpec, shrinkTowards = Alignment.Top) + fadeOut(),
-            ) {
-                ClientNavigationBar(selectedTab = selectedTab, onSelect = onSelectTab)
-            }
-            // Mirrors the navigation bar with the same spring so the mini player glides down to the
-            // gesture area instead of jumping when the bar collapses.
-            AnimatedVisibility(
-                visible = !showNavigationBar,
-                enter = expandVertically(sizeSpec, expandFrom = Alignment.Top),
-                exit = shrinkVertically(sizeSpec, shrinkTowards = Alignment.Top),
-            ) {
-                Spacer(
-                    Modifier
-                        .fillMaxWidth()
-                        .windowInsetsBottomHeight(WindowInsets.navigationBars),
-                )
-            }
+            MiniPlayer(
+                state = miniPlayer,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                    .then(miniPlayerModifier),
+                onExpand = onExpandPlayer,
+                onTogglePlay = onTogglePlay,
+                onNext = onNext,
+                onPrevious = onPrevious,
+                sheetDrag = sheetDrag,
+            )
+        }
+        AnimatedVisibility(
+            visible = showNavigationBar,
+            enter = expandVertically(sizeSpec, expandFrom = Alignment.Top) + fadeIn(),
+            exit = shrinkVertically(sizeSpec, shrinkTowards = Alignment.Top) + fadeOut(),
+        ) {
+            ClientNavigationBar(selectedTab = selectedTab, onSelect = onSelectTab)
+        }
+        // Mirrors the navigation bar with the same spring so the mini player glides down to the
+        // gesture area instead of jumping when the bar collapses.
+        AnimatedVisibility(
+            visible = !showNavigationBar,
+            enter = expandVertically(sizeSpec, expandFrom = Alignment.Top),
+            exit = shrinkVertically(sizeSpec, shrinkTowards = Alignment.Top),
+        ) {
+            Spacer(
+                Modifier
+                    .fillMaxWidth()
+                    .windowInsetsBottomHeight(WindowInsets.navigationBars),
+            )
         }
     }
 }
@@ -346,6 +500,9 @@ private fun ScreenContent(
 @Composable
 private fun HomeRoute(model: NocturnViewModel) {
     val home by model.home.collectAsStateWithLifecycle()
+    val reselectFlow = remember(model) {
+        model.tabReselectEvents.filter { it == AppTab.Home }.map { }
+    }
     HomeScreen(
         state = home,
         onRefresh = model::refreshHome,
@@ -356,11 +513,15 @@ private fun HomeRoute(model: NocturnViewModel) {
         },
         onOpenDaily = dropUnlessResumed { model.openDailySongs() },
         onPlayAllDaily = { model.playAll(home.dailySongs) },
+        onPlayPlaylist = model::playPlaylist,
+        onRoamingClick = model::openRoaming,
         onSearchClick = dropUnlessResumed {
             model.selectTab(AppTab.Search)
             model.expandSearch()
         },
         onAccountClick = dropUnlessResumed { model.selectTab(AppTab.Library) },
+        onFreeListenClick = model::openFreeListenDialog,
+        reselectFlow = reselectFlow,
     )
 }
 
@@ -393,15 +554,20 @@ private fun SearchRoute(model: NocturnViewModel) {
 @Composable
 private fun LibraryRoute(model: NocturnViewModel) {
     val library by model.library.collectAsStateWithLifecycle()
+    val reselectFlow = remember(model) {
+        model.tabReselectEvents.filter { it == AppTab.Library }.map { }
+    }
     LibraryScreen(
         state = library,
         onLoginClick = model::startLogin,
         onLogout = model::logout,
         onLikedSongsClick = dropUnlessResumed { model.openLikedSongs() },
         onPlaylistClick = rememberResumedNavigation(model::openPlaylist),
+        onHeartbeatClick = model::startHeartbeatMode,
         onRecentSongsClick = dropUnlessResumed { model.openRecentSongs() },
         onSettingsClick = dropUnlessResumed { model.openSettings() },
         onRetry = model::refreshLibrary,
+        reselectFlow = reselectFlow,
     )
 }
 
@@ -410,7 +576,7 @@ private fun SettingsRoute(model: NocturnViewModel) {
     val settingsState by model.settingsUi.collectAsStateWithLifecycle()
     SettingsScreen(
         state = settingsState,
-        onBack = dropUnlessResumed { model.back() },
+        onBack = { model.back() },
         onNavigatePlayback = dropUnlessResumed { model.openSettingsPlayback() },
         onNavigateAppearance = dropUnlessResumed { model.openSettingsAppearance() },
         onNavigateGeneral = dropUnlessResumed { model.openSettingsGeneral() },
@@ -424,8 +590,12 @@ private fun SettingsPlaybackRoute(model: NocturnViewModel) {
     val settingsState by model.settingsUi.collectAsStateWithLifecycle()
     SettingsPlaybackScreen(
         state = settingsState,
-        onBack = dropUnlessResumed { model.back() },
+        onBack = { model.back() },
         onQualityChange = model::setQuality,
+        onImmerseTypeChange = model::setImmerseType,
+        onUnblockEnabledChange = model::setUnblockEnabled,
+        onScrobbleEnabledChange = model::setScrobbleEnabled,
+        onRelayPlayStateEnabledChange = model::setRelayPlayStateEnabled,
     )
 }
 
@@ -434,8 +604,11 @@ private fun SettingsAppearanceRoute(model: NocturnViewModel) {
     val settingsState by model.settingsUi.collectAsStateWithLifecycle()
     SettingsAppearanceScreen(
         state = settingsState,
-        onBack = dropUnlessResumed { model.back() },
+        onBack = { model.back() },
         onThemeModeChange = model::setThemeMode,
+        onColorSchemeChange = model::setColorScheme,
+        onDynamicVariantChange = model::setDynamicVariant,
+        onResetColorScheme = model::resetColorScheme,
         onDynamicColorChange = model::setDynamicColor,
     )
 }
@@ -445,7 +618,7 @@ private fun SettingsGeneralRoute(model: NocturnViewModel) {
     val settingsState by model.settingsUi.collectAsStateWithLifecycle()
     SettingsGeneralScreen(
         state = settingsState,
-        onBack = dropUnlessResumed { model.back() },
+        onBack = { model.back() },
         onHapticsChange = model::setHapticsEnabled,
         onLyriconChange = model::setLyriconEnabled,
     )
@@ -456,7 +629,7 @@ private fun SettingsStorageRoute(model: NocturnViewModel) {
     val settingsState by model.settingsUi.collectAsStateWithLifecycle()
     SettingsStorageScreen(
         state = settingsState,
-        onBack = dropUnlessResumed { model.back() },
+        onBack = { model.back() },
         onClearSearchHistory = model::clearSearchHistory,
         onClearCache = model::clearCache,
     )
@@ -467,7 +640,7 @@ private fun SettingsAboutRoute(model: NocturnViewModel) {
     val settingsState by model.settingsUi.collectAsStateWithLifecycle()
     SettingsAboutScreen(
         state = settingsState,
-        onBack = dropUnlessResumed { model.back() },
+        onBack = { model.back() },
     )
 }
 
@@ -481,7 +654,7 @@ private fun PlaylistRoute(id: Long, model: NocturnViewModel) {
     val entry by remember(id) { derivedStateOf { all.value[id] } }
     PlaylistScreen(
         state = rememberLastNonNull(entry) ?: PlaylistUiState(playlistId = id, loading = true),
-        onBack = dropUnlessResumed { model.back() },
+        onBack = { model.back() },
         onPlayAll = model::playAll,
         onSongClick = { song, songs ->
             model.playSongs(songs, songs.indexOf(song).coerceAtLeast(0))
@@ -494,6 +667,20 @@ private fun PlaylistRoute(id: Long, model: NocturnViewModel) {
             model.selectTab(AppTab.Search)
             model.expandSearch()
         },
+        onHeartbeatMode = {
+            val detail = entry?.detail
+            if (detail != null) {
+                val summary = dev.nocturn.app.data.model.PlaylistSummary(
+                    id = detail.id,
+                    name = detail.name,
+                    coverUrl = detail.coverUrl,
+                    trackCount = detail.trackCount,
+                    playCount = detail.playCount,
+                    specialType = if (detail.name.contains("喜欢")) 5 else 0,
+                )
+                model.startHeartbeatMode(summary)
+            }
+        },
     )
 }
 
@@ -503,7 +690,7 @@ private fun AlbumRoute(id: Long, model: NocturnViewModel) {
     val entry by remember(id) { derivedStateOf { all.value[id] } }
     AlbumScreen(
         state = rememberLastNonNull(entry) ?: AlbumUiState(albumId = id, loading = true),
-        onBack = dropUnlessResumed { model.back() },
+        onBack = { model.back() },
         onPlayAll = model::playAll,
         onSongClick = { song, songs ->
             model.playSongs(songs, songs.indexOf(song).coerceAtLeast(0))
@@ -519,7 +706,7 @@ private fun ArtistRoute(id: Long, model: NocturnViewModel) {
     val entry by remember(id) { derivedStateOf { all.value[id] } }
     ArtistScreen(
         state = rememberLastNonNull(entry) ?: ArtistUiState(artistId = id, loading = true),
-        onBack = dropUnlessResumed { model.back() },
+        onBack = { model.back() },
         onSongClick = { song, songs ->
             model.playSongs(songs, songs.indexOf(song).coerceAtLeast(0))
         },
@@ -534,7 +721,7 @@ private fun RecentSongsRoute(model: NocturnViewModel) {
     val library by model.library.collectAsStateWithLifecycle()
     RecentSongsScreen(
         state = library,
-        onBack = dropUnlessResumed { model.back() },
+        onBack = { model.back() },
         onPlayAll = { model.playAll(library.recentSongs) },
         onSongClick = { song, songs ->
             model.playSongs(songs, songs.indexOf(song).coerceAtLeast(0))
@@ -548,7 +735,7 @@ private fun LikedSongsRoute(model: NocturnViewModel) {
     val likedSongs by model.likedSongs.collectAsStateWithLifecycle()
     LikedSongsScreen(
         state = likedSongs,
-        onBack = dropUnlessResumed { model.back() },
+        onBack = { model.back() },
         onPlayAll = { model.playAll(likedSongs.songs) },
         onSongClick = { song, songs ->
             model.playSongs(songs, songs.indexOf(song).coerceAtLeast(0))
@@ -562,7 +749,7 @@ private fun DailySongsRoute(model: NocturnViewModel) {
     val home by model.home.collectAsStateWithLifecycle()
     DailySongsScreen(
         state = home,
-        onBack = dropUnlessResumed { model.back() },
+        onBack = { model.back() },
         onPlayAll = { model.playAll(home.dailySongs) },
         onSongClick = { song, songs ->
             model.playSongs(songs, songs.indexOf(song).coerceAtLeast(0))
@@ -590,17 +777,22 @@ private class LastValue<T : Any> {
 private fun ClientNavigationBar(
     selectedTab: AppTab,
     onSelect: (AppTab) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val haptics = rememberHaptics()
-    // Transparent: the frosted chrome strip behind it is the container.
-    ShortNavigationBar(containerColor = Color.Transparent) {
+    val backdrop = LocalShellBackdrop.current
+    val material = GlassMaterials.chrome()
+    ShortNavigationBar(
+        modifier = modifier.glass(backdrop, RectangleShape, material),
+        containerColor = Color.Transparent,
+    ) {
         ShortNavigationBarItem(
             selected = selectedTab == AppTab.Home,
             onClick = {
                 haptics.step()
                 onSelect(AppTab.Home)
             },
-            icon = { Icon(Icons.Filled.Home, contentDescription = null) },
+            icon = { Icon(Icons.Rounded.Home, contentDescription = null) },
             label = { Text("首页") },
         )
         ShortNavigationBarItem(
@@ -609,7 +801,7 @@ private fun ClientNavigationBar(
                 haptics.step()
                 onSelect(AppTab.Search)
             },
-            icon = { Icon(Icons.Filled.Search, contentDescription = null) },
+            icon = { Icon(Icons.Rounded.Search, contentDescription = null) },
             label = { Text("搜索") },
         )
         ShortNavigationBarItem(
@@ -618,8 +810,75 @@ private fun ClientNavigationBar(
                 haptics.step()
                 onSelect(AppTab.Library)
             },
-            icon = { Icon(Icons.Filled.LibraryMusic, contentDescription = null) },
+            icon = { Icon(Icons.Rounded.LibraryMusic, contentDescription = null) },
             label = { Text("我的") },
+        )
+    }
+}
+
+@Composable
+private fun ClientNavigationRail(
+    selectedTab: AppTab,
+    onSelect: (AppTab) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptics = rememberHaptics()
+    NavigationRail(
+        modifier = modifier
+            .fillMaxHeight()
+            .testTag("client-navigation-rail"),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        header = {
+            Box(
+                modifier = Modifier
+                    .padding(top = 16.dp, bottom = 12.dp)
+                    .size(44.dp)
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Headphones,
+                    contentDescription = "Nocturn",
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+        },
+    ) {
+        Spacer(Modifier.height(12.dp))
+        NavigationRailItem(
+            selected = selectedTab == AppTab.Home,
+            onClick = {
+                haptics.step()
+                onSelect(AppTab.Home)
+            },
+            icon = { Icon(Icons.Rounded.Home, contentDescription = null) },
+            label = { Text("首页") },
+            modifier = Modifier.testTag("nav-rail-home"),
+        )
+        Spacer(Modifier.height(6.dp))
+        NavigationRailItem(
+            selected = selectedTab == AppTab.Search,
+            onClick = {
+                haptics.step()
+                onSelect(AppTab.Search)
+            },
+            icon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+            label = { Text("搜索") },
+            modifier = Modifier.testTag("nav-rail-search"),
+        )
+        Spacer(Modifier.height(6.dp))
+        NavigationRailItem(
+            selected = selectedTab == AppTab.Library,
+            onClick = {
+                haptics.step()
+                onSelect(AppTab.Library)
+            },
+            icon = { Icon(Icons.Rounded.LibraryMusic, contentDescription = null) },
+            label = { Text("我的") },
+            modifier = Modifier.testTag("nav-rail-library"),
         )
     }
 }

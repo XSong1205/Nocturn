@@ -180,7 +180,17 @@ test('ID lists are bounded, positive and do not silently lose numeric precision'
   }
   assert.equal(validateParameters('song/url/v1', { id: '9223372036854775807,347230', level: 'hires' }), null);
   assert(validateParameters('lyric', { id: '1,2' }));
-  assert(validateParameters('song/url/v1', { id: '1', level: 'vivid' }));
+  for (const quality of ['standard', 'higher', 'exhigh', 'lossless', 'hires', 'jyeffect', 'dolby', 'vivid', 'jymaster', 'sky']) {
+    assert.equal(validateParameters('song/url/v1', { id: '1', level: quality }), null);
+  }
+  assert.match(validateParameters('song/url/v1', { id: '1', level: 'invalid' }), /Unsupported audio quality/);
+  for (const type of ['c512', 'ste2', 'aac2', 'c51', 'ste', 'aac']) {
+    assert.equal(validateParameters('song/url/v1', { id: '1', level: 'sky', immerseType: type }), null);
+  }
+  assert.match(validateParameters('song/url/v1', { id: '1', level: 'sky', immerseType: 'unknown' }), /Unsupported immerse type/);
+  assert.equal(validateParameters('song/url/v1', { id: '1', level: 'standard', unblock: true }), null);
+  assert.equal(validateParameters('song/url/v1', { id: '1', level: 'standard', unblock: false }), null);
+  assert.match(validateParameters('song/url/v1', { id: '1', level: 'standard', unblock: 'invalid' }), /unblock must be boolean/);
   assert.equal(validateParameters('like', { id: '1' }), null);
 });
 
@@ -208,7 +218,10 @@ test('account endpoints dispatch explicit actions with one phone credential', as
   for (const [route, params] of [
     ['register/anonimous', {}], ['login/refresh', { cookie: 'test' }],
     ['user/account', { cookie: 'test' }], ['user/subcount', { cookie: 'test' }],
+    ['user/level', { cookie: 'test' }], ['listen/data/total', { cookie: 'test' }],
+    ['playmode/intelligence/list', { id: '33894312', pid: '24381616', count: 20 }],
     ['captcha/sent', { phone: '13800138000', ctcode: '86' }],
+    ['captcha/sent/v1', { phone: '13800138000', ctcode: '86' }],
     ['captcha/verify', { phone: '13800138000', captcha: '012345', ctcode: '86' }],
     ['login/cellphone', { phone: '13800138000', captcha: '012345', countrycode: '86' }],
     ['login/cellphone', { phone: '13800138000', password: 'local-secret', countrycode: '86' }],
@@ -225,4 +238,25 @@ test('account endpoints dispatch explicit actions with one phone credential', as
     { phone: '13800138000', md5_password: 'secret' },
     { phone: '13800138000', captcha: '1234', countrycode: '0' },
   ]) assert.equal((await post(api, 'login/cellphone', params)).status, 400);
+});
+
+test('playback reporting endpoints validate bounds and dispatch valid payloads', async (t) => {
+  const api = await fixture(t);
+  for (const [route, params] of [
+    ['scrobble', { id: '347230', sourceid: '12345', time: 120 }],
+    ['scrobble/v1', { id: '347230', time: 120, total: 240, sourceid: '12345', name: '夜曲', artist: '周杰伦', level: 'lossless', vip: false }],
+    ['relay/play/state/submit', { id: '347230', sessionId: 'ABC123XYZ456', progress: 30, playMode: 'list_loop', type: 'song' }],
+    ['top/song', { type: 0 }],
+  ]) assert.equal((await post(api, route, params)).status, 200, route);
+  for (const [route, params] of [
+    ['scrobble', {}],
+    ['scrobble', { id: 'invalid' }],
+    ['scrobble/v1', { id: '347230' }],
+    ['scrobble/v1', { id: '347230', time: 0 }],
+    ['scrobble/v1', { id: '347230', time: 10, level: 'unknown' }],
+    ['relay/play/state/submit', {}],
+    ['relay/play/state/submit', { id: '347230', type: 'unsupported' }],
+    ['relay/play/state/submit', { id: '347230', sessionId: '***invalid***' }],
+    ['top/song', { type: 999 }],
+  ]) assert.equal((await post(api, route, params)).status, 400, route);
 });

@@ -92,11 +92,12 @@ class NeteaseJsonAccountTest {
     }
 
     @Test
-    fun likedIdsAreDeduplicatedAndInvalidValuesDropped() {
+    fun likedIdsAreDeduplicatedInvalidValuesDroppedAndReversedToMatchOfficialOrder() {
         val ids = NeteaseJson.parseLikedIds(
             json("""{"code":200,"ids":[1,2,2,0,-3,"5","bad"]}"""),
         )
         assertEquals(setOf(1L, 2L, 5L), ids)
+        assertEquals(listOf(5L, 2L, 1L), ids.toList())
         assertTrue(NeteaseJson.parseLikedIds(json("""{"code":200}""")).isEmpty())
     }
 
@@ -203,5 +204,173 @@ class NeteaseJsonAccountTest {
         assertThrows(MalformedResponseException::class.java) {
             NeteaseJson.ensureSuccess(json("""{"msg":"no code"}"""))
         }
+    }
+
+    @Test
+    fun parseFreeListenRightsParsesValidPayload() {
+        val payload = json(
+            """
+            {
+              "code": 200,
+              "data": {
+                "title": "免费听时长剩余",
+                "vipInfoContent": "已解锁今日免费听歌时长",
+                "status": "已解锁",
+                "rightsEndTime": 1731110000000,
+                "rightsRemainingTime": 1800000,
+                "rightsCoverToday": true,
+                "rightsUpperLimit": false,
+                "cardContent": {
+                  "actionTitle": "领取30分钟"
+                }
+              }
+            }
+            """.trimIndent(),
+        )
+        val rights = NeteaseJson.parseFreeListenRights(payload)
+        assertEquals(1800000L, rights.remainingMs)
+        assertEquals(1731110000000L, rights.endTimeMs)
+        assertTrue(rights.coverToday)
+        assertFalse(rights.upperLimit)
+        assertEquals("已解锁", rights.status)
+        assertEquals("免费听时长剩余", rights.title)
+        assertEquals("已解锁今日免费听歌时长", rights.vipInfoContent)
+        assertEquals("领取30分钟", rights.actionTitle)
+        assertTrue(rights.isUnlocked)
+    }
+
+    @Test
+    fun parseFreeListenRightsHandlesEmptyOrFallback() {
+        val payload = json("""{"code": 200}""")
+        val rights = NeteaseJson.parseFreeListenRights(payload)
+        assertEquals(0L, rights.remainingMs)
+        assertEquals(0L, rights.endTimeMs)
+        assertFalse(rights.coverToday)
+        assertFalse(rights.upperLimit)
+        assertFalse(rights.isUnlocked)
+        assertEquals("领取30分钟", rights.actionTitle)
+    }
+
+    @Test
+    fun parseFreeListenClaimParsesSuccessAndFailure() {
+        val successPayload = json(
+            """
+            {
+              "code": 200,
+              "data": {
+                "gainFlag": true,
+                "showContent": "恭喜获得30分钟免费听",
+                "rightsUpperLimit": false,
+                "gainRightsDuration": 1800000
+              }
+            }
+            """.trimIndent(),
+        )
+        val successResult = NeteaseJson.parseFreeListenClaim(successPayload)
+        assertTrue(successResult.success)
+        assertEquals("恭喜获得30分钟免费听", successResult.message)
+        assertEquals(1800000L, successResult.durationMs)
+        assertFalse(successResult.upperLimit)
+
+        val failPayload = json(
+            """
+            {
+              "code": 200,
+              "data": {
+                "gainFlag": false,
+                "showContent": "今日领取已达上限",
+                "rightsUpperLimit": true,
+                "gainRightsDuration": 0
+              }
+            }
+            """.trimIndent(),
+        )
+        val failResult = NeteaseJson.parseFreeListenClaim(failPayload)
+        assertFalse(failResult.success)
+        assertEquals("今日领取已达上限", failResult.message)
+        assertEquals(0L, failResult.durationMs)
+        assertTrue(failResult.upperLimit)
+    }
+
+    @Test
+    fun accountStatsParsesUserDetailAndListenDataTotalWithFallback() {
+        val userDetail = json(
+            """
+            {
+              "code": 200,
+              "level": 6,
+              "listenSongs": 2518,
+              "profile": {
+                "userId": 10074058552,
+                "nickname": "XSong0507",
+                "follows": 7,
+                "followeds": 2,
+                "playlistCount": 1
+              }
+            }
+            """.trimIndent(),
+        )
+        val listenTotal = json(
+            """
+            {
+              "code": 200,
+              "data": {
+                "totalDuration": 910800,
+                "hours": 253
+              }
+            }
+            """.trimIndent(),
+        )
+        val stats = NeteaseJson.parseAccountStats(
+            detailBody = userDetail,
+            listenTotalBody = listenTotal,
+        )
+        assertEquals(1, stats.playlistCount)
+        assertEquals(7, stats.followingCount)
+        assertEquals(2, stats.followerCount)
+        assertEquals(6, stats.level)
+        assertEquals(2518L, stats.listenSongs)
+        assertEquals(253, stats.listenHours)
+    }
+
+    @Test
+    fun parseIntelligenceListParsesNestedSongInfoAndNormalizesTracks() {
+        val payload = json(
+            """
+            {
+              "code": 200,
+              "data": [
+                {
+                  "id": 101,
+                  "songInfo": {
+                    "id": 101,
+                    "name": "心动一",
+                    "ar": [{"id": 1, "name": "周杰伦"}],
+                    "al": {"id": 10, "name": "十一月的萧邦"},
+                    "dt": 240000
+                  }
+                },
+                {
+                  "id": 102,
+                  "song": {
+                    "id": 102,
+                    "name": "心动二",
+                    "artists": [{"id": 2, "name": "林俊杰"}],
+                    "album": {"id": 20, "name": "江南"},
+                    "duration": 210000
+                  }
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+        val songs = NeteaseJson.parseIntelligenceList(payload)
+        assertEquals(2, songs.size)
+        assertEquals(101L, songs[0].id)
+        assertEquals("心动一", songs[0].name)
+        assertEquals("周杰伦", songs[0].artistText)
+        assertEquals(102L, songs[1].id)
+        assertEquals("心动二", songs[1].name)
+        assertEquals("林俊杰", songs[1].artistText)
     }
 }

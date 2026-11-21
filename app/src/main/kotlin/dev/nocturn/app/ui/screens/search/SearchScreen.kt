@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -90,6 +91,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalFocusManager
@@ -101,6 +104,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import dev.nocturn.app.data.model.AlbumSummary
 import dev.nocturn.app.data.model.ArtistSummary
+import dev.nocturn.app.data.model.DefaultSearchKeyword
 import dev.nocturn.app.data.model.Song
 import dev.nocturn.app.data.model.ThemeMode
 import dev.nocturn.app.ui.components.CoverArt
@@ -127,12 +131,12 @@ import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 
 /** Material 3 Expressive non-linear physical spring specs. */
 private val M3SpringSpatialFloat = spring<Float>(
-    dampingRatio = Spring.DampingRatioLowBouncy,
+    dampingRatio = Spring.DampingRatioNoBouncy,
     stiffness = Spring.StiffnessMediumLow,
 )
 
 private val M3SpringSpatialDp = spring<Dp>(
-    dampingRatio = Spring.DampingRatioLowBouncy,
+    dampingRatio = Spring.DampingRatioNoBouncy,
     stiffness = Spring.StiffnessMediumLow,
 )
 
@@ -170,6 +174,7 @@ fun SearchScreen(
     val haptics = rememberHaptics()
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
+    val focusRequester = remember { FocusRequester() }
     val textFieldState = rememberTextFieldState(state.query)
     val searchBarState = rememberSearchBarState(
         initialValue = if (state.expanded) SearchBarValue.Expanded else SearchBarValue.Collapsed,
@@ -212,6 +217,16 @@ fun SearchScreen(
 
     val isExpanded = state.expanded || searchBarState.currentValue == SearchBarValue.Expanded ||
         searchBarState.targetValue == SearchBarValue.Expanded || state.submittedKeyword != null
+
+    LaunchedEffect(isExpanded) {
+        if (isExpanded) {
+            try {
+                focusRequester.requestFocus()
+            } catch (_: Throwable) {}
+        } else {
+            focusManager.clearFocus()
+        }
+    }
 
     // Material 3 Expressive Non-linear Spring Physics
     val expansionProgress by animateFloatAsState(
@@ -266,16 +281,20 @@ fun SearchScreen(
     ) {
         val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
         val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+        val imeBottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
         val bottomChromePadding = LocalBottomChromePadding.current
-        val bottomPadding = maxOf(bottomChromePadding, navBarBottom) + 8.dp
+        val bottomObstruction = maxOf(imeBottom, maxOf(bottomChromePadding, navBarBottom))
 
+        val expandedTopPadding = statusBarTop + 8.dp
         val animatedTopPadding by animateDpAsState(
-            targetValue = if (isExpanded) (statusBarTop + 4.dp) else (statusBarTop + 8.dp),
+            targetValue = expandedTopPadding,
             animationSpec = M3SpringSpatialDp,
             label = "search-top-padding",
         )
 
-        val targetExpandedHeight = (maxHeight - statusBarTop - 6.dp - bottomPadding).coerceAtLeast(56.dp)
+        // Equal spacing on left, right, and bottom when expanded (8.dp)
+        val expandedMargin = 8.dp
+        val targetExpandedHeight = (maxHeight - bottomObstruction - expandedTopPadding - expandedMargin).coerceAtLeast(56.dp)
         val animatedHeight by animateDpAsState(
             targetValue = if (isExpanded) targetExpandedHeight else 56.dp,
             animationSpec = M3SpringSpatialDp,
@@ -337,7 +356,7 @@ fun SearchScreen(
                 .padding(horizontal = animatedHorizontalPadding)
                 .widthIn(max = 720.dp)
                 .fillMaxWidth()
-                .height(animatedHeight)
+                .height(animatedHeight.coerceAtLeast(56.dp))
                 .shadow(
                     elevation = animatedElevation,
                     shape = floatingShape,
@@ -372,6 +391,9 @@ fun SearchScreen(
                                     haptics.tap()
                                     onExpand()
                                     scope.launch { searchBarState.animateToExpanded() }
+                                    try {
+                                        focusRequester.requestFocus()
+                                    } catch (_: Throwable) {}
                                 }
                             } else {
                                 Modifier
@@ -384,6 +406,7 @@ fun SearchScreen(
                         searchBarState = searchBarState,
                         defaultKeyword = state.defaultKeyword,
                         onSearch = onSearch,
+                        focusRequester = focusRequester,
                         trailing = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 if (textFieldState.text.isNotEmpty()) {
@@ -400,7 +423,7 @@ fun SearchScreen(
                                 AnimatedVisibility(
                                     visible = isExpanded,
                                     enter = fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) +
-                                        scaleIn(spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)),
+                                        scaleIn(spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)),
                                     exit = fadeOut(spring(stiffness = Spring.StiffnessHigh)) +
                                         scaleOut(spring(stiffness = Spring.StiffnessHigh)),
                                 ) {
@@ -573,78 +596,8 @@ private fun SearchFloatingExploreContent(
                 }
             }
         } else {
-            val defaultKeyword = state.defaultKeyword?.takeIf { it.isNotBlank() }
-            if (defaultKeyword != null) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(MaterialTheme.shapes.medium)
-                        .clickable {
-                            haptics.tap()
-                            onSuggestionClick(defaultKeyword)
-                        }
-                        .padding(horizontal = 4.dp, vertical = 10.dp)
-                        .testTag("search-default-keyword"),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.TrendingUp,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Spacer(Modifier.width(14.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = defaultKeyword,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            text = "默认推荐 · 点击立即搜索",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    IconButton(
-                        onClick = {
-                            haptics.tap()
-                            onQueryChange(defaultKeyword)
-                        },
-                        modifier = Modifier.size(36.dp),
-                    ) {
-                        Icon(
-                            Icons.Filled.NorthWest,
-                            contentDescription = "填入搜索框",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                    IconButton(
-                        onClick = {
-                            haptics.tap()
-                            onSuggestionClick(defaultKeyword)
-                        },
-                        modifier = Modifier.size(36.dp),
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = "立即搜索",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                }
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 8.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                )
-            }
-
             if (state.hotKeywords.isNotEmpty()) {
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(8.dp))
                 SearchSectionTitle(title = "热门搜索")
                 Spacer(Modifier.height(8.dp))
                 FlowRow(
@@ -731,17 +684,22 @@ private fun SearchInputField(
     onSearch: (String) -> Unit,
     trailing: @Composable () -> Unit,
     modifier: Modifier = Modifier,
-    defaultKeyword: String? = null,
+    defaultKeyword: DefaultSearchKeyword? = null,
+    focusRequester: FocusRequester? = null,
 ) {
-    val placeholderText = defaultKeyword?.takeIf { it.isNotBlank() } ?: "搜索歌曲、歌手、歌单"
+    val placeholderText = defaultKeyword?.display?.takeIf { it.isNotBlank() }
+        ?: defaultKeyword?.keyword?.takeIf { it.isNotBlank() }
+        ?: "搜索歌曲、歌手、歌单"
     SearchBarDefaults.InputField(
         textFieldState = textFieldState,
         searchBarState = searchBarState,
         onSearch = { keyword ->
-            val effective = keyword.trim().ifEmpty { defaultKeyword?.trim().orEmpty() }
+            val effective = keyword.trim().ifEmpty { defaultKeyword?.keyword?.trim().orEmpty() }
             if (effective.isNotBlank()) onSearch(effective)
         },
-        modifier = modifier,
+        modifier = modifier.then(
+            if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier,
+        ),
         placeholder = {
             Text(
                 text = placeholderText,
@@ -783,44 +741,32 @@ private fun SearchExploreContent(
             .verticalScroll(scrollState)
             .padding(horizontal = 20.dp)
             .testTag("search-explore"),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(Modifier.height(topPadding))
-        header?.invoke()
-        if (state.suggestions.isNotEmpty()) {
-            SearchSectionTitle(title = "搜索建议")
-            state.suggestions.forEach { keyword ->
-                SuggestionRow(
-                    keyword = keyword,
-                    onClick = {
-                        haptics.tap()
-                        onQueryPicked?.invoke()
-                        onSuggestionClick(keyword)
-                    },
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 840.dp),
+        ) {
+            Spacer(Modifier.height(topPadding))
+            header?.invoke()
+            if (state.suggestions.isNotEmpty()) {
+                SearchSectionTitle(title = "搜索建议")
+                state.suggestions.forEach { keyword ->
+                    SuggestionRow(
+                        keyword = keyword,
+                        onClick = {
+                            haptics.tap()
+                            onQueryPicked?.invoke()
+                            onSuggestionClick(keyword)
+                        },
+                    )
+                }
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 12.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant,
                 )
             }
-            HorizontalDivider(
-                modifier = Modifier.padding(vertical = 12.dp),
-                color = MaterialTheme.colorScheme.outlineVariant,
-            )
-        }
-
-        val defaultKeyword = state.defaultKeyword?.takeIf { it.isNotBlank() }
-        if (defaultKeyword != null) {
-            SearchSectionTitle(title = "默认搜索")
-            Spacer(Modifier.height(8.dp))
-            AssistChip(
-                onClick = { pick(defaultKeyword) },
-                label = { Text(defaultKeyword, style = MaterialTheme.typography.labelLarge) },
-                leadingIcon = {
-                    Icon(
-                        Icons.AutoMirrored.Filled.TrendingUp,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                },
-                modifier = Modifier.testTag("search-default-keyword"),
-            )
-        }
 
         if (state.hotKeywords.isNotEmpty()) {
             Spacer(Modifier.height(16.dp))
@@ -894,6 +840,7 @@ private fun SearchExploreContent(
         }
 
         Spacer(Modifier.height(bottomContentPadding(40.dp)))
+        }
     }
 }
 

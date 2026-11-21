@@ -8,6 +8,9 @@ import dev.nocturn.app.data.model.AlbumSummary
 import dev.nocturn.app.data.model.ArtistDetail
 import dev.nocturn.app.data.model.ArtistRef
 import dev.nocturn.app.data.model.ArtistSummary
+import dev.nocturn.app.data.model.DefaultSearchKeyword
+import dev.nocturn.app.data.model.FreeListenClaimResult
+import dev.nocturn.app.data.model.FreeListenRights
 import dev.nocturn.app.data.model.LyricLine
 import dev.nocturn.app.data.model.Lyrics
 import dev.nocturn.app.data.model.LyricWord
@@ -319,11 +322,39 @@ internal object NeteaseJson {
         }.map { it.trim() }.filter { it.isNotEmpty() }.distinct().take(MAX_HOT_SEARCHES)
     }
 
-    fun parseDefaultKeyword(body: JsonObject): String? {
+    private val PROMO_PREFIX_REGEX = Regex(
+        "^([\\p{So}\\p{Sk}\\p{Sm}\\p{Sc}\\p{Punct}\\s]*" +
+            "(?:大家都在搜|大家都在听|热门搜索|全网在搜|全网都在搜|实时热搜|热搜|推荐)[：:\\s-]*)+",
+        RegexOption.IGNORE_CASE,
+    )
+
+    internal fun cleanShowKeyword(raw: String?): String? {
+        if (raw == null) return null
+        val stripped = raw.replace(PROMO_PREFIX_REGEX, "")
+            .replace(Regex("^[\\p{So}\\p{Sk}\\p{Sm}\\p{Sc}\\p{Punct}\\s]+"), "")
+            .trim()
+        return stripped.takeIf { it.isNotEmpty() }
+    }
+
+    fun parseDefaultKeyword(body: JsonObject): DefaultSearchKeyword? {
         val data = body.obj("data") ?: body
-        return (data.string("showKeyword") ?: data.string("realkeyword")
-            ?: data.string("keyword") ?: body.string("showKeyword"))
-            ?.trim()?.takeIf { it.isNotEmpty() }
+        val real = data.string("realkeyword")?.trim()?.takeIf { it.isNotEmpty() }
+        val show = data.string("showKeyword")?.trim()?.takeIf { it.isNotEmpty() }
+            ?: body.string("showKeyword")?.trim()?.takeIf { it.isNotEmpty() }
+        val legacy = data.string("keyword")?.trim()?.takeIf { it.isNotEmpty() }
+
+        val keyword = real
+            ?: cleanShowKeyword(show)
+            ?: show
+            ?: legacy
+            ?: return null
+
+        val display = show ?: real ?: legacy ?: keyword
+
+        return DefaultSearchKeyword(
+            keyword = keyword,
+            display = display,
+        )
     }
 
     // ---------------------------------------------------------------------------------------
@@ -506,32 +537,95 @@ internal object NeteaseJson {
         )
     }
 
-    /** Merge of `user/subcount` counts (playlists) and profile follow counts. */
-    fun parseAccountStats(subcountBody: JsonObject?, accountBody: JsonObject?): AccountStats {
+    /** Merge of `user/detail`, `user/subcount`, `user/level`, `listen/data/total`, and account profile. */
+    fun parseAccountStats(
+        subcountBody: JsonObject? = null,
+        accountBody: JsonObject? = null,
+        detailBody: JsonObject? = null,
+        levelBody: JsonObject? = null,
+        listenTotalBody: JsonObject? = null,
+    ): AccountStats {
         val subcount = subcountBody?.let(::unwrapData)
-        val profile = accountBody?.let(::profileOf)
+        val profile = detailBody?.let(::profileOf) ?: accountBody?.let(::profileOf)
+        val detail = detailBody?.let(::unwrapData)
+        val levelData = levelBody?.obj("data") ?: levelBody?.let(::unwrapData)
+
         val created = subcount?.int("createPlaylistCount")
         val collected = subcount?.int("collectPlaylistCount")
         val playlistCount = if (created != null || collected != null) {
             (created ?: 0) + (collected ?: 0)
         } else {
-            firstInt(subcount, "playlistCount", "subPlaylistCount") ?: 0
+            firstInt(subcount, "playlistCount", "subPlaylistCount")
+                ?: firstInt(profile, "playlistCount") ?: 0
         }
-        val following = firstInt(subcount, "followedUserCount", "followingCount")
-            ?: firstInt(profile, "followedUserCount", "followingCount") ?: 0
-        val followers = firstInt(subcount, "followerCount", "followers", "followeds")
-            ?: firstInt(profile, "followerCount", "followers", "followeds") ?: 0
+        val following = firstInt(profile, "follows", "followedUserCount", "followingCount")
+            ?: firstInt(subcount, "followedUserCount", "followingCount") ?: 0
+        val followers = firstInt(profile, "followeds", "followerCount", "followers")
+            ?: firstInt(subcount, "followerCount", "followers", "followeds") ?: 0
+
+        val level = firstInt(detail, "level")
+            ?: firstInt(levelData, "level")
+            ?: firstInt(profile, "level") ?: 0
+
+        val listenSongs = firstLong(detail, "listenSongs")
+            ?: firstLong(levelData, "nowPlayCount", "listenSongs")
+            ?: 0L
+
+        // Parse listen hours from listenDataTotal
+        val totalData = listenTotalBody?.obj("data") ?: listenTotalBody
+        val rawDuration = firstLong(totalData, "totalDuration", "duration", "totalTime", "playTime")
+        val explicitHours = firstInt(totalData, "hours", "totalHours", "listenHours")
+
+        val listenHours = when {
+            explicitHours != null && explicitHours > 0 -> explicitHours
+            rawDuration != null && rawDuration > 0 -> {
+                if (rawDuration > 365 * 24 * 3600L) {
+                    (rawDuration / 3600_000L).toInt()
+                } else if (rawDuration > 1000) {
+                    (rawDuration / 3600L).toInt()
+                } else {
+                    rawDuration.toInt()
+                }
+            }
+            listenSongs > 0 -> (listenSongs / 10).toInt()
+            else -> 0
+        }
+
         return AccountStats(
             playlistCount = playlistCount.coerceAtLeast(0),
             followingCount = following.coerceAtLeast(0),
             followerCount = followers.coerceAtLeast(0),
+            level = level.coerceAtLeast(0),
+            listenSongs = listenSongs.coerceAtLeast(0L),
+            listenHours = listenHours.coerceAtLeast(0),
         )
     }
 
+    /**
+     * Parses the smart recommendation queue from `/playmode/intelligence/list`.
+     */
+    fun parseIntelligenceList(body: JsonObject): List<Song> {
+        val data = body.array("data") ?: body.obj("data")?.array("list") ?: return emptyList()
+        return data.mapNotNull { element ->
+            val obj = element as? JsonObject ?: return@mapNotNull null
+            val songObj = obj.obj("songInfo") ?: obj.obj("song") ?: obj
+            parseSong(songObj)
+        }.distinctBy { it.id }
+    }
+
+    /**
+     * Parses the account's liked song IDs from `likelist`.
+     *
+     * NetEase Cloud Music's `likelist` endpoint returns song IDs in ascending chronological
+     * order (earliest liked first). The official app and user expectations display liked songs
+     * in reverse chronological order (newest liked first). The IDs are reversed so the most
+     * recently added songs appear first.
+     */
     fun parseLikedIds(body: JsonObject): Set<Long> {
         val entries = body.array("ids") ?: body.obj("data")?.array("ids") ?: return emptySet()
         return entries.mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.trim()?.toLongOrNull() }
             .filter { it > 0 }
+            .reversed()
             .toSet()
     }
 
@@ -581,6 +675,79 @@ internal object NeteaseJson {
             val cover = item.string("picUrl")?.trim()?.takeIf { it.isNotEmpty() }
             if (song.coverUrl == null && cover != null) song.copy(coverUrl = cover) else song
         }.distinctBy { it.id }
+    }
+
+    /**
+     * Parses personalized songs from `/homepage/block/page` block `HOMEPAGE_BLOCK_STYLE_RCMD`.
+     * Upstream nests each song in `creatives[].resources[].resourceExtInfo.song`.
+     */
+    fun parseHomepageStyleSongs(body: JsonObject): List<Song> {
+        val blocks = body.obj("data")?.array("blocks") ?: return emptyList()
+        val styleBlock = blocks.filterIsInstance<JsonObject>().firstOrNull { block ->
+            val code = block.string("blockCode") ?: ""
+            code == "HOMEPAGE_BLOCK_STYLE_RCMD" || code.contains("STYLE_RCMD")
+        } ?: return emptyList()
+
+        val creatives = styleBlock.array("creatives")?.filterIsInstance<JsonObject>() ?: return emptyList()
+        val songs = mutableListOf<Song>()
+        for (creative in creatives) {
+            val resources = creative.array("resources")?.filterIsInstance<JsonObject>() ?: continue
+            for (resource in resources) {
+                if (resource.string("resourceType") != "song") continue
+                val extInfo = resource.obj("resourceExtInfo")
+                val songObj = extInfo?.obj("song")
+                val song = if (songObj != null) {
+                    parseSong(songObj)
+                } else {
+                    val songData = extInfo?.obj("songData")
+                    if (songData != null) parseSong(songData) else parseSong(resource)
+                } ?: continue
+
+                val ui = resource.obj("uiElement")
+                val cover = ui?.obj("image")?.string("imageUrl")?.trim()?.takeIf { it.isNotEmpty() }
+                val resolvedSong = if (song.coverUrl == null && cover != null) song.copy(coverUrl = cover) else song
+                songs.add(resolvedSong)
+            }
+        }
+        return songs.distinctBy { it.id }
+    }
+
+    /**
+     * Parses radar playlists from `/homepage/block/page` block `HOMEPAGE_BLOCK_MGC_PLAYLIST`.
+     */
+    fun parseHomepageRadarPlaylists(body: JsonObject): List<PlaylistSummary> {
+        val blocks = body.obj("data")?.array("blocks") ?: return emptyList()
+        val radarBlock = blocks.filterIsInstance<JsonObject>().firstOrNull { block ->
+            val code = block.string("blockCode") ?: ""
+            code == "HOMEPAGE_BLOCK_MGC_PLAYLIST" || code.contains("RADAR") || code.contains("MGC_PLAYLIST")
+        } ?: return emptyList()
+
+        val creatives = radarBlock.array("creatives")?.filterIsInstance<JsonObject>() ?: return emptyList()
+        val playlists = mutableListOf<PlaylistSummary>()
+        for (creative in creatives) {
+            val resources = creative.array("resources")?.filterIsInstance<JsonObject>() ?: continue
+            for (resource in resources) {
+                val idStr = resource.string("resourceId") ?: continue
+                val id = idStr.toLongOrNull() ?: continue
+                val ui = resource.obj("uiElement")
+                val rawTitle = ui?.obj("mainTitle")?.string("title") ?: continue
+                val name = if (rawTitle.contains('|')) rawTitle.substringAfterLast('|').trim() else rawTitle.trim()
+                val cover = ui.obj("image")?.string("imageUrl")
+                val subTitle = ui.obj("subTitle")?.string("title")
+                playlists.add(
+                    PlaylistSummary(
+                        id = id,
+                        name = name.ifEmpty { rawTitle },
+                        coverUrl = cover,
+                        trackCount = 0,
+                        playCount = 0,
+                        creatorName = null,
+                        description = subTitle,
+                    ),
+                )
+            }
+        }
+        return playlists.distinctBy { it.id }
     }
 
     // ---------------------------------------------------------------------------------------
@@ -686,6 +853,53 @@ internal object NeteaseJson {
             value.int(key)?.let { return it }
         }
         return null
+    }
+
+    private fun firstLong(value: JsonObject?, vararg keys: String): Long? {
+        if (value == null) return null
+        for (key in keys) {
+            value.long(key)?.let { return it }
+        }
+        return null
+    }
+
+    fun parseFreeListenRights(body: JsonObject): FreeListenRights {
+        val data = body.obj("data") ?: body
+        val remainingMs = data.long("rightsRemainingTime") ?: 0L
+        val endTimeMs = data.long("rightsEndTime") ?: 0L
+        val coverToday = data.bool("rightsCoverToday") ?: false
+        val upperLimit = data.bool("rightsUpperLimit") ?: false
+        val status = data.string("status") ?: data.content("status") ?: ""
+        val title = data.string("title") ?: "免费听时长剩余"
+        val vipInfoContent = data.string("vipInfoContent") ?: ""
+        val actionTitle = data.obj("cardContent")?.string("actionTitle") ?: "领取30分钟"
+        return FreeListenRights(
+            remainingMs = remainingMs.coerceAtLeast(0L),
+            endTimeMs = endTimeMs.coerceAtLeast(0L),
+            coverToday = coverToday,
+            upperLimit = upperLimit,
+            status = status,
+            title = title,
+            vipInfoContent = vipInfoContent,
+            actionTitle = actionTitle,
+        )
+    }
+
+    fun parseFreeListenClaim(body: JsonObject): FreeListenClaimResult {
+        val data = body.obj("data") ?: body
+        val gainFlag = data.bool("gainFlag") ?: (body.int("code") == 200)
+        val showContent = data.string("showContent")
+            ?: data.content("showContent")
+            ?: body.string("message")
+            ?: (if (gainFlag) "领取成功" else "领取失败")
+        val gainRightsDuration = data.long("gainRightsDuration") ?: 0L
+        val upperLimit = data.bool("rightsUpperLimit") ?: false
+        return FreeListenClaimResult(
+            success = gainFlag,
+            message = showContent,
+            durationMs = gainRightsDuration.coerceAtLeast(0L),
+            upperLimit = upperLimit,
+        )
     }
 
     private val DATA_URL_PREFIX = Regex("^data:[^,]*;base64,", RegexOption.IGNORE_CASE)

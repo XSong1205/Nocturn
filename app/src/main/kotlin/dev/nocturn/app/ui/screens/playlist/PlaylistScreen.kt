@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -26,9 +27,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearWavyProgressIndicator
@@ -62,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import dev.nocturn.app.data.model.PlaylistDetail
 import dev.nocturn.app.data.model.Song
 import dev.nocturn.app.data.model.ThemeMode
+import dev.nocturn.app.ui.adaptive.LocalWindowWidthClass
 import dev.nocturn.app.ui.components.BarBackButton
 import dev.nocturn.app.ui.components.BarTitle
 import dev.nocturn.app.ui.components.CoverArt
@@ -101,6 +106,7 @@ fun PlaylistScreen(
     onRetry: () -> Unit = {},
     onSubscribeToggle: () -> Unit = {},
     onSearchClick: () -> Unit = {},
+    onHeartbeatMode: () -> Unit = {},
 ) {
     val detail = state.detail
     if (detail == null) {
@@ -159,6 +165,7 @@ fun PlaylistScreen(
         onRetry = onRetry,
         onSubscribeToggle = onSubscribeToggle,
         onSearchClick = onSearchClick,
+        onHeartbeatMode = onHeartbeatMode,
     )
 }
 
@@ -175,6 +182,7 @@ private fun PlaylistContent(
     onRetry: () -> Unit,
     onSubscribeToggle: () -> Unit,
     onSearchClick: () -> Unit,
+    onHeartbeatMode: () -> Unit,
 ) {
     val listState = rememberLazyListState()
     var descriptionExpanded by rememberSaveable { mutableStateOf(false) }
@@ -191,6 +199,10 @@ private fun PlaylistContent(
     }
     // Once the hero has scrolled away the playlist name appears in the frosted bar.
     val heroScrolledAway by listState.scrolledPast(420)
+
+    val widthClass = LocalWindowWidthClass.current
+    val isExpanded = widthClass.isExpanded
+    val isWide = widthClass.isAtLeastMedium
 
     GlassScaffold(
         modifier = modifier,
@@ -239,6 +251,7 @@ private fun PlaylistContent(
                     detail = detail,
                     onPlayAll = onPlayAll,
                     onSubscribeToggle = onSubscribeToggle,
+                    onHeartbeatMode = onHeartbeatMode,
                 )
             }
             item(key = "tracks-header") {
@@ -261,21 +274,66 @@ private fun PlaylistContent(
                     )
                 }
             }
-            itemsIndexed(
-                items = state.songs,
-                key = { _, song -> song.id },
-            ) { index, song ->
-                SongRow(
-                    song = song,
-                    onClick = { onSongClick(song, state.songs) },
-                    modifier = Modifier
-                        .padding(horizontal = 8.dp)
-                        .testTag("playlist-song-$index"),
-                    index = index + 1,
-                    isPlaying = state.nowPlayingSongId == song.id,
-                    isLiked = song.id in state.likedSongIds,
-                    onLikeClick = { onLikeClick(song) },
-                )
+            if (isExpanded) {
+                items(
+                    items = state.songs.chunked(2),
+                    key = { pair -> "song-pair-${pair.first().id}" },
+                ) { pair ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        val song0 = pair[0]
+                        val index0 = state.songs.indexOf(song0)
+                        SongRow(
+                            song = song0,
+                            onClick = { onSongClick(song0, state.songs) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("playlist-song-$index0"),
+                            index = index0 + 1,
+                            isPlaying = state.nowPlayingSongId == song0.id,
+                            isLiked = song0.id in state.likedSongIds,
+                            onLikeClick = { onLikeClick(song0) },
+                        )
+                        if (pair.size > 1) {
+                            val song1 = pair[1]
+                            val index1 = state.songs.indexOf(song1)
+                            SongRow(
+                                song = song1,
+                                onClick = { onSongClick(song1, state.songs) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("playlist-song-$index1"),
+                                index = index1 + 1,
+                                isPlaying = state.nowPlayingSongId == song1.id,
+                                isLiked = song1.id in state.likedSongIds,
+                                onLikeClick = { onLikeClick(song1) },
+                            )
+                        } else {
+                            Spacer(Modifier.weight(1f))
+                        }
+                    }
+                }
+            } else {
+                itemsIndexed(
+                    items = state.songs,
+                    key = { _, song -> song.id },
+                ) { index, song ->
+                    SongRow(
+                        song = song,
+                        onClick = { onSongClick(song, state.songs) },
+                        modifier = Modifier
+                            .padding(horizontal = 8.dp)
+                            .testTag("playlist-song-$index"),
+                        index = index + 1,
+                        isPlaying = state.nowPlayingSongId == song.id,
+                        isLiked = song.id in state.likedSongIds,
+                        onLikeClick = { onLikeClick(song) },
+                    )
+                }
             }
             if (state.loadingMore) {
                 item(key = "loading-more") { LoadingMoreRow() }
@@ -318,12 +376,141 @@ private fun PlaylistHero(
                     ),
                 ),
         )
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 20.dp, end = 20.dp, top = topInset + 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
+        val isWide = LocalWindowWidthClass.current.isAtLeastMedium
+        if (isWide) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 28.dp, end = 28.dp, top = topInset + 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val playlistIcon = if (detail.name.contains("喜欢") || detail.name.contains("Favorite", ignoreCase = true)) {
+                    Icons.Rounded.Favorite
+                } else {
+                    Icons.AutoMirrored.Rounded.QueueMusic
+                }
+                CoverArt(
+                    imageUrl = detail.coverUrl,
+                    modifier = Modifier
+                        .size(200.dp)
+                        .shadow(
+                            elevation = 22.dp,
+                            shape = MaterialTheme.shapes.extraLarge,
+                            ambientColor = colors.primary.copy(alpha = 0.42f),
+                            spotColor = colors.primary.copy(alpha = 0.48f),
+                        ),
+                    shape = MaterialTheme.shapes.extraLarge,
+                    seed = detail.id.hashCode(),
+                    contentDescription = detail.name,
+                    placeholderIcon = playlistIcon,
+                )
+                Spacer(Modifier.width(28.dp))
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.Start,
+                ) {
+                    Text(
+                        text = detail.name,
+                        style = MaterialTheme.typography.headlineMediumEmphasized,
+                        color = colors.onSurface,
+                        textAlign = TextAlign.Start,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    val creator = detail.creatorName
+                    if (!creator.isNullOrBlank()) {
+                        Spacer(Modifier.height(10.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CoverArt(
+                                imageUrl = detail.creatorAvatarUrl,
+                                modifier = Modifier
+                                    .size(26.dp)
+                                    .clip(CircleShape),
+                                shape = CircleShape,
+                                seed = creator.hashCode(),
+                                contentDescription = null,
+                                placeholderIcon = Icons.Rounded.Person,
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = creator,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = colors.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        MetaChip(text = "${formatCount(detail.playCount)} 次播放")
+                        MetaChip(text = "${detail.trackCount} 首歌曲")
+                        val frequency = detail.updateFrequency
+                        if (!frequency.isNullOrBlank()) {
+                            MetaChip(
+                                text = frequency,
+                                containerColor = colors.secondaryContainer,
+                                contentColor = colors.onSecondaryContainer,
+                            )
+                        }
+                    }
+                    if (detail.tags.isNotEmpty()) {
+                        Spacer(Modifier.height(10.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            detail.tags.take(3).forEach { tag ->
+                                MetaChip(
+                                    text = "# $tag",
+                                    containerColor = colors.tertiaryContainer,
+                                    contentColor = colors.onTertiaryContainer,
+                                )
+                            }
+                        }
+                    }
+                    val description = detail.description
+                    if (!description.isNullOrBlank()) {
+                        Spacer(Modifier.height(12.dp))
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.large,
+                            color = colors.surfaceContainerLow,
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text(
+                                    text = description,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = colors.onSurfaceVariant,
+                                    maxLines = if (expanded) 40 else 3,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                if (description.length > 60) {
+                                    ToggleButton(
+                                        checked = expanded,
+                                        onCheckedChange = { onToggleDescription() },
+                                        modifier = Modifier
+                                            .padding(top = 4.dp)
+                                            .testTag("playlist-description-toggle"),
+                                    ) {
+                                        Text(if (expanded) "收起" else "展开完整简介")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 20.dp, end = 20.dp, top = topInset + 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+            val playlistIcon = if (detail.name.contains("喜欢") || detail.name.contains("Favorite", ignoreCase = true)) {
+                Icons.Rounded.Favorite
+            } else {
+                Icons.AutoMirrored.Rounded.QueueMusic
+            }
             CoverArt(
                 imageUrl = detail.coverUrl,
                 modifier = Modifier
@@ -337,6 +524,7 @@ private fun PlaylistHero(
                 shape = MaterialTheme.shapes.extraLarge,
                 seed = detail.id.hashCode(),
                 contentDescription = detail.name,
+                placeholderIcon = playlistIcon,
             )
             Spacer(Modifier.height(22.dp))
             Text(
@@ -359,6 +547,7 @@ private fun PlaylistHero(
                         shape = CircleShape,
                         seed = creator.hashCode(),
                         contentDescription = null,
+                        placeholderIcon = Icons.Rounded.Person,
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
@@ -432,6 +621,7 @@ private fun PlaylistHero(
         }
     }
 }
+}
 
 @Composable
 private fun PlaylistActions(
@@ -439,6 +629,7 @@ private fun PlaylistActions(
     detail: PlaylistDetail,
     onPlayAll: (List<Song>) -> Unit,
     onSubscribeToggle: () -> Unit,
+    onHeartbeatMode: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -446,47 +637,73 @@ private fun PlaylistActions(
             .padding(horizontal = 20.dp),
     ) {
         val haptics = rememberHaptics()
-        SplitButtonLayout(
-            leadingButton = {
-                SplitButtonDefaults.LeadingButton(
-                    onClick = {
-                        haptics.confirm()
-                        onPlayAll(state.songs)
-                    },
-                    modifier = Modifier.testTag("playlist-play-all"),
-                    enabled = state.songs.isNotEmpty(),
-                ) {
-                    Icon(
-                        Icons.Rounded.PlayArrow,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("播放全部")
-                }
-            },
-            trailingButton = {
-                SplitButtonDefaults.TrailingButton(
-                    onClick = {
-                        haptics.toggle(on = !detail.subscribed)
-                        onSubscribeToggle()
-                    },
-                    modifier = Modifier.testTag("playlist-subscribe"),
-                    enabled = !state.subscribing,
-                    colors = ButtonDefaults.filledTonalButtonColors(),
-                ) {
-                    Icon(
-                        imageVector = if (detail.subscribed) {
-                            Icons.Rounded.Favorite
-                        } else {
-                            Icons.Rounded.FavoriteBorder
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SplitButtonLayout(
+                modifier = Modifier.weight(1f),
+                leadingButton = {
+                    SplitButtonDefaults.LeadingButton(
+                        onClick = {
+                            haptics.confirm()
+                            onPlayAll(state.songs)
                         },
-                        contentDescription = if (detail.subscribed) "已收藏歌单" else "收藏歌单",
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            },
-        )
+                        modifier = Modifier.testTag("playlist-play-all"),
+                        enabled = state.songs.isNotEmpty(),
+                    ) {
+                        Icon(
+                            Icons.Rounded.PlayArrow,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("播放全部")
+                    }
+                },
+                trailingButton = {
+                    SplitButtonDefaults.TrailingButton(
+                        onClick = {
+                            haptics.toggle(on = !detail.subscribed)
+                            onSubscribeToggle()
+                        },
+                        modifier = Modifier.testTag("playlist-subscribe"),
+                        enabled = !state.subscribing,
+                        colors = ButtonDefaults.filledTonalButtonColors(),
+                    ) {
+                        Icon(
+                            imageVector = if (detail.subscribed) {
+                                Icons.Rounded.Favorite
+                            } else {
+                                Icons.Rounded.FavoriteBorder
+                            },
+                            contentDescription = if (detail.subscribed) "已收藏歌单" else "收藏歌单",
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                },
+            )
+            FilledTonalButton(
+                onClick = {
+                    haptics.confirm()
+                    onHeartbeatMode()
+                },
+                modifier = Modifier
+                    .height(48.dp)
+                    .testTag("playlist-heartbeat-button"),
+                shape = MaterialTheme.shapes.large,
+                enabled = state.songs.isNotEmpty(),
+            ) {
+                Icon(
+                    Icons.Rounded.Favorite,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text("心动模式")
+            }
+        }
         val subscribeError = state.subscribeError
         if (subscribeError != null) {
             Spacer(Modifier.height(8.dp))

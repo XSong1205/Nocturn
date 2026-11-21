@@ -2,6 +2,7 @@ package dev.nocturn.app.ui.state
 
 import dev.nocturn.app.data.model.AlbumSummary
 import dev.nocturn.app.data.model.ArtistSummary
+import dev.nocturn.app.data.model.DefaultSearchKeyword
 import dev.nocturn.app.data.model.PlaylistSummary
 import dev.nocturn.app.data.model.Song
 
@@ -21,7 +22,7 @@ data class SearchUiState(
     val loadingMore: Boolean = false,
     val error: String? = null,
     val hotKeywords: List<String> = emptyList(),
-    val defaultKeyword: String? = null,
+    val defaultKeyword: DefaultSearchKeyword? = null,
     val history: List<String> = emptyList(),
     val suggestions: List<String> = emptyList(),
     val songs: List<Song> = emptyList(),

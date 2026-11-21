@@ -23,6 +23,7 @@ module.exports = function createProvider(dataDirectory) {
   'login/refresh': require('@neteasecloudmusicapienhanced/api/module/login_refresh.js'),
   'register/anonimous': require('@neteasecloudmusicapienhanced/api/module/register_anonimous.js'),
   'captcha/sent': require('@neteasecloudmusicapienhanced/api/module/captcha_sent.js'),
+  'captcha/sent/v1': require('@neteasecloudmusicapienhanced/api/module/captcha_sent_v1.js'),
   'captcha/verify': require('@neteasecloudmusicapienhanced/api/module/captcha_verify.js'),
   'login/cellphone': require('@neteasecloudmusicapienhanced/api/module/login_cellphone.js'),
   logout: require('@neteasecloudmusicapienhanced/api/module/logout.js'),
@@ -62,6 +63,9 @@ module.exports = function createProvider(dataDirectory) {
   'user/detail': require('@neteasecloudmusicapienhanced/api/module/user_detail.js'),
   'user/account': require('@neteasecloudmusicapienhanced/api/module/user_account.js'),
   'user/subcount': require('@neteasecloudmusicapienhanced/api/module/user_subcount.js'),
+  'user/level': require('@neteasecloudmusicapienhanced/api/module/user_level.js'),
+  'listen/data/total': require('@neteasecloudmusicapienhanced/api/module/listen_data_total.js'),
+  'playmode/intelligence/list': require('@neteasecloudmusicapienhanced/api/module/playmode_intelligence_list.js'),
   'user/playlist': require('@neteasecloudmusicapienhanced/api/module/user_playlist.js'),
   'user/playlist/create': require('@neteasecloudmusicapienhanced/api/module/user_playlist_create.js'),
   'user/playlist/collect': require('@neteasecloudmusicapienhanced/api/module/user_playlist_collect.js'),
@@ -79,6 +83,14 @@ module.exports = function createProvider(dataDirectory) {
   'artist/sub': require('@neteasecloudmusicapienhanced/api/module/artist_sub.js'),
   'artist/sublist': require('@neteasecloudmusicapienhanced/api/module/artist_sublist.js'),
   'personal/fm': require('@neteasecloudmusicapienhanced/api/module/personal_fm.js'),
+  'ad/listening/rights': require('@neteasecloudmusicapienhanced/api/module/ad_listening_rights.js'),
+  'ad/listening/rights/gain': require('@neteasecloudmusicapienhanced/api/module/ad_listening_rights_gain.js'),
+  'ad/get': require('@neteasecloudmusicapienhanced/api/module/ad_get.js'),
+  'register/checktoken/v3': require('@neteasecloudmusicapienhanced/api/module/register_checktoken_v3.js'),
+  'scrobble/v1': require('@neteasecloudmusicapienhanced/api/module/scrobble_v1.js'),
+  scrobble: require('@neteasecloudmusicapienhanced/api/module/scrobble.js'),
+  'relay/play/state/submit': require('@neteasecloudmusicapienhanced/api/module/relay_play_state_submit.js'),
+  'top/song': require('@neteasecloudmusicapienhanced/api/module/top_song.js'),
   };
   const axios = require('axios').default;
   axios.defaults.timeout = 12000;
@@ -105,10 +117,20 @@ module.exports = function createProvider(dataDirectory) {
   return async function provider(endpoint, params) {
     const handler = modules[endpoint];
     if (!handler) throw new Error('Unsupported endpoint.');
-    if (endpoint === 'song/url/v1' || endpoint === 'register/anonimous') await ensureXeapiKey();
+    if (endpoint === 'song/url/v1' || endpoint === 'register/anonimous' || endpoint === 'ad/get' || endpoint === 'ad/listening/rights' || endpoint === 'ad/listening/rights/gain') await ensureXeapiKey();
     const cookie = cookieToJson(params.cookie || '');
+    if (endpoint === 'song/url/v1' && params.level === 'dolby' && !cookie.os) {
+      cookie.os = 'pc';
+    }
     try {
-      return await handler(providerParameters(params, cookie), request);
+      const result = await handler(providerParameters(params, cookie), request);
+      if (endpoint === 'register/anonimous' && result?.body?.cookie) {
+        const parsed = cookieToJson(result.body.cookie);
+        if (parsed.MUSIC_A) {
+          fs.writeFileSync(anonymousPath, parsed.MUSIC_A, { mode: 0o600 });
+        }
+      }
+      return result;
     } finally {
       // Guest registration rotates upstream global.deviceId. Persist it even if the request fails
       // so the next process/key bootstrap uses the same identity rather than a stale device file.

@@ -24,7 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -38,9 +38,11 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -68,15 +70,16 @@ import dev.nocturn.app.ui.components.rememberHaptics
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-// A short, damped carry between rows, rather than moving the entire sheet as one rigid block.
+// Fluid, critically-damped Apple Music style animation curves.
+// When seeking or rewinding backwards, the per-row spring chain is bypassed to prevent row overlap.
 private val LineScrollChain = LyricsScrollChain(
-    stiffness = 180f,
-    damping = 26f,
-    coupling = 0.25f,
-    distanceFalloff = 0.2f,
-    minResponse = 0.6f,
+    stiffness = 200f,
+    damping = 28f,
+    coupling = 0.15f,
+    distanceFalloff = 0.15f,
+    minResponse = 0.75f,
 )
-private val LineScrollAnimation = tween<Float>(540, easing = CubicBezierEasing(0.2f, 0f, 0.2f, 1f))
+private val LineScrollAnimation = tween<Float>(580, easing = CubicBezierEasing(0.25f, 0.1f, 0.25f, 1f))
 
 internal enum class LyricsStage {
     Loading,
@@ -164,6 +167,22 @@ private fun LyricsRenderer(
 ) {
     val haptics = rememberHaptics()
     val scope = rememberCoroutineScope()
+    val currentLineIndex by remember(lyrics, position) {
+        derivedStateOf { lyrics.indexAt(position.intValue.toLong()) }
+    }
+    val previousIndexRef = remember(lyrics) { intArrayOf(currentLineIndex) }
+    var isBackward by remember(lyrics) { mutableStateOf(false) }
+
+    val activeIndex = currentLineIndex
+    if (activeIndex != previousIndexRef[0]) {
+        if (activeIndex < previousIndexRef[0]) {
+            isBackward = true
+        } else if (activeIndex > previousIndexRef[0]) {
+            isBackward = false
+        }
+        previousIndexRef[0] = activeIndex
+    }
+
     val currentLine by remember(lyrics, position) {
         derivedStateOf { lyrics.lines.getOrNull(lyrics.indexAt(position.intValue.toLong())) }
     }
@@ -174,9 +193,17 @@ private fun LyricsRenderer(
     }
     val onClick = remember(lyrics, synced, onLineClick, haptics) {
         { clicked: ISyncedLine ->
-            if (onLineClick != null) {
-                val index = synced.lines.indexOf(clicked)
-                lyrics.lines.getOrNull(index)?.let { haptics.confirm(); onLineClick(it) }
+            val index = synced.lines.indexOf(clicked)
+            if (index in lyrics.lines.indices) {
+                if (index < previousIndexRef[0]) {
+                    isBackward = true
+                } else if (index > previousIndexRef[0]) {
+                    isBackward = false
+                }
+                previousIndexRef[0] = index
+                if (onLineClick != null) {
+                    lyrics.lines.getOrNull(index)?.let { haptics.confirm(); onLineClick(it) }
+                }
             }
         }
     }
@@ -212,7 +239,7 @@ private fun LyricsRenderer(
             itemSpacing = 20.dp,
             keepAliveZone = 24.dp,
             scrollAnimationSpec = LineScrollAnimation,
-            scrollChain = LineScrollChain,
+            scrollChain = if (isBackward) null else LineScrollChain,
             autoScrollResumeDelayMillis = 3_500,
         )
         androidx.compose.animation.AnimatedVisibility(
@@ -309,7 +336,7 @@ private fun LyricsPlaceholder(modifier: Modifier = Modifier) {
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
-                    imageVector = Icons.Filled.GraphicEq,
+                    imageVector = Icons.Rounded.GraphicEq,
                     contentDescription = null,
                     modifier = Modifier.size(36.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,

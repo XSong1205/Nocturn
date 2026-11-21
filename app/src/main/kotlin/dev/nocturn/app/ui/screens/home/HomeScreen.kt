@@ -33,9 +33,13 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -53,6 +57,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -63,6 +68,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -114,8 +120,12 @@ fun HomeScreen(
     onSongClick: (Song, List<Song>) -> Unit = { _, _ -> },
     onOpenDaily: () -> Unit = {},
     onPlayAllDaily: () -> Unit = {},
+    onPlayPlaylist: (Long) -> Unit = {},
+    onRoamingClick: () -> Unit = {},
     onSearchClick: () -> Unit = {},
     onAccountClick: () -> Unit = {},
+    onFreeListenClick: () -> Unit = {},
+    reselectFlow: kotlinx.coroutines.flow.Flow<Unit>? = null,
 ) {
     if (state.loading && !state.hasContent) {
         CenteredStatus(modifier) { ScreenLoading(label = "正在加载") }
@@ -147,8 +157,12 @@ fun HomeScreen(
         onSongClick = onSongClick,
         onOpenDaily = onOpenDaily,
         onPlayAllDaily = onPlayAllDaily,
+        onPlayPlaylist = onPlayPlaylist,
+        onRoamingClick = onRoamingClick,
         onSearchClick = onSearchClick,
         onAccountClick = onAccountClick,
+        onFreeListenClick = onFreeListenClick,
+        reselectFlow = reselectFlow,
     )
 }
 
@@ -174,10 +188,19 @@ private fun HomeFeed(
     onSongClick: (Song, List<Song>) -> Unit,
     onOpenDaily: () -> Unit,
     onPlayAllDaily: () -> Unit,
+    onPlayPlaylist: (Long) -> Unit,
+    onRoamingClick: () -> Unit,
     onSearchClick: () -> Unit,
     onAccountClick: () -> Unit,
+    onFreeListenClick: () -> Unit,
+    reselectFlow: kotlinx.coroutines.flow.Flow<Unit>? = null,
 ) {
     val listState = rememberLazyListState()
+    LaunchedEffect(reselectFlow) {
+        reselectFlow?.collect {
+            listState.animateScrollToItem(0)
+        }
+    }
     val today = remember { todayLabel() }
     val greeting = state.greeting.ifBlank { greetingForHour() }
     val refreshState = rememberPullToRefreshState()
@@ -198,6 +221,8 @@ private fun HomeFeed(
                 HomeBarContent(
                     greeting = greeting,
                     subtitle = today,
+                    showFreeListen = state.showFreeListenButton,
+                    onFreeListenClick = onFreeListenClick,
                     onSearchClick = onSearchClick,
                     onAccountClick = onAccountClick,
                 )
@@ -231,7 +256,9 @@ private fun HomeFeed(
                         state = state,
                         onOpenDaily = onOpenDaily,
                         onPlayAllDaily = onPlayAllDaily,
-                        onChartClick = onChartClick,
+                        onPlaylistClick = onPlaylistClick,
+                        onPlayPlaylist = onPlayPlaylist,
+                        onRoamingClick = onRoamingClick,
                         onAccountClick = onAccountClick,
                     )
                 }
@@ -281,6 +308,22 @@ private fun HomeFeed(
                     }
                 }
 
+                if (state.charts.isNotEmpty()) {
+                    item(key = "charts-header") {
+                        SectionHeader(
+                            title = "官方榜单",
+                            subtitle = "实时热度与权威风向",
+                            modifier = Modifier.padding(top = 28.dp, bottom = 14.dp),
+                        )
+                    }
+                    item(key = "charts") {
+                        ChartsRow(
+                            charts = state.charts,
+                            onChartClick = onChartClick,
+                        )
+                    }
+                }
+
                 val inlineError = state.error
                 if (inlineError != null) {
                     item(key = "inline-error") {
@@ -299,6 +342,8 @@ private fun HomeFeed(
 private fun RowScope.HomeBarContent(
     greeting: String,
     subtitle: String,
+    showFreeListen: Boolean,
+    onFreeListenClick: () -> Unit,
     onSearchClick: () -> Unit,
     onAccountClick: () -> Unit,
 ) {
@@ -319,6 +364,35 @@ private fun RowScope.HomeBarContent(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+    if (showFreeListen) {
+        FilledTonalButton(
+            onClick = {
+                haptics.tap()
+                onFreeListenClick()
+            },
+            modifier = Modifier
+                .height(32.dp)
+                .testTag("home-free-listen"),
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+            shape = CircleShape,
+            colors = ButtonDefaults.filledTonalButtonColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            ),
+        ) {
+            Icon(
+                Icons.Rounded.Headphones,
+                contentDescription = null,
+                modifier = Modifier.size(15.dp),
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = "免费听",
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+            )
+        }
+        Spacer(Modifier.width(4.dp))
     }
     IconButton(
         onClick = {
@@ -349,12 +423,17 @@ private fun RowScope.HomeBarContent(
  * opens the full list, the play glyph plays it); signed out, that slot invites login. Every chart
  * follows as its own card. Artwork drifts with a light parallax while the row scrolls.
  */
+/**
+ * 顶栏 Banner 行：仅保留「每日推荐」「雷达歌单」「私人漫游（待实现）」3 张核心卡片。
+ */
 @Composable
 private fun HomeHeroRow(
     state: HomeUiState,
     onOpenDaily: () -> Unit,
     onPlayAllDaily: () -> Unit,
-    onChartClick: (Toplist) -> Unit,
+    onPlaylistClick: (Long) -> Unit,
+    onPlayPlaylist: (Long) -> Unit,
+    onRoamingClick: () -> Unit,
     onAccountClick: () -> Unit,
 ) {
     val rowState = rememberLazyListState()
@@ -394,8 +473,79 @@ private fun HomeHeroRow(
                     modifier = cardModifier.testTag("home-login-prompt"),
                 )
             }
+
+            else -> item(key = "daily-empty") {
+                HeroCard(
+                    title = "每日推荐",
+                    subtitle = "今日推荐准备中",
+                    imageUrl = null,
+                    seed = 20_241,
+                    onClick = onOpenDaily,
+                    parallax = { rowState.layoutInfo.centreOffsetOf("daily-empty") },
+                    modifier = cardModifier.testTag("home-hero-daily"),
+                )
+            }
         }
-        items(items = state.charts, key = { "chart-${it.id}" }) { chart ->
+
+        val radar = state.radarPlaylist
+        item(key = "radar") {
+            HeroCard(
+                title = radar?.name ?: "雷达歌单",
+                subtitle = radar?.description?.takeIf { it.isNotBlank() }
+                    ?: if (state.isLoggedIn) "根据你的口味实时推荐" else "登录解锁专属雷达",
+                imageUrl = radar?.coverUrl,
+                seed = (radar?.id ?: 20_242L).hashCode(),
+                onClick = {
+                    if (state.isLoggedIn) {
+                        if (radar != null) onPlaylistClick(radar.id)
+                    } else {
+                        onAccountClick()
+                    }
+                },
+                onPlay = if (state.isLoggedIn && radar != null) {
+                    { onPlayPlaylist(radar.id) }
+                } else null,
+                parallax = { rowState.layoutInfo.centreOffsetOf("radar") },
+                modifier = cardModifier.testTag("home-hero-radar"),
+            )
+        }
+
+        item(key = "roaming") {
+            HeroCard(
+                title = "私人漫游",
+                subtitle = "即将上线 · 待实现",
+                imageUrl = null,
+                seed = 20_243,
+                badge = "待实现",
+                onClick = onRoamingClick,
+                onPlay = onRoamingClick,
+                parallax = { rowState.layoutInfo.centreOffsetOf("roaming") },
+                modifier = cardModifier.testTag("home-hero-roaming"),
+            )
+        }
+    }
+}
+
+/**
+ * 官方榜单横向紧凑滑块行。
+ */
+@Composable
+private fun ChartsRow(
+    charts: List<Toplist>,
+    onChartClick: (Toplist) -> Unit,
+) {
+    val rowState = rememberLazyListState()
+    val cardModifier = Modifier.size(width = 172.dp, height = 232.dp)
+    LazyRow(
+        state = rowState,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("home-charts-row"),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        flingBehavior = rememberSnapFlingBehavior(rowState, SnapPosition.Start),
+    ) {
+        items(items = charts, key = { "chart-${it.id}" }) { chart ->
             HeroCard(
                 title = chart.name,
                 subtitle = chart.updateFrequency?.takeIf { it.isNotBlank() }
@@ -459,12 +609,18 @@ private fun PlaylistCarouselCard(
                 onClick()
             },
     ) {
+        val placeholderIcon = if (playlist.name.contains("喜欢") || playlist.name.contains("Favorite", ignoreCase = true)) {
+            Icons.Rounded.Favorite
+        } else {
+            Icons.AutoMirrored.Rounded.QueueMusic
+        }
         CoverArt(
             imageUrl = playlist.coverUrl,
             modifier = Modifier.fillMaxSize(),
             shape = MaterialTheme.shapes.large,
             seed = playlist.id.hashCode(),
             contentDescription = playlist.name,
+            placeholderIcon = placeholderIcon,
         )
         Box(
             modifier = Modifier

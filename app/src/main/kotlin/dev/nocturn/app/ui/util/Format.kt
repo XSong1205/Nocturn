@@ -38,6 +38,30 @@ private fun trimDecimal(value: Double): String {
 }
 
 private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.CHINA)
+private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.CHINA)
+
+fun formatDateTime(epochMillis: Long): String? {
+    if (epochMillis <= 0) return null
+    return runCatching {
+        Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault())
+            .format(dateTimeFormatter)
+    }.getOrNull()
+}
+
+/** Formats remaining milliseconds into "DD天 HH时 mm分 ss秒" or "mm分ss秒". */
+fun formatCountdown(remainingMs: Long): String {
+    if (remainingMs <= 0) return "00分00秒"
+    val totalSec = remainingMs / 1000
+    val days = totalSec / 86400
+    val hours = (totalSec % 86400) / 3600
+    val minutes = (totalSec % 3600) / 60
+    val seconds = totalSec % 60
+    return buildString {
+        if (days > 0) append("${days}天 ")
+        if (days > 0 || hours > 0) append(String.format(Locale.ROOT, "%02d时 ", hours))
+        append(String.format(Locale.ROOT, "%02d分%02d秒", minutes, seconds))
+    }
+}
 
 fun formatDate(epochMillis: Long): String? {
     if (epochMillis <= 0) return null

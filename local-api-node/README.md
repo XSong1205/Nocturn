@@ -74,7 +74,7 @@ Content-Type: application/json
 | `login/qr/check` | `key` |
 | `login/status`、`logout` | `{}` |
 | `login/refresh`、`register/anonimous` | `{}`，刷新登录需要 Cookie，二维码会话不支持刷新 |
-| `captcha/sent` | `phone`，可选 `ctcode` |
+| `captcha/sent/v1`、`captcha/sent` | `phone`，可选 `ctcode` |
 | `captcha/verify` | `phone`、`captcha`，可选 `ctcode` |
 | `login/cellphone` | `phone`、`captcha` 或 `password` 二选一，可选 `countrycode`；不接受预计算的 `md5_password` |
 | `search`、`cloudsearch` | `keywords`，可选 `type`（含 1018）、`limit`、`offset` |

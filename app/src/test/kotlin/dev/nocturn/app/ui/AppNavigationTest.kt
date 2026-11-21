@@ -28,6 +28,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.unit.LayoutDirection
+import dev.nocturn.app.ui.adaptive.LocalWindowWidthClass
+import dev.nocturn.app.ui.adaptive.WindowWidthClass
 import dev.nocturn.app.ui.state.AppTab
 import dev.nocturn.app.ui.state.NavState
 import dev.nocturn.app.ui.state.Screen
@@ -201,7 +203,7 @@ class AppNavigationTest {
     }
 
     @Test
-    fun predictiveBackFromEitherEdgeUsesTheSamePopTransformThroughRelease() {
+    fun predictiveBackFromEitherEdgeFollowsPhysicalSwipeDirectionThroughRelease() {
         startHost()
         pushAlbum()
         compose.mainClock.autoAdvance = false
@@ -216,13 +218,61 @@ class AppNavigationTest {
             beginGesture(BackEventCompat.EDGE_RIGHT)
             dragTo(0.5f, BackEventCompat.EDGE_RIGHT)
             val beforeCommit = bounds().left
-            assertTrue("Either edge seeks the normal pop transform", beforeCommit > 1f)
+            assertTrue("Right-edge back slides left with finger", beforeCommit < -1f)
             compose.runOnIdle { dispatcher.onBackPressed() }
             advanceFrames(2)
-            assertTrue("Release continues in the same direction", bounds().left >= beforeCommit - 1f)
+            assertTrue("Release continues in the same leftward direction", bounds().left <= beforeCommit + 1f)
             advanceFrames(30)
             compose.onNodeWithTag("album-page").assertDoesNotExist()
             compose.runOnIdle { assertEquals(1, popCount) }
+        } finally {
+            finishGestureTest()
+        }
+    }
+
+    @Test
+    fun predictiveBackCancellationFromRightEdgeRestoresPageSmoothlyWithoutLayerInversionOrContentDrop() {
+        startHost()
+        pushAlbum()
+        compose.mainClock.autoAdvance = false
+        try {
+            beginGesture(BackEventCompat.EDGE_RIGHT)
+            dragTo(0.5f, BackEventCompat.EDGE_RIGHT)
+            assertTrue("Right-edge back slides left with finger", bounds().left < -1f)
+            compose.runOnIdle { dispatcher.dispatchOnBackCancelled() }
+            advanceFrames(4)
+            // Mid-cancellation: verify top page is retained and rendered (not dropped/excluded by layer inversion)
+            compose.onNodeWithTag("album-page").assertIsDisplayed()
+            advanceFrames(30)
+            assertEquals(0f, bounds().left, 0.5f)
+            compose.onNodeWithTag("album-page").assertIsDisplayed()
+            compose.runOnIdle { assertEquals(0, popCount) }
+        } finally {
+            finishGestureTest()
+        }
+    }
+
+    @Test
+    fun restartingRightEdgeGestureDuringCancellationCanStillCommit() {
+        startHost()
+        pushAlbum()
+        compose.mainClock.autoAdvance = false
+        try {
+            beginGesture(BackEventCompat.EDGE_RIGHT)
+            dragTo(0.6f, BackEventCompat.EDGE_RIGHT)
+            compose.runOnIdle { dispatcher.dispatchOnBackCancelled() }
+            advanceFrames(2)
+            beginGesture(BackEventCompat.EDGE_RIGHT)
+            dragTo(0.3f, BackEventCompat.EDGE_RIGHT)
+            assertTrue("Restarted right-edge drag translates left", bounds().left < -1f)
+            compose.runOnIdle { dispatcher.onBackPressed() }
+            advanceFrames(30)
+            compose.runOnIdle {
+                assertEquals(1, popCount)
+                assertTrue(navigation.stack.isEmpty())
+            }
+            compose.onNodeWithTag("rows").assertIsDisplayed()
+            compose.onNodeWithTag("album-page").assertDoesNotExist()
         } finally {
             finishGestureTest()
         }
@@ -365,6 +415,61 @@ class AppNavigationTest {
         } finally {
             finishGestureTest()
         }
+    }
+
+    @Test
+    fun wideScreenNavigationRendersWithoutLateralSlideDisplacement() {
+        var nav by mutableStateOf(NavState())
+        compose.setContent {
+            CompositionLocalProvider(LocalWindowWidthClass provides WindowWidthClass.Expanded) {
+                NocturnTheme {
+                    ScreenNavigationHost(nav, true, {}) { screen ->
+                        when (screen) {
+                            Screen.Home -> Text("Home")
+                            is Screen.Album -> Box(Modifier.fillMaxSize().testTag("album-page")) { Text("Album") }
+                            else -> Text(screen.toString())
+                        }
+                    }
+                }
+            }
+        }
+        compose.onNodeWithText("Home").assertIsDisplayed()
+        compose.runOnIdle { nav = nav.copy(stack = listOf(Screen.Album(1))) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("album-page").assertIsDisplayed()
+        val rect = compose.onNodeWithTag("album-page").fetchSemanticsNode().boundsInRoot
+        assertEquals(0f, rect.left, 0.5f)
+    }
+
+    @Test
+    fun switchingTabsWithIndependentStacksRendersActiveTabAndRestoresPreviousTab() {
+        var nav by mutableStateOf(
+            NavState(
+                tab = AppTab.Home,
+                stacks = mapOf(
+                    AppTab.Home to listOf(Screen.Album(1)),
+                    AppTab.Library to listOf(Screen.LikedSongs),
+                ),
+            )
+        )
+        compose.setContent {
+            NocturnTheme {
+                ScreenNavigationHost(nav, true, {}) { screen ->
+                    when (screen) {
+                        is Screen.Album -> Text("Album ${screen.id}")
+                        Screen.LikedSongs -> Text("Liked Songs Screen")
+                        else -> Text(screen.toString())
+                    }
+                }
+            }
+        }
+        compose.onNodeWithText("Album 1").assertIsDisplayed()
+        compose.runOnIdle { nav = nav.copy(tab = AppTab.Library) }
+        compose.waitForIdle()
+        compose.onNodeWithText("Liked Songs Screen").assertIsDisplayed()
+        compose.runOnIdle { nav = nav.copy(tab = AppTab.Home) }
+        compose.waitForIdle()
+        compose.onNodeWithText("Album 1").assertIsDisplayed()
     }
 
     private fun pop() {

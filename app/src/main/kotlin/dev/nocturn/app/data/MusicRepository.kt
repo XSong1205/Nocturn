@@ -4,6 +4,9 @@ import dev.nocturn.app.data.model.AccountProfile
 import dev.nocturn.app.data.model.AccountStats
 import dev.nocturn.app.data.model.AlbumDetail
 import dev.nocturn.app.data.model.ArtistDetail
+import dev.nocturn.app.data.model.DefaultSearchKeyword
+import dev.nocturn.app.data.model.FreeListenClaimResult
+import dev.nocturn.app.data.model.FreeListenRights
 import dev.nocturn.app.data.model.HomeFeed
 import dev.nocturn.app.data.model.Lyrics
 import dev.nocturn.app.data.model.PlaylistDetail
@@ -17,6 +20,7 @@ import dev.nocturn.app.data.model.SearchPlaylistsPage
 import dev.nocturn.app.data.model.SearchSongsPage
 import dev.nocturn.app.data.model.Song
 import dev.nocturn.localapi.client.AudioQuality
+import dev.nocturn.localapi.client.ImmerseType
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -52,7 +56,7 @@ interface MusicRepository {
     suspend fun hotSearches(): List<String>
 
     /** The service's rotating default keyword, shown as a chip on the idle search page. */
-    suspend fun defaultKeyword(): String?
+    suspend fun defaultKeyword(): DefaultSearchKeyword?
 
     suspend fun albumDetail(id: Long): AlbumDetail
 
@@ -62,7 +66,12 @@ interface MusicRepository {
     suspend fun lyrics(songId: Long): Lyrics
 
     /** Batch playable URLs for a queue. Keys are song IDs; null values mean "no source". */
-    suspend fun streamUrls(ids: List<Long>, quality: AudioQuality): Map<Long, String?>
+    suspend fun streamUrls(
+        ids: List<Long>,
+        quality: AudioQuality,
+        immerseType: ImmerseType? = null,
+        unblock: Boolean = false,
+    ): Map<Long, String?>
 
     // ---------------------------------------------------------------------------------------
     // Account and session
@@ -100,6 +109,9 @@ interface MusicRepository {
 
     suspend fun likedSongs(): List<Song>
 
+    /** Fetches the smart recommendation queue for heartbeat mode (/playmode/intelligence/list). */
+    suspend fun intelligenceList(songId: Long, playlistId: Long, startSongId: Long? = null): List<Song> = emptyList()
+
     suspend fun dailySongs(): List<Song>
 
     /** `personalized/newsong`: "根据你喜爱的歌曲推荐". Anonymous-friendly; personalised when logged in. */
@@ -108,6 +120,32 @@ interface MusicRepository {
     suspend fun recentSongs(): List<Song>
 
     suspend fun setPlaylistSubscribed(playlistId: Long, subscribed: Boolean): Boolean
+
+    /** Queries remaining free listening time and today's claim status. */
+    suspend fun getFreeListenRights(): FreeListenRights = FreeListenRights()
+
+    /** Claims free listening time via incentive ad reward flow. */
+    suspend fun claimFreeListen(): FreeListenClaimResult = FreeListenClaimResult(false, "Not implemented")
+
+    /** Scrobble playback reporting. NCBL v1 encrypted report with fallback to classic scrobble. */
+    suspend fun scrobble(
+        songId: Long,
+        timeSeconds: Int,
+        totalSeconds: Int? = null,
+        sourceId: Long? = null,
+        source: String = "list",
+        songName: String? = null,
+        artistName: String? = null,
+        level: AudioQuality? = null,
+    ): Boolean = false
+
+    /** Submits real-time play state and maintains playback session tracking. */
+    suspend fun submitPlayState(
+        songId: Long,
+        sessionId: String? = null,
+        progressSeconds: Int = 0,
+        playMode: String = "list_loop",
+    ): Boolean = false
 
     /** Releases the HTTP client. The embedded Node runtime is process-owned and keeps running. */
     fun close()

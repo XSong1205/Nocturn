@@ -9,6 +9,7 @@ import dev.nocturn.app.data.model.AccountProfile
 import dev.nocturn.app.data.model.AccountStats
 import dev.nocturn.app.data.model.AlbumDetail
 import dev.nocturn.app.data.model.ArtistDetail
+import dev.nocturn.app.data.model.DefaultSearchKeyword
 import dev.nocturn.app.data.model.HomeFeed
 import dev.nocturn.app.data.model.LyricLine as NocturnLyricLine
 import dev.nocturn.app.data.model.LyricWord as NocturnLyricWord
@@ -815,13 +816,18 @@ class LyriconManagerTest {
 
         override suspend fun hotSearches(): List<String> = emptyList()
 
-        override suspend fun defaultKeyword(): String? = null
+        override suspend fun defaultKeyword(): DefaultSearchKeyword? = null
 
         override suspend fun albumDetail(id: Long): AlbumDetail = error("not needed")
 
         override suspend fun artistDetail(id: Long): ArtistDetail = error("not needed")
 
-        override suspend fun streamUrls(ids: List<Long>, quality: AudioQuality): Map<Long, String?> = emptyMap()
+        override suspend fun streamUrls(
+            ids: List<Long>,
+            quality: AudioQuality,
+            immerseType: dev.nocturn.localapi.client.ImmerseType?,
+            unblock: Boolean,
+        ): Map<Long, String?> = emptyMap()
 
         override suspend fun createQrChallenge(): QrChallenge = error("not needed")
 
@@ -856,6 +862,10 @@ class LyriconManagerTest {
         override suspend fun recentSongs(): List<NocturnSong> = emptyList()
 
         override suspend fun setPlaylistSubscribed(playlistId: Long, subscribed: Boolean): Boolean = false
+
+        override suspend fun getFreeListenRights(): dev.nocturn.app.data.model.FreeListenRights = dev.nocturn.app.data.model.FreeListenRights()
+
+        override suspend fun claimFreeListen(): dev.nocturn.app.data.model.FreeListenClaimResult = dev.nocturn.app.data.model.FreeListenClaimResult(true, "ok")
 
         override fun close() = Unit
     }

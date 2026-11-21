@@ -61,14 +61,33 @@ suspend fun LocalApiClient.songUrls(
     ids: List<Long>,
     level: AudioQuality = AudioQuality.Standard,
     cookie: String? = null,
+): JsonObject = songUrls(ids = ids, level = level, immerseType = null, unblock = false, cookie = cookie)
+
+suspend fun LocalApiClient.songUrls(
+    ids: List<Long>,
+    level: AudioQuality = AudioQuality.Standard,
+    immerseType: ImmerseType? = null,
+    unblock: Boolean = false,
+    cookie: String? = null,
 ): JsonObject {
     require(ids.isNotEmpty() && ids.size <= 200 && ids.all { it > 0 }) {
         "Supply between 1 and 200 positive song IDs."
     }
+    val effectiveCookie = if (level == AudioQuality.Dolby) {
+        if (cookie.isNullOrBlank()) "os=pc" else if (!cookie.contains("os=")) "$cookie; os=pc" else cookie
+    } else {
+        cookie
+    }
     return request(LocalApiEndpoint.SongUrl, buildJsonObject {
         put("id", ids.joinToString(","))
         put("level", level.value)
-        cookie?.let { put("cookie", it) }
+        if (level == AudioQuality.Sky && immerseType != null) {
+            put("immerseType", immerseType.value)
+        }
+        if (unblock) {
+            put("unblock", true)
+        }
+        effectiveCookie?.let { put("cookie", it) }
     })
 }
 
@@ -102,8 +121,48 @@ suspend fun LocalApiClient.userAccount(cookie: String): JsonObject =
 suspend fun LocalApiClient.userSubcount(cookie: String): JsonObject =
     requestWithCookie(LocalApiEndpoint.UserSubcount, cookie)
 
+suspend fun LocalApiClient.userLevel(cookie: String): JsonObject =
+    requestWithCookie(LocalApiEndpoint.UserLevel, cookie)
+
+suspend fun LocalApiClient.listenDataTotal(cookie: String): JsonObject =
+    requestWithCookie(LocalApiEndpoint.ListenDataTotal, cookie)
+
+suspend fun LocalApiClient.userDetail(uid: Long, cookie: String? = null): JsonObject {
+    require(uid > 0) { "A positive user id is required." }
+    return request(LocalApiEndpoint.UserDetail, buildJsonObject {
+        put("uid", uid.toString())
+        cookie?.let { put("cookie", it) }
+    })
+}
+
+suspend fun LocalApiClient.intelligenceList(
+    id: Long,
+    pid: Long,
+    sid: Long? = null,
+    count: Int? = null,
+    cookie: String? = null,
+): JsonObject {
+    require(id > 0) { "A positive song id is required." }
+    require(pid > 0) { "A positive playlist id is required." }
+    return request(LocalApiEndpoint.PlaymodeIntelligence, buildJsonObject {
+        put("id", id.toString())
+        put("pid", pid.toString())
+        sid?.takeIf { it > 0 }?.let { put("sid", it.toString()) }
+        count?.takeIf { it > 0 }?.let { put("count", it) }
+        cookie?.let { put("cookie", it) }
+    })
+}
+
 /** Call only in response to the user's explicit Send code action. No automatic retries. */
 suspend fun LocalApiClient.sendVerificationCode(phone: String, countryCode: String = "86"): JsonObject {
+    requirePhone(phone, countryCode)
+    return request(LocalApiEndpoint.CaptchaSentV1, buildJsonObject {
+        put("phone", phone)
+        put("ctcode", countryCode)
+    })
+}
+
+suspend fun LocalApiClient.sendVerificationCodeLegacy(phone: String, countryCode: String = "86"): JsonObject {
     requirePhone(phone, countryCode)
     return request(LocalApiEndpoint.CaptchaSent, buildJsonObject {
         put("phone", phone)
@@ -241,6 +300,104 @@ suspend fun LocalApiClient.lyricsNew(id: Long, cookie: String? = null): JsonObje
         cookie?.let { put("cookie", it) }
     })
 }
+
+suspend fun LocalApiClient.adListeningRights(cookie: String? = null): JsonObject =
+    request(LocalApiEndpoint.AdListeningRights, buildJsonObject {
+        cookie?.takeIf { it.isNotBlank() }?.let { put("cookie", it) }
+    })
+
+suspend fun LocalApiClient.adListeningRightsGain(
+    cookie: String? = null,
+    reqUid: String? = null,
+    rightsGainMethod: Int? = null,
+    creativeType: Int? = null,
+): JsonObject =
+    request(LocalApiEndpoint.AdListeningRightsGain, buildJsonObject {
+        cookie?.takeIf { it.isNotBlank() }?.let { put("cookie", it) }
+        reqUid?.takeIf { it.isNotBlank() }?.let { put("reqUid", it) }
+        rightsGainMethod?.let { put("rightsGainMethod", it) }
+        creativeType?.let { put("creativeType", it) }
+    })
+
+suspend fun LocalApiClient.adGet(typeIds: String? = null, cookie: String? = null): JsonObject =
+    request(LocalApiEndpoint.AdGet, buildJsonObject {
+        typeIds?.takeIf { it.isNotBlank() }?.let { put("type_ids", it) }
+        cookie?.takeIf { it.isNotBlank() }?.let { put("cookie", it) }
+    })
+
+suspend fun LocalApiClient.registerCheckToken(refresh: Boolean = true): JsonObject =
+    request(LocalApiEndpoint.RegisterCheckToken, buildJsonObject {
+        put("refresh", refresh)
+    })
+
+suspend fun LocalApiClient.scrobbleV1(
+    id: Long,
+    time: Int,
+    total: Int? = null,
+    sourceId: Long? = null,
+    source: String = "list",
+    name: String? = null,
+    artist: String? = null,
+    bitrate: Int? = null,
+    level: AudioQuality? = null,
+    vip: Boolean? = null,
+    cookie: String? = null,
+): JsonObject {
+    require(id > 0 && time > 0) { "A positive song ID and positive played time are required." }
+    return request(LocalApiEndpoint.ScrobbleV1, buildJsonObject {
+        put("id", id.toString())
+        put("time", time)
+        total?.let { put("total", it) }
+        sourceId?.let { put("sourceid", it.toString()) }
+        put("source", source)
+        name?.takeIf { it.isNotBlank() }?.let { put("name", it) }
+        artist?.takeIf { it.isNotBlank() }?.let { put("artist", it) }
+        bitrate?.let { put("bitrate", it) }
+        level?.let { put("level", it.value) }
+        vip?.let { put("vip", it) }
+        cookie?.takeIf { it.isNotBlank() }?.let { put("cookie", it) }
+    })
+}
+
+suspend fun LocalApiClient.scrobble(
+    id: Long,
+    sourceId: Long? = null,
+    time: Int? = null,
+    cookie: String? = null,
+): JsonObject {
+    require(id > 0) { "A positive song ID is required." }
+    return request(LocalApiEndpoint.Scrobble, buildJsonObject {
+        put("id", id.toString())
+        sourceId?.let { put("sourceid", it.toString()) }
+        time?.let { put("time", it) }
+        cookie?.takeIf { it.isNotBlank() }?.let { put("cookie", it) }
+    })
+}
+
+suspend fun LocalApiClient.relayPlayStateSubmit(
+    id: Long,
+    sessionId: String? = null,
+    progress: Int = 0,
+    playMode: String = "list_loop",
+    type: String = "song",
+    cookie: String? = null,
+): JsonObject {
+    require(id > 0) { "A positive song ID is required." }
+    return request(LocalApiEndpoint.RelayPlayStateSubmit, buildJsonObject {
+        put("id", id.toString())
+        sessionId?.takeIf { it.isNotBlank() }?.let { put("sessionId", it) }
+        put("progress", progress)
+        put("playMode", playMode)
+        put("type", type)
+        cookie?.takeIf { it.isNotBlank() }?.let { put("cookie", it) }
+    })
+}
+
+suspend fun LocalApiClient.topSong(type: Int = 0, cookie: String? = null): JsonObject =
+    request(LocalApiEndpoint.TopSong, buildJsonObject {
+        put("type", type)
+        cookie?.takeIf { it.isNotBlank() }?.let { put("cookie", it) }
+    })
 
 private suspend fun LocalApiClient.requestWithCookie(endpoint: LocalApiEndpoint, cookie: String): JsonObject {
     require(cookie.isNotBlank()) { "An account cookie is required." }

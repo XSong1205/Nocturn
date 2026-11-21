@@ -8,6 +8,7 @@ import dev.nocturn.app.data.model.AlbumSummary
 import dev.nocturn.app.data.model.ArtistDetail
 import dev.nocturn.app.data.model.ArtistRef
 import dev.nocturn.app.data.model.ArtistSummary
+import dev.nocturn.app.data.model.DefaultSearchKeyword
 import dev.nocturn.app.data.model.LyricLine
 import dev.nocturn.app.data.model.LyricWord
 import dev.nocturn.app.data.model.Lyrics
@@ -231,7 +232,33 @@ object PreviewData {
         signature = "把夜色交给音乐。",
     )
 
-    val stats = AccountStats(playlistCount = 8, followingCount = 42, followerCount = 128)
+    val stats = AccountStats(
+        playlistCount = 8,
+        followingCount = 7,
+        followerCount = 2,
+        level = 6,
+        listenSongs = 2518L,
+        listenHours = 253,
+    )
+
+    val favoritePlaylist = PlaylistSummary(
+        id = 10175270850L,
+        name = "我喜欢的音乐",
+        coverUrl = null,
+        playCount = 389,
+        trackCount = 230,
+        specialType = 5,
+        description = "我喜欢的音乐",
+    )
+
+    val radarPlaylist = PlaylistSummary(
+        id = 2829883282L,
+        name = "私人雷达",
+        coverUrl = null,
+        playCount = 1_280_000,
+        trackCount = 35,
+        description = "猜你喜欢 · 每日更新",
+    )
 
     // ---------------------------------------------------------------------------------------
     // Screen states
@@ -244,9 +271,12 @@ object PreviewData {
         charts = charts,
         dailySongs = songs.take(4),
         personalizedSongs = personalizedSongs,
+        radarPlaylist = radarPlaylist,
         isLoggedIn = true,
         likedSongIds = setOf(SONG_LIKED_ID),
     )
+
+    val homeStateVip = homeState.copy(isVip = true)
 
     const val SONG_LIKED_ID = 186016L
 
@@ -260,7 +290,7 @@ object PreviewData {
 
     val searchIdle = SearchUiState(
         hotKeywords = listOf("晴天", "夜曲", "海阔天空", "起风了", "慢慢喜欢你", "小情歌"),
-        defaultKeyword = "晴天",
+        defaultKeyword = DefaultSearchKeyword(keyword = "晴天", display = "晴天"),
         history = listOf("周杰伦", "华语流行"),
     )
 
@@ -279,9 +309,9 @@ object PreviewData {
         loading = false,
         profile = profile,
         stats = stats,
-        playlists = playlists,
+        playlists = listOf(favoritePlaylist) + playlists,
         recentSongs = songs.take(6),
-        likedCount = 128,
+        likedCount = 230,
     )
 
     val libraryAnonymous = LibraryUiState(
@@ -335,6 +365,8 @@ object PreviewData {
         quality = AudioQuality.Exhigh,
         dynamicColor = true,
         hapticsEnabled = true,
+        scrobbleEnabled = true,
+        relayPlayStateEnabled = true,
         searchHistoryCount = 2,
         cacheSizeBytes = 12_800_000L,
         version = "0.1.28",

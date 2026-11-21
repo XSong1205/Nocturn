@@ -94,6 +94,39 @@ class LocalApiClientTest {
     }
 
     @Test
+    fun songUrlSupportsVividDolbyAndImmerseParameters() = runTest {
+        withClient({ request ->
+            assertEquals("/api/song/url/v1", request.url.encodedPath)
+            val body = Json.parseToJsonElement(request.body.toByteArray().decodeToString()) as JsonObject
+            assertEquals("789", body["id"]?.jsonPrimitive?.content)
+            assertEquals("vivid", body["level"]?.jsonPrimitive?.content)
+            respondJson("""{"code":200,"data":[]}""")
+        }) { client -> client.songUrl(789, AudioQuality.Vivid) }
+
+        withClient({ request ->
+            assertEquals("/api/song/url/v1", request.url.encodedPath)
+            val body = Json.parseToJsonElement(request.body.toByteArray().decodeToString()) as JsonObject
+            assertEquals("789", body["id"]?.jsonPrimitive?.content)
+            assertEquals("sky", body["level"]?.jsonPrimitive?.content)
+            assertEquals("c512", body["immerseType"]?.jsonPrimitive?.content)
+            assertEquals("true", body["unblock"]?.jsonPrimitive?.content)
+            respondJson("""{"code":200,"data":[]}""")
+        }) { client ->
+            client.songUrl(789, AudioQuality.Sky, immerseType = ImmerseType.C512, unblock = true)
+        }
+
+        withClient({ request ->
+            assertEquals("/api/song/url/v1", request.url.encodedPath)
+            val body = Json.parseToJsonElement(request.body.toByteArray().decodeToString()) as JsonObject
+            assertEquals("dolby", body["level"]?.jsonPrimitive?.content)
+            assertEquals("MUSIC_U=session; os=pc", body["cookie"]?.jsonPrimitive?.content)
+            respondJson("""{"code":200,"data":[]}""")
+        }) { client ->
+            client.songUrl(789, AudioQuality.Dolby, cookie = "MUSIC_U=session")
+        }
+    }
+
+    @Test
     fun qrPendingStatusIsPreservedForTheAccountLayer() = runTest {
         withClient({ request ->
             assertEquals("/api/login/qr/check", request.url.encodedPath)
@@ -187,6 +220,142 @@ class LocalApiClientTest {
     fun cancellationIsNotWrappedAsATransportError() = runTest {
         withClient({ throw CancellationException("Cancelled by caller") }) { client ->
             assertFailsWith<CancellationException> { client.loginQrKey() }
+        }
+    }
+
+    @Test
+    fun freeListenOperationsDispatchToExpectedEndpoints() = runTest {
+        withClient({ request ->
+            when (request.url.encodedPath) {
+                "/api/ad/listening/rights" -> {
+                    assertEquals(HttpMethod.Post, request.method)
+                    respondJson("""{"code":200,"data":{"rightsRemainingTime":1800000}}""")
+                }
+                "/api/ad/listening/rights/gain" -> {
+                    assertEquals(HttpMethod.Post, request.method)
+                    val body = Json.parseToJsonElement(request.body.toByteArray().decodeToString()) as JsonObject
+                    assertEquals("test-req-id", body["reqUid"]?.jsonPrimitive?.content)
+                    respondJson("""{"code":200,"data":{"gainFlag":true,"showContent":"领取成功"}}""")
+                }
+                "/api/ad/get" -> {
+                    assertEquals(HttpMethod.Post, request.method)
+                    respondJson("""{"code":200,"extra":{"reqId":"test-req-id"}}""")
+                }
+                "/api/register/checktoken/v3" -> {
+                    assertEquals(HttpMethod.Post, request.method)
+                    val body = Json.parseToJsonElement(request.body.toByteArray().decodeToString()) as JsonObject
+                    assertEquals("true", body["refresh"]?.jsonPrimitive?.content)
+                    respondJson("""{"code":200,"token":"yidun-token"}""")
+                }
+                else -> error("Unexpected url: ${request.url.encodedPath}")
+            }
+        }) { client ->
+            val rights = client.adListeningRights(cookie = "cookie")
+            assertEquals("1800000", (rights["data"] as JsonObject)["rightsRemainingTime"]?.jsonPrimitive?.content)
+
+            val ad = client.adGet()
+            assertEquals("200", ad["code"]?.jsonPrimitive?.content)
+
+            val checkToken = client.registerCheckToken(refresh = true)
+            assertEquals("yidun-token", checkToken["token"]?.jsonPrimitive?.content)
+
+            val gain = client.adListeningRightsGain(reqUid = "test-req-id")
+            assertEquals("true", (gain["data"] as JsonObject)["gainFlag"]?.jsonPrimitive?.content)
+        }
+    }
+
+    @Test
+    fun playbackReportingOperationsSerializeParametersProperly() = runTest {
+        withClient({ request ->
+            assertEquals(HttpMethod.Post, request.method)
+            assertEquals("Bearer $TOKEN", request.headers[HttpHeaders.Authorization])
+            val body = Json.parseToJsonElement(request.body.toByteArray().decodeToString()) as JsonObject
+            when (request.url.encodedPath) {
+                "/api/scrobble/v1" -> {
+                    assertEquals("347230", body["id"]?.jsonPrimitive?.content)
+                    assertEquals("120", body["time"]?.jsonPrimitive?.content)
+                    assertEquals("240", body["total"]?.jsonPrimitive?.content)
+                    assertEquals("12345", body["sourceid"]?.jsonPrimitive?.content)
+                    assertEquals("夜曲", body["name"]?.jsonPrimitive?.content)
+                    assertEquals("周杰伦", body["artist"]?.jsonPrimitive?.content)
+                    assertEquals("lossless", body["level"]?.jsonPrimitive?.content)
+                    assertEquals("false", body["vip"]?.jsonPrimitive?.content)
+                    respondJson("""{"code":200,"data":"scrobble_v1 上报成功"}""")
+                }
+                "/api/scrobble" -> {
+                    assertEquals("347230", body["id"]?.jsonPrimitive?.content)
+                    assertEquals("12345", body["sourceid"]?.jsonPrimitive?.content)
+                    assertEquals("120", body["time"]?.jsonPrimitive?.content)
+                    respondJson("""{"code":200,"data":"success"}""")
+                }
+                "/api/relay/play/state/submit" -> {
+                    assertEquals("347230", body["id"]?.jsonPrimitive?.content)
+                    assertEquals("ABC123XYZ456", body["sessionId"]?.jsonPrimitive?.content)
+                    assertEquals("30", body["progress"]?.jsonPrimitive?.content)
+                    assertEquals("list_loop", body["playMode"]?.jsonPrimitive?.content)
+                    assertEquals("song", body["type"]?.jsonPrimitive?.content)
+                    respondJson("""{"code":200,"data":"ok"}""")
+                }
+                "/api/top/song" -> {
+                    assertEquals("7", body["type"]?.jsonPrimitive?.content)
+                    respondJson("""{"code":200,"data":[]}""")
+                }
+                else -> error("Unexpected url: ${request.url.encodedPath}")
+            }
+        }) { client ->
+            val v1Result = client.scrobbleV1(
+                id = 347230L,
+                time = 120,
+                total = 240,
+                sourceId = 12345L,
+                name = "夜曲",
+                artist = "周杰伦",
+                level = AudioQuality.Lossless,
+                vip = false,
+            )
+            assertEquals("200", v1Result["code"]?.jsonPrimitive?.content)
+
+            val scrobbleResult = client.scrobble(id = 347230L, sourceId = 12345L, time = 120)
+            assertEquals("200", scrobbleResult["code"]?.jsonPrimitive?.content)
+
+            val relayResult = client.relayPlayStateSubmit(
+                id = 347230L,
+                sessionId = "ABC123XYZ456",
+                progress = 30,
+                playMode = "list_loop",
+            )
+            assertEquals("200", relayResult["code"]?.jsonPrimitive?.content)
+
+            val topSongResult = client.topSong(type = 7)
+            assertEquals("200", topSongResult["code"]?.jsonPrimitive?.content)
+        }
+    }
+
+    @Test
+    fun verificationCodeOperationsDispatchToV1ByDefault() = runTest {
+        withClient({ request ->
+            assertEquals(HttpMethod.Post, request.method)
+            assertEquals("Bearer $TOKEN", request.headers[HttpHeaders.Authorization])
+            val body = Json.parseToJsonElement(request.body.toByteArray().decodeToString()) as JsonObject
+            when (request.url.encodedPath) {
+                "/api/captcha/sent/v1" -> {
+                    assertEquals("13800138000", body["phone"]?.jsonPrimitive?.content)
+                    assertEquals("86", body["ctcode"]?.jsonPrimitive?.content)
+                    respondJson("""{"code":200,"data":true}""")
+                }
+                "/api/captcha/sent" -> {
+                    assertEquals("13800138000", body["phone"]?.jsonPrimitive?.content)
+                    assertEquals("86", body["ctcode"]?.jsonPrimitive?.content)
+                    respondJson("""{"code":200,"data":true}""")
+                }
+                else -> error("Unexpected url: ${request.url.encodedPath}")
+            }
+        }) { client ->
+            val v1Result = client.sendVerificationCode("13800138000", "86")
+            assertEquals("200", v1Result["code"]?.jsonPrimitive?.content)
+
+            val legacyResult = client.sendVerificationCodeLegacy("13800138000", "86")
+            assertEquals("200", legacyResult["code"]?.jsonPrimitive?.content)
         }
     }
 

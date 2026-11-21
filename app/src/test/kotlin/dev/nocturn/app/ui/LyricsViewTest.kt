@@ -178,4 +178,25 @@ class LyricsViewTest {
         assertTrue("line should carry towards its anchor over time", carriedTop > settled.top + 1f)
         assertEquals(list.top + list.height * 0.38f, settled.top, 2f)
     }
+
+    @Test
+    fun seekingBackwardsDoesNotCauseLyricsRowsToOverlap() {
+        val sample = mutableLongStateOf(40_000L)
+        compose.setContent {
+            NocturnTheme {
+                LyricsView(PreviewData.lyrics, sample.longValue, false, Modifier.fillMaxSize(), durationMs = 269_000)
+            }
+        }
+        waitForLyricRow(compose, 5)
+        compose.mainClock.autoAdvance = false
+        // Seek backwards to line 2
+        compose.runOnIdle { sample.longValue = 24_000L }
+        // Verify across backward animation frames that adjacent rows do not overlap
+        for (step in 1..15) {
+            compose.mainClock.advanceTimeBy(32)
+            val row2Bottom = compose.onNode(lyricRow(2), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.bottom
+            val row3Top = compose.onNode(lyricRow(3), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.top
+            assertTrue("row 2 bottom ($row2Bottom) should not exceed row 3 top ($row3Top)", row2Bottom <= row3Top + 1f)
+        }
+    }
 }

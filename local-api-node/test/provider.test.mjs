@@ -36,3 +36,9 @@ test('non-like booleans preserve their meaning in the upstream handlers', async 
     assert.equal(home.cursor, 'next');
   }
 });
+
+test('unblock boolean is normalized to string for song_url_v1', () => {
+  assert.equal(parameters({ unblock: true }, {}).unblock, 'true');
+  assert.equal(parameters({ unblock: false }, {}).unblock, 'false');
+  assert.equal(parameters({}, {}).unblock, undefined);
+});

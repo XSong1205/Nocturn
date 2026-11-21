@@ -15,7 +15,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -102,6 +103,7 @@ fun SongRow(
                 shape = MaterialTheme.shapes.small,
                 seed = song.id.hashCode(),
                 contentDescription = null,
+                placeholderIcon = Icons.Rounded.MusicNote,
             )
             Spacer(Modifier.width(12.dp))
         }
@@ -149,7 +151,7 @@ fun SongRow(
                     onMoreClick()
                 }) {
                     Icon(
-                        Icons.Filled.MoreHoriz,
+                        Icons.Rounded.MoreHoriz,
                         contentDescription = "更多",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -186,6 +188,7 @@ fun CompactSongRow(
             shape = MaterialTheme.shapes.small,
             seed = song.id.hashCode(),
             contentDescription = null,
+            placeholderIcon = Icons.Rounded.MusicNote,
         )
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {

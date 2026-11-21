@@ -41,9 +41,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -53,20 +55,20 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Lyrics
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material.icons.filled.RepeatOne
-import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Lyrics
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Repeat
+import androidx.compose.material.icons.rounded.RepeatOne
+import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material.icons.rounded.SkipNext
+import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -79,6 +81,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -92,6 +95,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
@@ -101,6 +105,7 @@ import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -110,21 +115,27 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
+import androidx.compose.ui.util.lerp
 import dev.nocturn.app.data.model.Song
 import dev.nocturn.app.data.model.LyricLine
 import dev.nocturn.app.data.model.ThemeMode
 import dev.nocturn.app.playback.RepeatMode
+import dev.nocturn.app.ui.adaptive.LocalWindowWidthClass
+import dev.nocturn.app.ui.adaptive.WindowWidthClass
 import dev.nocturn.app.ui.components.CoverArt
 import dev.nocturn.app.ui.components.GlassMaterials
 import dev.nocturn.app.ui.components.LikeButton
 import dev.nocturn.app.ui.components.LocalShellBackdrop
 import dev.nocturn.app.ui.components.NocturnBackdrop
 import dev.nocturn.app.ui.components.PlayPauseButton
+import dev.nocturn.app.ui.components.PlayerMonetBackdrop
 import dev.nocturn.app.ui.components.glass
 import dev.nocturn.app.ui.components.pressScale
 import dev.nocturn.app.ui.components.rememberHaptics
 import dev.nocturn.app.ui.preview.PreviewData
 import dev.nocturn.app.ui.state.MiniPlayerUiState
+import dev.nocturn.app.ui.state.PlaybackMode
 import dev.nocturn.app.ui.state.PlayerUiState
 import dev.nocturn.app.ui.theme.NocturnText
 import dev.nocturn.app.ui.theme.NocturnTheme
@@ -158,6 +169,7 @@ fun PlayerScreen(
     onToggleLike: () -> Unit = {},
     onToggleShuffle: () -> Unit = {},
     onCycleRepeat: () -> Unit = {},
+    onCyclePlaybackMode: () -> Unit = onCycleRepeat,
     onQueueSongClick: (Int) -> Unit = {},
     initialLyricsVisible: Boolean = false,
     sheetDrag: PlayerSheetDrag? = null,
@@ -244,9 +256,10 @@ fun PlayerScreen(
                 shape = RoundedCornerShape((32f * fraction).dp)
                 clip = true
             },
-        color = MaterialTheme.colorScheme.surface,
+        color = Color.Transparent,
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
+            PlayerMonetBackdrop(song = song)
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -254,9 +267,11 @@ fun PlayerScreen(
                     .padding(horizontal = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
+                val isExpanded = LocalWindowWidthClass.current.isExpanded
                 PlayerHeader(
                     song = song,
                     onCollapse = onCollapse,
+                    showLyrics = false,
                     modifier = dismissDrag,
                 )
                 val error = state.error
@@ -272,81 +287,134 @@ fun PlayerScreen(
                 }
                 if (song == null) {
                     PlayerEmptyState(modifier = Modifier.weight(1f))
-                } else {
-                    AnimatedContent(
-                        targetState = showLyrics,
+                } else if (isExpanded) {
+                    Row(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
-                            // The lyric list scrolls vertically itself, so only the cover drags.
-                            .then(if (showLyrics) Modifier else dismissDrag),
-                        transitionSpec = {
-                            (
-                                fadeIn(animationSpec = effects) +
-                                    scaleIn(initialScale = 0.94f, animationSpec = spatial)
-                                ) togetherWith (
-                                fadeOut(animationSpec = effects) +
-                                    scaleOut(targetScale = 1.03f, animationSpec = spatial)
-                                )
-                        },
-                        contentAlignment = Alignment.Center,
-                        label = "player-stage",
-                    ) { lyricsMode ->
-                        if (lyricsMode) {
-                            AnimatedContent(
-                                targetState = song,
-                                contentKey = { it.id },
-                                transitionSpec = {
-                                    (
-                                        fadeIn(tween(260, delayMillis = 60)) +
-                                            slideInVertically(spatialOffset) { it / 8 } +
-                                            scaleIn(spatial, initialScale = 0.94f)
-                                        ) togetherWith (
-                                        fadeOut(tween(160)) +
-                                            slideOutVertically(spatialOffset) { -it / 10 } +
-                                            scaleOut(spatial, targetScale = 1.02f)
-                                        )
-                                },
-                                contentAlignment = Alignment.Center,
-                                label = "lyrics-crossfade",
-                            ) { currentSong ->
-                                LyricsView(
-                                    lyrics = state.lyrics,
-                                    positionMs = displayedPositionMs,
-                                    loading = state.lyricsLoading,
-                                    durationMs = state.durationMs,
-                                    playing = state.playing && !state.buffering && seekPreview == null,
-                                    positionSampledAtNanos = state.positionSampledAtNanos,
-                                    positionDiscontinuity = state.positionDiscontinuity,
-                                    playbackSpeed = state.playbackSpeed,
-                                    positionOverride = seekPreview != null,
-                                    showTranslation = showTranslation,
-                                    showRomanization = showRomanization,
-                                    modifier = Modifier.fillMaxSize(),
-                                    onLineClick = onLyricLineClick,
-                                    songId = currentSong.id,
-                                )
-                            }
-                        } else {
+                            .padding(vertical = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(32.dp),
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.SpaceBetween,
+                        ) {
                             PlayerCoverStage(
                                 song = song,
                                 playing = state.playing,
                                 buffering = state.buffering,
-                                onToggleStage = { showLyrics = true },
-                                modifier = Modifier.fillMaxSize(),
+                                liked = state.liked,
+                                onToggleLike = onToggleLike,
+                                onToggleStage = {},
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth(),
+                            )
+                            Spacer(Modifier.height(16.dp))
+                            PlayerProgressSection(
+                                progress = displayedProgress,
+                                positionMs = displayedPositionMs,
+                                durationMs = state.durationMs,
+                                playing = state.playing,
+                                seeking = seekPreview != null,
+                                onSeekPreview = { seekPreview = it },
+                                onSeekCommit = {
+                                    seekPreview?.let(onSeek)
+                                    seekPreview = null
+                                },
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            PlayerTransport(
+                                playing = state.playing,
+                                onPrevious = onPrevious,
+                                onTogglePlay = onTogglePlay,
+                                onNext = onNext,
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            PlayerActionsToolbar(
+                                showLyrics = true,
+                                onShowLyricsChange = {},
+                                liked = state.liked,
+                                shuffle = state.shuffle,
+                                repeatMode = state.repeatMode,
+                                playbackMode = state.playbackMode,
+                                onToggleLike = onToggleLike,
+                                onToggleShuffle = onToggleShuffle,
+                                onCycleRepeat = onCycleRepeat,
+                                onCyclePlaybackMode = onCyclePlaybackMode,
+                                onOpenQueue = { queueVisible = true },
+                                showLikeInToolbar = false,
+                            )
+                        }
+                        Column(
+                            modifier = Modifier
+                                .weight(1.1f)
+                                .fillMaxHeight(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            if (hasTranslation || hasRomanization) {
+                                PlayerLyricsOptions(
+                                    hasTranslation = hasTranslation,
+                                    hasRomanization = hasRomanization,
+                                    showTranslation = showTranslation,
+                                    showRomanization = showRomanization,
+                                    onShowTranslationChange = { showTranslation = it },
+                                    onShowRomanizationChange = { showRomanization = it },
+                                )
+                                Spacer(Modifier.height(8.dp))
+                            }
+                            LyricsView(
+                                lyrics = state.lyrics,
+                                positionMs = displayedPositionMs,
+                                loading = state.lyricsLoading,
+                                durationMs = state.durationMs,
+                                playing = state.playing && !state.buffering && seekPreview == null,
+                                positionSampledAtNanos = state.positionSampledAtNanos,
+                                positionDiscontinuity = state.positionDiscontinuity,
+                                playbackSpeed = state.playbackSpeed,
+                                positionOverride = seekPreview != null,
+                                showTranslation = showTranslation,
+                                showRomanization = showRomanization,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth(),
+                                onLineClick = onLyricLineClick,
+                                songId = song.id,
                             )
                         }
                     }
-                    if (showLyrics && (hasTranslation || hasRomanization)) {
-                        PlayerLyricsOptions(
-                            hasTranslation = hasTranslation,
-                            hasRomanization = hasRomanization,
-                            showTranslation = showTranslation,
-                            showRomanization = showRomanization,
-                            onShowTranslationChange = { showTranslation = it },
-                            onShowRomanizationChange = { showRomanization = it },
-                        )
-                    }
+                } else {
+                    PlayerSmoothStage(
+                        song = song,
+                        lyrics = state.lyrics,
+                        showLyrics = showLyrics,
+                        lyricsLoading = state.lyricsLoading,
+                        playing = state.playing,
+                        buffering = state.buffering,
+                        liked = state.liked,
+                        positionMs = displayedPositionMs,
+                        durationMs = state.durationMs,
+                        positionSampledAtNanos = state.positionSampledAtNanos,
+                        positionDiscontinuity = state.positionDiscontinuity,
+                        playbackSpeed = state.playbackSpeed,
+                        seekPreviewActive = seekPreview != null,
+                        showTranslation = showTranslation,
+                        showRomanization = showRomanization,
+                        hasTranslation = hasTranslation,
+                        hasRomanization = hasRomanization,
+                        onShowTranslationChange = { showTranslation = it },
+                        onShowRomanizationChange = { showRomanization = it },
+                        onToggleLike = onToggleLike,
+                        onToggleLyrics = { showLyrics = it },
+                        onLineClick = onLyricLineClick,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        dismissDragModifier = dismissDrag,
+                    )
                     PlayerProgressSection(
                         progress = displayedProgress,
                         positionMs = displayedPositionMs,
@@ -371,10 +439,13 @@ fun PlayerScreen(
                         liked = state.liked,
                         shuffle = state.shuffle,
                         repeatMode = state.repeatMode,
+                        playbackMode = state.playbackMode,
                         onToggleLike = onToggleLike,
                         onToggleShuffle = onToggleShuffle,
                         onCycleRepeat = onCycleRepeat,
+                        onCyclePlaybackMode = onCyclePlaybackMode,
                         onOpenQueue = { queueVisible = true },
+                        showLikeInToolbar = false,
                     )
                 }
             }
@@ -397,65 +468,55 @@ fun PlayerScreen(
 private fun PlayerHeader(
     song: Song?,
     onCollapse: () -> Unit,
+    showLyrics: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val haptics = rememberHaptics()
     Column(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        // 小横条：支持点击收起，同时所在整个 Header 均附加了 dismissDrag 手势以支持向下滑动收起
         Box(
             modifier = Modifier
-                .padding(top = 10.dp, bottom = 2.dp)
-                .size(width = 36.dp, height = 4.dp)
+                .padding(top = 18.dp, bottom = if (showLyrics) 8.dp else 16.dp)
+                .size(width = 40.dp, height = 4.5.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.outlineVariant),
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(
-                onClick = {
-                    haptics.tap()
-                    onCollapse()
-                },
-                modifier = Modifier.testTag("player-collapse"),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.ExpandMore,
-                    contentDescription = "收起播放器",
-                    modifier = Modifier.size(28.dp),
+                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f))
+                .clickable(
+                    role = Role.Button,
+                    onClickLabel = "收起播放器",
+                    onClick = {
+                        haptics.step()
+                        onCollapse()
+                    },
                 )
-            }
-            val titleEffects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-            val titleSpatial = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
-            val titleExit = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-            AnimatedContent(
-                targetState = song,
-                modifier = Modifier.weight(1f),
-                contentKey = { it?.id },
-                transitionSpec = {
-                    (fadeIn(titleEffects) + slideInVertically(titleSpatial) { it / 2 }) togetherWith
-                        fadeOut(titleExit)
-                },
-                contentAlignment = Alignment.Center,
-                label = "player-title",
-            ) { shown ->
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
+                .testTag("player-collapse"),
+        )
+        AnimatedVisibility(
+            visible = showLyrics && song != null,
+            enter = fadeIn(tween(240)) + expandVertically(),
+            exit = fadeOut(tween(180)) + shrinkVertically(),
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.Center,
+            ) {
+                if (song != null) {
                     Text(
-                        text = shown?.name ?: "未在播放",
-                        style = MaterialTheme.typography.titleMediumEmphasized,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        text = song.name,
+                        style = MaterialTheme.typography.titleMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Spacer(Modifier.height(2.dp))
                     Text(
-                        text = shown?.artistText ?: "挑一首歌开始今晚的循环",
+                        text = song.artistText,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -463,7 +524,6 @@ private fun PlayerHeader(
                     )
                 }
             }
-            Spacer(Modifier.size(48.dp))
         }
     }
 }
@@ -486,7 +546,7 @@ private fun PlayerErrorBanner(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = Icons.Filled.CloudOff,
+                imageVector = Icons.Rounded.CloudOff,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
             )
@@ -501,49 +561,404 @@ private fun PlayerErrorBanner(
 }
 
 @Composable
+private fun PlayerSmoothStage(
+    song: Song,
+    lyrics: dev.nocturn.app.data.model.Lyrics,
+    showLyrics: Boolean,
+    lyricsLoading: Boolean,
+    playing: Boolean,
+    buffering: Boolean,
+    liked: Boolean,
+    positionMs: Long,
+    durationMs: Long,
+    positionSampledAtNanos: Long,
+    positionDiscontinuity: Long,
+    playbackSpeed: Float,
+    seekPreviewActive: Boolean,
+    showTranslation: Boolean,
+    showRomanization: Boolean,
+    hasTranslation: Boolean,
+    hasRomanization: Boolean,
+    onShowTranslationChange: (Boolean) -> Unit,
+    onShowRomanizationChange: (Boolean) -> Unit,
+    onToggleLike: () -> Unit,
+    onToggleLyrics: (Boolean) -> Unit,
+    onLineClick: ((LyricLine) -> Unit)?,
+    modifier: Modifier = Modifier,
+    dismissDragModifier: Modifier = Modifier,
+) {
+    val haptics = rememberHaptics()
+    val spatialOffset = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
+    val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+    val shadowColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.28f)
+
+    // 零重组高性能动画驱动器：Progress 仅在 Draw / GraphicsLayer 阶段读取，彻底避免每帧重组
+    val progressAnimatable = remember { Animatable(if (showLyrics) 1f else 0f) }
+    LaunchedEffect(showLyrics) {
+        val target = if (showLyrics) 1f else 0f
+        if (progressAnimatable.targetValue != target) {
+            progressAnimatable.animateTo(
+                targetValue = target,
+                animationSpec = spring(
+                    dampingRatio = 0.80f,
+                    stiffness = 380f,
+                    visibilityThreshold = 0.001f,
+                ),
+            )
+        }
+    }
+
+    val coverPlayScale by animateFloatAsState(
+        targetValue = if (playing) 1f else 0.94f,
+        animationSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+        label = "cover-play-scale",
+    )
+
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (!showLyrics) dismissDragModifier else Modifier),
+    ) {
+        val density = LocalDensity.current
+        val availableWidth = maxWidth
+        val availableHeight = maxHeight
+
+        // 歌词模式下的顶部 Mini Header 规格
+        val smallCoverSide = 48.dp
+        val smallCoverX = 4.dp
+        val smallCoverY = 2.dp
+        val smallCorner = 10.dp
+        val miniHeaderHeight = smallCoverSide + 8.dp
+
+        // 封面模式下的居中大封面与详情规格
+        val largeDetailsHeight = 64.dp
+        val maxCoverHeight = (availableHeight - largeDetailsHeight - 24.dp).coerceAtLeast(120.dp)
+        val largeCoverSide = minOf(availableWidth - 8.dp, maxCoverHeight, 360.dp).coerceAtLeast(140.dp)
+        val largeCoverX = ((availableWidth - largeCoverSide) / 2).coerceAtLeast(0.dp)
+        val largeCoverY = (((maxCoverHeight - largeCoverSide) / 2)).coerceAtLeast(4.dp)
+        val largeCorner = 24.dp
+
+        val minScale = (smallCoverSide / largeCoverSide).coerceIn(0.01f, 1f)
+
+        val largeDetailsX = 4.dp
+        val largeDetailsY = largeCoverY + largeCoverSide + 14.dp
+        val largeDetailsWidth = (availableWidth - 8.dp).coerceAtLeast(0.dp)
+
+        val smallDetailsX = smallCoverX + smallCoverSide + 12.dp
+        val smallDetailsY = smallCoverY
+        val smallDetailsWidth = (availableWidth - smallDetailsX - 4.dp).coerceAtLeast(0.dp)
+
+        // 预计算像素值以供 graphicsLayer 零重组插值使用
+        val smallCoverXPx = with(density) { smallCoverX.toPx() }
+        val smallCoverYPx = with(density) { smallCoverY.toPx() }
+        val largeCoverXPx = with(density) { largeCoverX.toPx() }
+        val largeCoverYPx = with(density) { largeCoverY.toPx() }
+        val largeCornerPx = with(density) { largeCorner.toPx() }
+        val smallCornerCompensatedPx = with(density) { (smallCorner / minScale).toPx() }
+        val largeElevationPx = with(density) { 16.dp.toPx() }
+        val smallElevationPx = with(density) { 4.dp.toPx() }
+        val largeDetailsTransYPx = with(density) { 24.dp.toPx() }
+        val miniDetailsTransYPx = with(density) { 16.dp.toPx() }
+        val lyricsTransYPx = with(density) { 28.dp.toPx() }
+
+        // 1. 歌词层（占据除 Mini Header 以外的中间区域）
+        val lyricsTopPadding = miniHeaderHeight + 4.dp
+        if (showLyrics || progressAnimatable.value > 0.001f) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = lyricsTopPadding)
+                    .graphicsLayer {
+                        val p = progressAnimatable.value
+                        alpha = ((p - 0.15f) / 0.85f).coerceIn(0f, 1f)
+                        translationY = (1f - p) * lyricsTransYPx
+                    },
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                ) {
+                    AnimatedContent(
+                        targetState = song,
+                        contentKey = { it.id },
+                        transitionSpec = {
+                            (
+                                fadeIn(tween(260, delayMillis = 60)) +
+                                    slideInVertically(spatialOffset) { it / 8 } +
+                                    scaleIn(spatial, initialScale = 0.94f)
+                            ) togetherWith (
+                                fadeOut(tween(160)) +
+                                    slideOutVertically(spatialOffset) { -it / 10 } +
+                                    scaleOut(spatial, targetScale = 1.02f)
+                            )
+                        },
+                        contentAlignment = Alignment.Center,
+                        label = "smooth-lyrics-crossfade",
+                    ) { currentSong ->
+                        LyricsView(
+                            lyrics = lyrics,
+                            positionMs = positionMs,
+                            loading = lyricsLoading,
+                            durationMs = durationMs,
+                            playing = playing && !buffering && !seekPreviewActive,
+                            positionSampledAtNanos = positionSampledAtNanos,
+                            positionDiscontinuity = positionDiscontinuity,
+                            playbackSpeed = playbackSpeed,
+                            positionOverride = seekPreviewActive,
+                            showTranslation = showTranslation,
+                            showRomanization = showRomanization,
+                            modifier = Modifier.fillMaxSize(),
+                            onLineClick = onLineClick,
+                            songId = currentSong.id,
+                        )
+                    }
+                }
+
+                if (showLyrics && (hasTranslation || hasRomanization)) {
+                    PlayerLyricsOptions(
+                        hasTranslation = hasTranslation,
+                        hasRomanization = hasRomanization,
+                        showTranslation = showTranslation,
+                        showRomanization = showRomanization,
+                        onShowTranslationChange = onShowTranslationChange,
+                        onShowRomanizationChange = onShowRomanizationChange,
+                    )
+                }
+            }
+        }
+
+        // 2. 封面模式下的大歌曲详情（固定布局尺寸，零重组 GPU 平移与渐隐）
+        if (!showLyrics || progressAnimatable.value < 0.99f) {
+            Row(
+                modifier = Modifier
+                    .offset(x = largeDetailsX, y = largeDetailsY)
+                    .width(largeDetailsWidth)
+                    .graphicsLayer {
+                        val p = progressAnimatable.value
+                        alpha = (1f - p * 2.2f).coerceIn(0f, 1f)
+                        translationY = -p * largeDetailsTransYPx
+                    },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = song.name,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = song.artistText,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (!showLyrics) {
+                    LikeButton(
+                        liked = liked,
+                        onToggle = onToggleLike,
+                        modifier = Modifier.testTag("player-like"),
+                    )
+                }
+            }
+        }
+
+        // 3. 歌词模式下的顶部 Mini 详情（固定布局尺寸，零重组 GPU 平移与淡入）
+        if (showLyrics || progressAnimatable.value > 0.01f) {
+            Row(
+                modifier = Modifier
+                    .offset(x = smallDetailsX, y = smallDetailsY)
+                    .width(smallDetailsWidth)
+                    .height(smallCoverSide)
+                    .graphicsLayer {
+                        val p = progressAnimatable.value
+                        alpha = ((p - 0.35f) / 0.65f).coerceIn(0f, 1f)
+                        translationY = (1f - p) * miniDetailsTransYPx
+                    }
+                    .then(if (showLyrics) dismissDragModifier else Modifier),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Text(
+                        text = song.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = song.artistText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (showLyrics) {
+                    LikeButton(
+                        liked = liked,
+                        onToggle = onToggleLike,
+                        modifier = Modifier.testTag("player-like"),
+                    )
+                }
+            }
+        }
+
+        // 4. 连续变形运动的封面 (The Morphing Cover)
+        // 布局尺寸固定为 largeCoverSide，完全由 graphicsLayer 在 GPU 层执行无级插值缩放与位移
+        val seed = song.id.hashCode()
+
+        Box(
+            modifier = Modifier
+                .size(largeCoverSide)
+                .graphicsLayer {
+                    val p = progressAnimatable.value
+                    val currentPlayScale = androidx.compose.ui.util.lerp(coverPlayScale, 1f, p)
+                    val s = androidx.compose.ui.util.lerp(1f, minScale, p) * currentPlayScale
+
+                    scaleX = s
+                    scaleY = s
+                    transformOrigin = TransformOrigin(0f, 0f)
+
+                    translationX = androidx.compose.ui.util.lerp(largeCoverXPx, smallCoverXPx, p)
+                    translationY = androidx.compose.ui.util.lerp(largeCoverYPx, smallCoverYPx, p)
+
+                    val corner = androidx.compose.ui.util.lerp(largeCornerPx, smallCornerCompensatedPx, p)
+                    shape = RoundedCornerShape(corner)
+                    clip = true
+
+                    shadowElevation = androidx.compose.ui.util.lerp(largeElevationPx, smallElevationPx, p)
+                    spotShadowColor = shadowColor
+                }
+                .clickable {
+                    haptics.tap()
+                    onToggleLyrics(!showLyrics)
+                },
+        ) {
+            CoverArt(
+                imageUrl = song.cover,
+                modifier = Modifier.fillMaxSize(),
+                shape = RoundedCornerShape(largeCorner),
+                seed = seed,
+                contentDescription = if (showLyrics) "${song.name} 封面，点击查看封面" else "${song.name} 封面，点击查看歌词",
+            )
+            if (buffering) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.32f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    LoadingIndicator(
+                        modifier = Modifier.size(56.dp),
+                        color = Color.White,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun PlayerCoverStage(
     song: Song,
     playing: Boolean,
     buffering: Boolean,
+    liked: Boolean,
+    onToggleLike: () -> Unit,
     onToggleStage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val shape = MaterialTheme.shapes.extraLarge
+    val shape = RoundedCornerShape(24.dp)
     val coverScale by animateFloatAsState(
-        targetValue = if (playing) 1f else 0.92f,
+        targetValue = if (playing) 1f else 0.94f,
         animationSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
         label = "cover-scale",
     )
-    BoxWithConstraints(
-        modifier = modifier,
-        contentAlignment = Alignment.Center,
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween,
     ) {
-        val side = minOf(maxWidth, maxHeight, 360.dp).coerceAtLeast(120.dp)
-        val coverSpatial = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
-        AnimatedContent(
-            targetState = song,
-            contentKey = { it.id },
-            transitionSpec = {
-                (
-                    fadeIn(tween(260, delayMillis = 60)) +
-                        scaleIn(coverSpatial, initialScale = 0.86f)
-                    ) togetherWith (
-                    fadeOut(tween(160)) +
-                        scaleOut(tween(220), targetScale = 1.06f)
-                    )
-            },
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
             contentAlignment = Alignment.Center,
-            label = "player-cover",
-        ) { shownSong ->
-            PlayerCover(
-                song = shownSong,
-                side = side,
-                scale = coverScale,
-                buffering = buffering,
-                shape = shape,
-                onClick = onToggleStage,
+        ) {
+            BoxWithConstraints(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                val side = minOf(maxWidth, maxHeight, 360.dp).coerceAtLeast(120.dp)
+                PlayerCover(
+                    song = song,
+                    side = side,
+                    scale = coverScale,
+                    buffering = buffering,
+                    shape = shape,
+                    onClick = onToggleStage,
+                )
+            }
+        }
+        Spacer(Modifier.height(18.dp))
+        PlayerSongDetails(
+            song = song,
+            liked = liked,
+            onToggleLike = onToggleLike,
+            modifier = Modifier.padding(bottom = 6.dp),
+        )
+    }
+}
+
+@Composable
+private fun PlayerSongDetails(
+    song: Song,
+    liked: Boolean,
+    onToggleLike: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = song.name,
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = song.artistText,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
+        LikeButton(
+            liked = liked,
+            onToggle = onToggleLike,
+            modifier = Modifier.testTag("player-like"),
+        )
     }
 }
 
@@ -565,6 +980,11 @@ private fun PlayerCover(
                 scaleX = scale
                 scaleY = scale
             }
+            .shadow(
+                elevation = 16.dp,
+                shape = shape,
+                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+            )
             .clip(shape)
             .clickable {
                 haptics.tap()
@@ -644,12 +1064,17 @@ private fun PlayerProgressSection(
     onSeekCommit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // The wave only moves while music plays; it irons flat on pause and while the thumb is held so
-    // the seek target is easy to read.
+    // In Material Design 3 Expressive, the wavy indicator indicates active playback with a gentle ripple.
+    // When paused or seeking, the wave flattens smoothly to a resting line with zero waveSpeed.
     val haptics = rememberHaptics()
+    val isWavy = playing && !seeking
     val amplitude by animateFloatAsState(
-        targetValue = if (playing && !seeking) 0.85f else 0f,
-        animationSpec = MaterialTheme.motionScheme.slowEffectsSpec(),
+        targetValue = if (isWavy) 0.50f else 0f,
+        animationSpec = if (isWavy) {
+            MaterialTheme.motionScheme.slowEffectsSpec()
+        } else {
+            MaterialTheme.motionScheme.fastEffectsSpec()
+        },
         label = "seek-amplitude",
     )
     val positionColor by animateColorAsState(
@@ -670,7 +1095,8 @@ private fun PlayerProgressSection(
                 color = MaterialTheme.colorScheme.primary,
                 trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
                 amplitude = { amplitude },
-                wavelength = 26.dp,
+                wavelength = 36.dp,
+                waveSpeed = if (isWavy) 10.dp else 0.dp,
             )
             Slider(
                 value = progress,
@@ -738,7 +1164,7 @@ private fun PlayerTransport(
                 .testTag("player-previous"),
         ) {
             Icon(
-                imageVector = Icons.Filled.SkipPrevious,
+                imageVector = Icons.Rounded.SkipPrevious,
                 contentDescription = "上一首",
                 modifier = Modifier.size(34.dp),
             )
@@ -760,7 +1186,7 @@ private fun PlayerTransport(
                 .testTag("player-next"),
         ) {
             Icon(
-                imageVector = Icons.Filled.SkipNext,
+                imageVector = Icons.Rounded.SkipNext,
                 contentDescription = "下一首",
                 modifier = Modifier.size(34.dp),
             )
@@ -775,24 +1201,17 @@ private fun PlayerActionsToolbar(
     liked: Boolean,
     shuffle: Boolean,
     repeatMode: RepeatMode,
+    playbackMode: PlaybackMode = PlaybackMode.Sequence,
     onToggleLike: () -> Unit,
     onToggleShuffle: () -> Unit,
     onCycleRepeat: () -> Unit,
+    onCyclePlaybackMode: () -> Unit = onCycleRepeat,
     onOpenQueue: () -> Unit,
     modifier: Modifier = Modifier,
+    showLikeInToolbar: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
     val haptics = rememberHaptics()
-    val shuffleTint by animateColorAsState(
-        targetValue = if (shuffle) colors.primary else colors.onSurfaceVariant,
-        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
-        label = "shuffle-tint",
-    )
-    val repeatTint by animateColorAsState(
-        targetValue = if (repeatMode == RepeatMode.Off) colors.onSurfaceVariant else colors.primary,
-        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
-        label = "repeat-tint",
-    )
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -807,46 +1226,41 @@ private fun PlayerActionsToolbar(
                 modifier = Modifier.testTag("player-toggle-lyrics"),
             ) {
                 Icon(
-                    imageVector = Icons.Filled.Lyrics,
+                    imageVector = Icons.Rounded.Lyrics,
                     contentDescription = if (showLyrics) "收起歌词" else "查看歌词",
                 )
             }
-            LikeButton(
-                liked = liked,
-                onToggle = onToggleLike,
-                modifier = Modifier.testTag("player-like"),
-            )
-            IconButton(
-                onClick = {
-                    haptics.toggle(on = !shuffle)
-                    onToggleShuffle()
-                },
-                modifier = Modifier.testTag("player-shuffle"),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Shuffle,
-                    contentDescription = if (shuffle) "关闭随机播放" else "开启随机播放",
-                    tint = shuffleTint,
+            if (showLikeInToolbar) {
+                LikeButton(
+                    liked = liked,
+                    onToggle = onToggleLike,
+                    modifier = Modifier.testTag("player-like"),
                 )
             }
             IconButton(
                 onClick = {
                     haptics.step()
-                    onCycleRepeat()
+                    onCyclePlaybackMode()
                 },
-                modifier = Modifier.testTag("player-repeat"),
+                modifier = Modifier.testTag("player-mode"),
             ) {
                 AnimatedContent(
-                    targetState = repeatMode == RepeatMode.One,
+                    targetState = playbackMode,
                     transitionSpec = {
                         (scaleIn(initialScale = 0.6f) + fadeIn()) togetherWith (scaleOut(targetScale = 0.6f) + fadeOut())
                     },
-                    label = "repeat-icon",
-                ) { one ->
+                    label = "playback-mode-icon",
+                ) { mode ->
+                    val (icon, desc, active) = when (mode) {
+                        PlaybackMode.Sequence -> Triple(Icons.Rounded.Repeat, "循环播放：列表循环", false)
+                        PlaybackMode.Heartbeat -> Triple(Icons.Rounded.Favorite, "播放模式：心动模式", true)
+                        PlaybackMode.Shuffle -> Triple(Icons.Rounded.Shuffle, "播放模式：随机播放", true)
+                        PlaybackMode.SingleCycle -> Triple(Icons.Rounded.RepeatOne, "循环播放：单曲循环", true)
+                    }
                     Icon(
-                        imageVector = if (one) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
-                        contentDescription = repeatMode.description(),
-                        tint = repeatTint,
+                        imageVector = icon,
+                        contentDescription = desc,
+                        tint = if (active) colors.primary else colors.onSurfaceVariant,
                     )
                 }
             }
@@ -858,7 +1272,7 @@ private fun PlayerActionsToolbar(
                 modifier = Modifier.testTag("player-queue"),
             ) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                    imageVector = Icons.AutoMirrored.Rounded.QueueMusic,
                     contentDescription = "播放队列",
                     tint = colors.onSurfaceVariant,
                 )
@@ -881,7 +1295,7 @@ private fun PlayerEmptyState(modifier: Modifier = Modifier) {
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
-                    imageVector = Icons.Filled.MusicNote,
+                    imageVector = Icons.Rounded.MusicNote,
                     contentDescription = null,
                     modifier = Modifier.size(40.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1147,7 +1561,7 @@ fun MiniPlayer(
                             label = "mini-player-play",
                         ) { playing ->
                             Icon(
-                                imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                imageVector = if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                                 contentDescription = if (playing) "暂停" else "播放",
                                 tint = MaterialTheme.colorScheme.primary,
                             )
@@ -1214,6 +1628,47 @@ private fun MiniPlayerPreview() {
             ) {
                 MiniPlayer(state = PreviewData.miniPlayerState)
             }
+        }
+    }
+}
+
+@Preview(
+    name = "播放器 · 歌词模式 · 深色",
+    widthDp = 412,
+    heightDp = 915,
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+private fun PlayerScreenLyricsPreview() {
+    NocturnTheme(themeMode = ThemeMode.System) {
+        PlayerScreen(
+            state = PreviewData.bilingualPlayerState.copy(positionMs = 115_000),
+            initialLyricsVisible = true,
+        )
+    }
+}
+
+@Preview(
+    name = "播放器 · 大屏双栏 · 深色",
+    widthDp = 1024,
+    heightDp = 768,
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
+@Preview(
+    name = "播放器 · 大屏双栏 · 浅色",
+    widthDp = 1024,
+    heightDp = 768,
+    showBackground = true,
+)
+@Composable
+private fun PlayerScreenTabletPreview() {
+    NocturnTheme(themeMode = ThemeMode.System) {
+        CompositionLocalProvider(LocalWindowWidthClass provides WindowWidthClass.Expanded) {
+            PlayerScreen(
+                state = PreviewData.bilingualPlayerState.copy(positionMs = 115_000),
+            )
         }
     }
 }

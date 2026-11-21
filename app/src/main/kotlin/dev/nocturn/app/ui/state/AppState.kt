@@ -27,8 +27,36 @@ sealed interface Screen {
 
 data class NavState(
     val tab: AppTab = AppTab.Home,
-    val stack: List<Screen> = emptyList(),
+    val stacks: Map<AppTab, List<Screen>> = emptyMap(),
 ) {
+    /** The back stack for the currently selected tab. */
+    val stack: List<Screen>
+        get() = stacks[tab] ?: emptyList()
+
+    /** All screens across all tab stacks. */
+    val allScreens: List<Screen>
+        get() = stacks.values.flatten()
+
+    /** Backward-compatible constructor for a single stack. */
+    constructor(tab: AppTab = AppTab.Home, stack: List<Screen>) : this(
+        tab = tab,
+        stacks = if (stack.isEmpty()) emptyMap() else mapOf(tab to stack),
+    )
+
+    /** Backward-compatible copy overload for mutating the current tab's stack. */
+    fun copy(stack: List<Screen>): NavState =
+        copy(stacks = if (stack.isEmpty()) stacks - tab else stacks + (tab to stack))
+
+    /** Backward-compatible copy overload specifying both tab and stack. */
+    fun copy(tab: AppTab, stack: List<Screen>): NavState {
+        val updatedStacks = if (stack.isEmpty()) {
+            stacks - tab
+        } else {
+            stacks + (tab to stack)
+        }
+        return copy(tab = tab, stacks = updatedStacks)
+    }
+
     val current: Screen
         get() = stack.lastOrNull() ?: when (tab) {
             AppTab.Home -> Screen.Home

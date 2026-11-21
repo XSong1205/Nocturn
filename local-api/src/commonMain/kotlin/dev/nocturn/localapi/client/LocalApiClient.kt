@@ -100,12 +100,31 @@ class LocalApiClient(
         id: Long,
         level: AudioQuality = AudioQuality.Standard,
         cookie: String? = null,
+    ): JsonObject = songUrl(id = id, level = level, immerseType = null, unblock = false, cookie = cookie)
+
+    suspend fun songUrl(
+        id: Long,
+        level: AudioQuality = AudioQuality.Standard,
+        immerseType: ImmerseType? = null,
+        unblock: Boolean = false,
+        cookie: String? = null,
     ): JsonObject {
         require(id > 0) { "A positive song ID is required." }
+        val effectiveCookie = if (level == AudioQuality.Dolby) {
+            if (cookie.isNullOrBlank()) "os=pc" else if (!cookie.contains("os=")) "$cookie; os=pc" else cookie
+        } else {
+            cookie
+        }
         return request(LocalApiEndpoint.SongUrl, buildJsonObject {
             put("id", id.toString())
             put("level", level.value)
-            cookie?.let { put("cookie", it) }
+            if (level == AudioQuality.Sky && immerseType != null) {
+                put("immerseType", immerseType.value)
+            }
+            if (unblock) {
+                put("unblock", true)
+            }
+            effectiveCookie?.let { put("cookie", it) }
         })
     }
 
@@ -213,7 +232,21 @@ enum class AudioQuality(val value: String) {
     Lossless("lossless"),
     Hires("hires"),
     Jyeffect("jyeffect"),
-    Sky("sky"),
     Dolby("dolby"),
+    Vivid("vivid"),
     Jymaster("jymaster"),
+    Sky("sky"),
+}
+
+enum class ImmerseType(val value: String) {
+    C512("c512"),
+    Ste2("ste2"),
+    Aac2("aac2"),
+    C51("c51"),
+    Ste("ste"),
+    Aac("aac");
+
+    companion object {
+        val Default = C51
+    }
 }

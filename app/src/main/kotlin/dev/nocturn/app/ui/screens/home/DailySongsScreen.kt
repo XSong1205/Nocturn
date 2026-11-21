@@ -2,6 +2,7 @@
 
 package dev.nocturn.app.ui.screens.home
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -14,9 +15,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -33,6 +36,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.nocturn.app.data.model.Song
 import dev.nocturn.app.data.model.ThemeMode
+import dev.nocturn.app.ui.adaptive.LocalWindowWidthClass
 import dev.nocturn.app.ui.components.BarBackButton
 import dev.nocturn.app.ui.components.BarTitle
 import dev.nocturn.app.ui.components.CoverArt
@@ -63,6 +67,7 @@ fun DailySongsScreen(
 ) {
     val listState = rememberLazyListState()
     val collapsed by listState.scrolledPast(220)
+    val isExpanded = LocalWindowWidthClass.current.isExpanded
     val songs = state.dailySongs
     GlassScaffold(
         modifier = modifier,
@@ -98,18 +103,63 @@ fun DailySongsScreen(
             item(key = "hero") {
                 DailyHero(cover = songs.first(), count = songs.size, onPlayAll = onPlayAll)
             }
-            itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
-                SongRow(
-                    song = song,
-                    onClick = { onSongClick(song, songs) },
-                    modifier = Modifier
-                        .padding(horizontal = 8.dp)
-                        .testTag("daily-song-$index"),
-                    index = index + 1,
-                    isPlaying = song.id == state.nowPlayingSongId,
-                    isLiked = song.id in state.likedSongIds,
-                    onLikeClick = { onLikeClick(song) },
-                )
+            if (isExpanded) {
+                items(
+                    items = songs.chunked(2),
+                    key = { pair -> "daily-pair-${pair.first().id}" },
+                ) { pair ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        val song0 = pair[0]
+                        val index0 = songs.indexOf(song0)
+                        SongRow(
+                            song = song0,
+                            onClick = { onSongClick(song0, songs) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("daily-song-$index0"),
+                            index = index0 + 1,
+                            isPlaying = song0.id == state.nowPlayingSongId,
+                            isLiked = song0.id in state.likedSongIds,
+                            onLikeClick = { onLikeClick(song0) },
+                        )
+                        if (pair.size > 1) {
+                            val song1 = pair[1]
+                            val index1 = songs.indexOf(song1)
+                            SongRow(
+                                song = song1,
+                                onClick = { onSongClick(song1, songs) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("daily-song-$index1"),
+                                index = index1 + 1,
+                                isPlaying = song1.id == state.nowPlayingSongId,
+                                isLiked = song1.id in state.likedSongIds,
+                                onLikeClick = { onLikeClick(song1) },
+                            )
+                        } else {
+                            Spacer(Modifier.weight(1f))
+                        }
+                    }
+                }
+            } else {
+                itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
+                    SongRow(
+                        song = song,
+                        onClick = { onSongClick(song, songs) },
+                        modifier = Modifier
+                            .padding(horizontal = 8.dp)
+                            .testTag("daily-song-$index"),
+                        index = index + 1,
+                        isPlaying = song.id == state.nowPlayingSongId,
+                        isLiked = song.id in state.likedSongIds,
+                        onLikeClick = { onLikeClick(song) },
+                    )
+                }
             }
         }
     }
@@ -121,6 +171,7 @@ private fun DailyHero(cover: Song, count: Int, onPlayAll: () -> Unit) {
     val today = remember { LocalDate.now() }
     val haptics = rememberHaptics()
     val colors = MaterialTheme.colorScheme
+    val isWide = LocalWindowWidthClass.current.isAtLeastMedium
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -159,8 +210,9 @@ private fun DailyHero(cover: Song, count: Int, onPlayAll: () -> Unit) {
                 seed = cover.id.hashCode(),
                 shape = MaterialTheme.shapes.large,
                 contentDescription = null,
+                placeholderIcon = Icons.Rounded.AutoAwesome,
                 modifier = Modifier
-                    .size(112.dp)
+                    .size(if (isWide) 128.dp else 112.dp)
                     .shadow(
                         elevation = 18.dp,
                         shape = MaterialTheme.shapes.large,
@@ -168,21 +220,39 @@ private fun DailyHero(cover: Song, count: Int, onPlayAll: () -> Unit) {
                         spotColor = colors.primary.copy(alpha = 0.5f),
                     ),
             )
+            if (isWide) {
+                Spacer(Modifier.width(20.dp))
+                Button(
+                    onClick = {
+                        haptics.confirm()
+                        onPlayAll()
+                    },
+                    modifier = Modifier
+                        .height(48.dp)
+                        .testTag("daily-play-all"),
+                ) {
+                    Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("播放全部")
+                }
+            }
         }
-        Spacer(Modifier.height(18.dp))
-        Button(
-            onClick = {
-                haptics.confirm()
-                onPlayAll()
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
-                .testTag("daily-play-all"),
-        ) {
-            Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("播放全部")
+        if (!isWide) {
+            Spacer(Modifier.height(18.dp))
+            Button(
+                onClick = {
+                    haptics.confirm()
+                    onPlayAll()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .testTag("daily-play-all"),
+            ) {
+                Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("播放全部")
+            }
         }
     }
 }

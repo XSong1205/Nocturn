@@ -38,17 +38,52 @@ internal class SessionStore(context: Context) {
     /** In-memory cached cookie; decrypted from storage at most once per process. */
     private var cachedCookie: String? = null
 
-    /** The current account cookie, or null when anonymous. Never logged or returned to the UI. */
+    /** In-memory cached anonymous cookie; decrypted from storage at most once per process. */
+    private var cachedAnonymousCookie: String? = null
+
+    /**
+     * The effective cookie for API calls: authorized account cookie if signed in,
+     * otherwise the anonymous/guest cookie if registered. Never logged or returned to the UI.
+     */
     suspend fun cookie(): String? = lock.withLock {
-        cachedCookie ?: readStoredCookieLocked()?.also { cachedCookie = it }
+        accountCookieLocked() ?: anonymousCookieLocked()
     }
+
+    /** The current authorized account cookie, or null when not signed in. */
+    suspend fun accountCookie(): String? = lock.withLock {
+        accountCookieLocked()
+    }
+
+    /** The persisted anonymous/guest cookie, or null when not registered. */
+    suspend fun anonymousCookie(): String? = lock.withLock {
+        anonymousCookieLocked()
+    }
+
+    private fun accountCookieLocked(): String? =
+        cachedCookie ?: readStoredCookieLocked(KEY_COOKIE)?.also { cachedCookie = it }
+
+    private fun anonymousCookieLocked(): String? =
+        cachedAnonymousCookie ?: readStoredCookieLocked(KEY_ANONYMOUS_COOKIE)?.also { cachedAnonymousCookie = it }
 
     /** Persists an authorized cookie and publishes the validated profile only after it is durable. */
     suspend fun save(cookie: String, profile: AccountProfile?) = lock.withLock {
         require(cookie.isNotBlank()) { "An account cookie is required." }
-        writeStoredCookieLocked(cookie)
+        writeStoredCookieLocked(KEY_COOKIE, cookie)
         cachedCookie = cookie
         if (profile != null) mutableSession.value = profile
+    }
+
+    /** Persists an anonymous/guest cookie for unauthenticated operations (e.g. free listen, playback). */
+    suspend fun saveAnonymousCookie(cookie: String) = lock.withLock {
+        require(cookie.isNotBlank()) { "An anonymous cookie is required." }
+        writeStoredCookieLocked(KEY_ANONYMOUS_COOKIE, cookie)
+        cachedAnonymousCookie = cookie
+    }
+
+    /** Clears the stored anonymous cookie. */
+    suspend fun clearAnonymousCookie() = lock.withLock {
+        preferences.edit().remove(KEY_ANONYMOUS_COOKIE).commit()
+        cachedAnonymousCookie = null
     }
 
     /**
@@ -59,7 +94,7 @@ internal class SessionStore(context: Context) {
      * cookie is kept for the next attempt. No stored cookie means the account is simply anonymous.
      */
     suspend fun restore(api: LocalApiClient): AccountProfile? {
-        val saved = cookie() ?: return null
+        val saved = accountCookie() ?: return null
         val profile = try {
             NeteaseJson.parseLoginStatus(
                 api.request(
@@ -90,12 +125,18 @@ internal class SessionStore(context: Context) {
         }
     }
 
-    /** Forgets the account cookie and the published profile (logout / invalid session). */
+    /** Forgets the account cookie, published profile, and anonymous session (logout / invalid session). */
     suspend fun clear() = lock.withLock {
-        check(preferences.edit().remove(KEY_COOKIE).commit()) {
+        check(
+            preferences.edit()
+                .remove(KEY_COOKIE)
+                .remove(KEY_ANONYMOUS_COOKIE)
+                .commit(),
+        ) {
             "Unable to clear the stored account session."
         }
         cachedCookie = null
+        cachedAnonymousCookie = null
         mutableSession.value = null
         Unit
     }
@@ -109,44 +150,52 @@ internal class SessionStore(context: Context) {
         mutableSession.value = null
     }
 
-    private fun readStoredCookieLocked(): String? {
-        val sealed = preferences.getString(KEY_COOKIE, null) ?: return null
+    private fun readStoredCookieLocked(keyName: String): String? {
+        val sealed = preferences.getString(keyName, null) ?: return null
         val key = runCatching { loadOrCreateKey() }.getOrNull()
             ?: return null
         val plaintext = SessionCipher.open(key, sealed)
         if (plaintext == null) {
             // Key rotated away or value tampered with: drop it instead of retrying every launch.
-            runCatching { preferences.edit().remove(KEY_COOKIE).commit() }
+            runCatching { preferences.edit().remove(keyName).commit() }
             return null
         }
         return plaintext.toString(Charsets.UTF_8).trim().takeIf { it.isNotEmpty() }
     }
 
-    private fun writeStoredCookieLocked(cookie: String) {
+    private fun writeStoredCookieLocked(keyName: String, cookie: String) {
         val sealed = SessionCipher.seal(loadOrCreateKey(), cookie.toByteArray(Charsets.UTF_8))
-        check(preferences.edit().putString(KEY_COOKIE, sealed).commit()) {
+        check(preferences.edit().putString(keyName, sealed).commit()) {
             "Unable to persist the account session."
         }
     }
 
     private fun loadOrCreateKey(): SecretKey {
-        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
-        val existing = keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry
-        if (existing != null) return existing.secretKey
-        val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
-        generator.init(
-            KeyGenParameterSpec.Builder(
-                KEY_ALIAS,
-                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
+        val keyStore = runCatching {
+            KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+        }.getOrNull()
+        if (keyStore != null) {
+            val existing = keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry
+            if (existing != null) return existing.secretKey
+            val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
+            generator.init(
+                KeyGenParameterSpec.Builder(
+                    KEY_ALIAS,
+                    KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
+                )
+                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                    .setKeySize(KEY_SIZE_BITS)
+                    // The session must be restorable on launch without a biometric prompt.
+                    .setUserAuthenticationRequired(false)
+                    .build(),
             )
-                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                .setKeySize(KEY_SIZE_BITS)
-                // The session must be restorable on launch without a biometric prompt.
-                .setUserAuthenticationRequired(false)
-                .build(),
-        )
-        return generator.generateKey()
+            return generator.generateKey()
+        }
+        // Fallback for host tests where AndroidKeyStore is not registered in the JVM runtime.
+        return hostTestKey ?: KeyGenerator.getInstance("AES").apply { init(KEY_SIZE_BITS) }.generateKey().also {
+            hostTestKey = it
+        }
     }
 
     private companion object {
@@ -155,5 +204,9 @@ internal class SessionStore(context: Context) {
         const val KEY_SIZE_BITS = 256
         const val PREFERENCES = "nocturn-session"
         const val KEY_COOKIE = "sealed-cookie"
+        const val KEY_ANONYMOUS_COOKIE = "sealed-anonymous-cookie"
+
+        @Volatile
+        private var hostTestKey: SecretKey? = null
     }
 }

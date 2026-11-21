@@ -61,6 +61,17 @@ fun StatusBarScrim(
 ) {
     // Inside the shell the progressive status bar blur does this job.
     if (LocalShellBackdrop.current != null) return
+    if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) {
+        if (!visible) return
+        val inset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .height(inset)
+                .background(color),
+        )
+        return
+    }
     val alpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
         animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),

@@ -6,7 +6,7 @@ Accompanist Lyrics UI 2.0.0-rc.3 使用已有的文字准备与栅格缓存。No
 
 时间轴修正：Media3 采样附带 `elapsedRealtimeNanos` 取样时刻、播放速度和位置跳变序号，完整传递到歌词时钟。绘制帧也读取同一单调时钟，补偿采样到 UI 的延迟；普通采样取已显示位置与修正位置的较大值，滞后的校正最多让高亮短暂停留，不会回退到上一个词。明确的拖动预览和 Media3 seek / repeat / item transition 才允许重置位置；不通过大幅倒退阈值猜测真实跳转。播放器无时间戳的离线预览使用接收时刻作为备用锚点。
 
-换行使用 540 ms 缓动配合阻尼弹簧链：stiffness 180、damping 26、coupling 0.25；保留 Accompanist 的当前行缩放和渐变。Android 12+ 对非当前行启用按距离递增的缓存图层模糊，blurDelta 2；手动浏览时恢复清晰，视口外保活距离为 24 dp。Android 10 / 11 不启用 RenderEffect 模糊。
+换行使用 580 ms Apple Music 风格流体缓动曲线 `CubicBezierEasing(0.25f, 0.1f, 0.25f, 1f)` 配合高阻尼顺滑弹簧链：stiffness 200、damping 28、coupling 0.15、minResponse 0.75。向前播放时各行保持紧凑连贯的弹性位移；当检测到歌词倒退跳转（进度条快退、点选上一句或重播）时，自动旁路逐行弹簧链以防止负向 offset 引发行间重叠碰撞，确保整体平移对齐阅读锚点。Android 12+ 对非当前行启用按距离递增的缓存图层模糊，blurDelta 2；手动浏览时恢复清晰，视口外保活距离为 24 dp。Android 10 / 11 不启用 RenderEffect 模糊。
 
 ## 验证
 

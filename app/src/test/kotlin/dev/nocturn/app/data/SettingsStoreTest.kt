@@ -128,8 +128,35 @@ class SettingsStoreTest {
         assertEquals(ThemeMode.System, store.themeMode)
         assertTrue(store.dynamicColor)
         assertEquals(AudioQuality.Exhigh, store.quality)
+        assertEquals(dev.nocturn.localapi.client.ImmerseType.C51, store.immerseType)
+        assertFalse(store.unblockEnabled)
         assertTrue(store.hapticsEnabled)
+        assertFalse(store.autoClaimFreeListen)
         assertTrue(store.searchHistory().isEmpty())
+    }
+
+    @Test
+    fun immerseTypeAndUnblockPersistAcrossInstances() {
+        val store1 = SettingsStore(context)
+        store1.immerseType = dev.nocturn.localapi.client.ImmerseType.Ste
+        store1.unblockEnabled = true
+
+        val store2 = SettingsStore(context)
+        assertEquals(dev.nocturn.localapi.client.ImmerseType.Ste, store2.immerseType)
+        assertTrue(store2.unblockEnabled)
+    }
+
+    @Test
+    fun autoClaimFreeListenPersistsAcrossInstances() {
+        val store1 = SettingsStore(context)
+        assertFalse(store1.autoClaimFreeListen)
+        store1.autoClaimFreeListen = true
+
+        val store2 = SettingsStore(context)
+        assertTrue("autoClaimFreeListen must persist true across instances", store2.autoClaimFreeListen)
+
+        val rawPrefs = context.getSharedPreferences("nocturn-settings", Context.MODE_PRIVATE)
+        assertTrue(rawPrefs.getBoolean(SettingsStore.KEY_AUTO_CLAIM_FREE_LISTEN, false))
     }
 
     @Test

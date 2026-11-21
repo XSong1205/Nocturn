@@ -4,6 +4,13 @@ import dev.nocturn.app.data.model.Lyrics
 import dev.nocturn.app.data.model.Song
 import dev.nocturn.app.playback.RepeatMode
 
+enum class PlaybackMode {
+    Sequence,
+    Heartbeat,
+    Shuffle,
+    SingleCycle,
+}
+
 data class MiniPlayerUiState(
     val song: Song? = null,
     val playing: Boolean = false,
@@ -21,6 +28,7 @@ data class PlayerUiState(
     val liked: Boolean = false,
     val shuffle: Boolean = false,
     val repeatMode: RepeatMode = RepeatMode.Off,
+    val playbackMode: PlaybackMode = PlaybackMode.Sequence,
     val lyrics: Lyrics = Lyrics.EMPTY,
     val lyricsLoading: Boolean = false,
     val queue: List<Song> = emptyList(),
@@ -32,6 +40,9 @@ data class PlayerUiState(
     val positionDiscontinuity: Long = 0L,
     val playbackSpeed: Float = 1f,
 ) {
+    val isHeartbeatMode: Boolean
+        get() = playbackMode == PlaybackMode.Heartbeat
+
     val progress: Float
         get() = if (durationMs > 0) {
             (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)

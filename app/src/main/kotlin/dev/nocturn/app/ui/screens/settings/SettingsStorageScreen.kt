@@ -3,6 +3,7 @@
 package dev.nocturn.app.ui.screens.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,13 +14,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CleaningServices
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.rounded.CleaningServices
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -77,13 +79,18 @@ fun SettingsStorageScreen(
             }
         },
     ) { topPadding ->
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxSize()
-                .testTag("settings-storage-screen"),
-            contentPadding = PaddingValues(top = topPadding + 4.dp, bottom = bottomContentPadding()),
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.TopCenter,
         ) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .widthIn(max = 840.dp)
+                    .testTag("settings-storage-screen"),
+                contentPadding = PaddingValues(top = topPadding + 4.dp, bottom = bottomContentPadding()),
+            ) {
             item(key = "hero") {
                 SettingsHero(
                     title = "存储与缓存",
@@ -125,7 +132,7 @@ fun SettingsStorageScreen(
                                 horizontalArrangement = Arrangement.Center,
                             ) {
                                 Icon(
-                                    Icons.Filled.History,
+                                    Icons.Rounded.History,
                                     contentDescription = null,
                                     modifier = Modifier.size(20.dp),
                                 )
@@ -199,7 +206,7 @@ fun SettingsStorageScreen(
                                 horizontalArrangement = Arrangement.Center,
                             ) {
                                 Icon(
-                                    Icons.Filled.CleaningServices,
+                                    Icons.Rounded.CleaningServices,
                                     contentDescription = null,
                                     modifier = Modifier.size(20.dp),
                                 )
@@ -248,7 +255,7 @@ fun SettingsStorageScreen(
                         verticalAlignment = Alignment.Top,
                     ) {
                         Icon(
-                            Icons.Filled.Security,
+                            Icons.Rounded.Security,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp),
@@ -272,11 +279,12 @@ fun SettingsStorageScreen(
             }
         }
     }
+}
 
     if (showClearHistoryDialog) {
         AlertDialog(
             onDismissRequest = { showClearHistoryDialog = false },
-            icon = { Icon(Icons.Filled.DeleteOutline, contentDescription = null) },
+            icon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null) },
             title = { Text("清除搜索历史？") },
             text = {
                 BlurBehindWindow()

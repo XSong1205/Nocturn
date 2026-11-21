@@ -59,6 +59,26 @@ class AccountAuthenticatorTest {
         }
     }
 
+    @Test
+    fun sendCodeDispatchesToV1CaptchaEndpoint() = runBlocking {
+        var requestedRoute: String? = null
+        var requestedBody: JsonObject? = null
+        val client = mockClient { route, body ->
+            requestedRoute = route
+            requestedBody = body
+            """{"code":200,"data":true}"""
+        }
+        try {
+            val auth = AccountAuthenticator({ client }) { _, _ -> }
+            auth.sendCode("13800138000", "86")
+            assertEquals("captcha/sent/v1", requestedRoute)
+            assertEquals("13800138000", requestedBody?.get("phone")?.toString()?.trim('"'))
+            assertEquals("86", requestedBody?.get("ctcode")?.toString()?.trim('"'))
+        } finally {
+            client.close()
+        }
+    }
+
     private fun mockClient(handler: (String, JsonObject) -> String): LocalApiClient =
         LocalApiClient(HttpClient(MockEngine { request ->
             val route = request.url.encodedPath.removePrefix("/api/")

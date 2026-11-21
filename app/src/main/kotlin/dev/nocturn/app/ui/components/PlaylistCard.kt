@@ -18,8 +18,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Headphones
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Headphones
+import androidx.compose.material.icons.rounded.Leaderboard
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -65,12 +67,18 @@ fun PlaylistCard(
                 .fillMaxWidth()
                 .aspectRatio(1f),
         ) {
+            val placeholderIcon = if (playlist.name.contains("喜欢") || playlist.name.contains("Favorite", ignoreCase = true)) {
+                Icons.Rounded.Favorite
+            } else {
+                Icons.AutoMirrored.Rounded.QueueMusic
+            }
             CoverArt(
                 imageUrl = playlist.coverUrl,
                 modifier = Modifier.fillMaxSize(),
                 shape = MaterialTheme.shapes.large,
                 seed = playlist.id.hashCode(),
                 contentDescription = playlist.name,
+                placeholderIcon = placeholderIcon,
             )
             Surface(
                 modifier = Modifier
@@ -86,7 +94,7 @@ fun PlaylistCard(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Icon(
-                        Icons.Filled.Headphones,
+                        Icons.Rounded.Headphones,
                         contentDescription = null,
                         modifier = Modifier.size(12.dp),
                     )
@@ -146,6 +154,7 @@ fun ChartCard(
                 shape = MaterialTheme.shapes.medium,
                 seed = toplist.id.hashCode(),
                 contentDescription = toplist.name,
+                placeholderIcon = Icons.Rounded.Leaderboard,
             )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {

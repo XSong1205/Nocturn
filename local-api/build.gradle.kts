@@ -7,7 +7,7 @@ kotlin {
     android {
         namespace = "dev.nocturn.localapi.client"
         compileSdk = 37
-        minSdk = 29
+        minSdk = 24
     }
     // Runs common client contract tests on the build host; no desktop application.
     jvm("host")

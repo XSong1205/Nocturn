@@ -13,11 +13,17 @@ data class HomeUiState(
     val charts: List<Toplist> = emptyList(),
     val dailySongs: List<Song> = emptyList(),
     val personalizedSongs: List<Song> = emptyList(),
+    val radarPlaylist: PlaylistSummary? = null,
     val isLoggedIn: Boolean = false,
+    val isVip: Boolean = false,
     val likedSongIds: Set<Long> = emptySet(),
     val nowPlayingSongId: Long? = null,
 ) {
+    val showFreeListenButton: Boolean
+        get() = !isVip
+
     val hasContent: Boolean
         get() = recommendedPlaylists.isNotEmpty() ||
-            charts.isNotEmpty() || dailySongs.isNotEmpty() || personalizedSongs.isNotEmpty()
+            charts.isNotEmpty() || dailySongs.isNotEmpty() || personalizedSongs.isNotEmpty() ||
+            radarPlaylist != null
 }

@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.AssistChip
@@ -55,6 +56,7 @@ import dev.nocturn.app.data.model.AlbumSummary
 import dev.nocturn.app.data.model.ArtistDetail
 import dev.nocturn.app.data.model.Song
 import dev.nocturn.app.data.model.ThemeMode
+import dev.nocturn.app.ui.adaptive.LocalWindowWidthClass
 import dev.nocturn.app.ui.components.BarBackButton
 import dev.nocturn.app.ui.components.BarTitle
 import dev.nocturn.app.ui.components.CoverArt
@@ -111,6 +113,8 @@ fun AlbumScreen(
 
     val listState = rememberLazyListState()
     val collapsed by listState.scrolledPast(280)
+    val widthClass = LocalWindowWidthClass.current
+    val isExpanded = widthClass.isExpanded
     GlassScaffold(
         modifier = modifier,
         topBar = {
@@ -149,18 +153,59 @@ fun AlbumScreen(
                     )
                 }
             }
-            itemsIndexed(
-                items = detail.songs,
-                key = { _, song -> song.id },
-            ) { index, song ->
-                AlbumSongRow(
-                    song = song,
-                    index = index,
-                    songs = detail.songs,
-                    state = state,
-                    onSongClick = onSongClick,
-                    onLikeClick = onLikeClick,
-                )
+            if (isExpanded) {
+                items(
+                    items = detail.songs.chunked(2),
+                    key = { pair -> "album-song-pair-${pair.first().id}" },
+                ) { pair ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        val song0 = pair[0]
+                        val index0 = detail.songs.indexOf(song0)
+                        AlbumSongRow(
+                            song = song0,
+                            index = index0,
+                            songs = detail.songs,
+                            state = state,
+                            onSongClick = onSongClick,
+                            onLikeClick = onLikeClick,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (pair.size > 1) {
+                            val song1 = pair[1]
+                            val index1 = detail.songs.indexOf(song1)
+                            AlbumSongRow(
+                                song = song1,
+                                index = index1,
+                                songs = detail.songs,
+                                state = state,
+                                onSongClick = onSongClick,
+                                onLikeClick = onLikeClick,
+                                modifier = Modifier.weight(1f),
+                            )
+                        } else {
+                            Spacer(Modifier.weight(1f))
+                        }
+                    }
+                }
+            } else {
+                itemsIndexed(
+                    items = detail.songs,
+                    key = { _, song -> song.id },
+                ) { index, song ->
+                    AlbumSongRow(
+                        song = song,
+                        index = index,
+                        songs = detail.songs,
+                        state = state,
+                        onSongClick = onSongClick,
+                        onLikeClick = onLikeClick,
+                    )
+                }
             }
         }
     }
@@ -174,11 +219,12 @@ private fun AlbumSongRow(
     state: AlbumUiState,
     onSongClick: (Song, List<Song>) -> Unit,
     onLikeClick: (Song) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     SongRow(
         song = song,
         onClick = { onSongClick(song, songs) },
-        modifier = Modifier
+        modifier = modifier
             .padding(horizontal = 8.dp)
             .testTag("album-song-$index"),
         index = index + 1,
@@ -195,99 +241,204 @@ private fun AlbumHero(
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        CoverArt(
-            imageUrl = detail.coverUrl,
-            modifier = Modifier
-                .size(196.dp)
-                .shadow(
-                    elevation = 22.dp,
-                    shape = MaterialTheme.shapes.extraLarge,
-                    ambientColor = colors.primary.copy(alpha = 0.38f),
-                    spotColor = colors.primary.copy(alpha = 0.44f),
-                ),
-            shape = MaterialTheme.shapes.extraLarge,
-            seed = detail.id.hashCode(),
-            contentDescription = detail.name,
-        )
-        Spacer(Modifier.height(20.dp))
-        Text(
-            text = detail.name,
-            style = MaterialTheme.typography.headlineSmallEmphasized,
-            color = colors.onSurface,
-            textAlign = TextAlign.Center,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (detail.artistText.isNotBlank()) {
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = detail.artistText,
-                style = MaterialTheme.typography.titleSmall,
-                color = colors.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Spacer(Modifier.height(14.dp))
+    val isWide = LocalWindowWidthClass.current.isAtLeastMedium
+    if (isWide) {
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(horizontal = 28.dp)
+                .testTag("album-hero"),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            formatDate(detail.publishTime)?.let { date ->
-                MetaChip(
-                    text = "${date} 发行",
-                    containerColor = colors.secondaryContainer,
-                    contentColor = colors.onSecondaryContainer,
+            CoverArt(
+                imageUrl = detail.coverUrl,
+                modifier = Modifier
+                    .size(196.dp)
+                    .shadow(
+                        elevation = 22.dp,
+                        shape = MaterialTheme.shapes.extraLarge,
+                        ambientColor = colors.primary.copy(alpha = 0.38f),
+                        spotColor = colors.primary.copy(alpha = 0.44f),
+                    ),
+                shape = MaterialTheme.shapes.extraLarge,
+                seed = detail.id.hashCode(),
+                contentDescription = detail.name,
+                placeholderIcon = Icons.Rounded.Album,
+            )
+            Spacer(Modifier.width(28.dp))
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.Start,
+            ) {
+                Text(
+                    text = detail.name,
+                    style = MaterialTheme.typography.headlineMediumEmphasized,
+                    color = colors.onSurface,
+                    textAlign = TextAlign.Start,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
-            }
-            val company = detail.company
-            if (!company.isNullOrBlank()) {
-                MetaChip(text = company)
-            }
-        }
-        if (detail.artists.isNotEmpty()) {
-            Spacer(Modifier.height(14.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                detail.artists.take(3).forEach { artist ->
-                    AssistChip(
-                        onClick = { onArtistClick(artist.id) },
-                        label = { Text(artist.name) },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Rounded.Person,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        },
+                if (detail.artistText.isNotBlank()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = detail.artistText,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = colors.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
+                }
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    formatDate(detail.publishTime)?.let { date ->
+                        MetaChip(
+                            text = "${date} 发行",
+                            containerColor = colors.secondaryContainer,
+                            contentColor = colors.onSecondaryContainer,
+                        )
+                    }
+                    val company = detail.company
+                    if (!company.isNullOrBlank()) {
+                        MetaChip(text = company)
+                    }
+                }
+                if (detail.artists.isNotEmpty()) {
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        detail.artists.take(3).forEach { artist ->
+                            AssistChip(
+                                onClick = { onArtistClick(artist.id) },
+                                label = { Text(artist.name) },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Rounded.Person,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                },
+                            )
+                        }
+                    }
+                }
+                val description = detail.description
+                if (!description.isNullOrBlank()) {
+                    Spacer(Modifier.height(12.dp))
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.large,
+                        color = colors.surfaceContainerLow,
+                    ) {
+                        Text(
+                            text = description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.onSurfaceVariant,
+                            maxLines = 5,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(14.dp),
+                        )
+                    }
                 }
             }
         }
-        val description = detail.description
-        if (!description.isNullOrBlank()) {
-            Spacer(Modifier.height(16.dp))
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.large,
-                color = colors.surfaceContainerLow,
-            ) {
+    } else {
+        Column(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            CoverArt(
+                imageUrl = detail.coverUrl,
+                modifier = Modifier
+                    .size(196.dp)
+                    .shadow(
+                        elevation = 22.dp,
+                        shape = MaterialTheme.shapes.extraLarge,
+                        ambientColor = colors.primary.copy(alpha = 0.38f),
+                        spotColor = colors.primary.copy(alpha = 0.44f),
+                    ),
+                shape = MaterialTheme.shapes.extraLarge,
+                seed = detail.id.hashCode(),
+                contentDescription = detail.name,
+                placeholderIcon = Icons.Rounded.Album,
+            )
+            Spacer(Modifier.height(20.dp))
+            Text(
+                text = detail.name,
+                style = MaterialTheme.typography.headlineSmallEmphasized,
+                color = colors.onSurface,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (detail.artistText.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
                 Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
+                    text = detail.artistText,
+                    style = MaterialTheme.typography.titleSmall,
                     color = colors.onSurfaceVariant,
-                    maxLines = 5,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(16.dp),
                 )
             }
+            Spacer(Modifier.height(14.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                formatDate(detail.publishTime)?.let { date ->
+                    MetaChip(
+                        text = "${date} 发行",
+                        containerColor = colors.secondaryContainer,
+                        contentColor = colors.onSecondaryContainer,
+                    )
+                }
+                val company = detail.company
+                if (!company.isNullOrBlank()) {
+                    MetaChip(text = company)
+                }
+            }
+            if (detail.artists.isNotEmpty()) {
+                Spacer(Modifier.height(14.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    detail.artists.take(3).forEach { artist ->
+                        AssistChip(
+                            onClick = { onArtistClick(artist.id) },
+                            label = { Text(artist.name) },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Rounded.Person,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            },
+                        )
+                    }
+                }
+            }
+            val description = detail.description
+            if (!description.isNullOrBlank()) {
+                Spacer(Modifier.height(16.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
+                    color = colors.surfaceContainerLow,
+                ) {
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.onSurfaceVariant,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(16.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.height(20.dp))
         }
-        Spacer(Modifier.height(20.dp))
     }
 }
 
@@ -361,6 +512,8 @@ fun ArtistScreen(
     val haptics = rememberHaptics()
     val listState = rememberLazyListState()
     val collapsed by listState.scrolledPast(300)
+    val widthClass = LocalWindowWidthClass.current
+    val isExpanded = widthClass.isExpanded
     GlassScaffold(
         modifier = modifier,
         topBar = {
@@ -420,21 +573,68 @@ fun ArtistScreen(
                     )
                 }
             }
-            itemsIndexed(
-                items = detail.hotSongs,
-                key = { _, song -> song.id },
-            ) { index, song ->
-                SongRow(
-                    song = song,
-                    onClick = { onSongClick(song, detail.hotSongs) },
-                    modifier = Modifier
-                        .padding(horizontal = 8.dp)
-                        .testTag("artist-song-$index"),
-                    index = index + 1,
-                    isPlaying = state.nowPlayingSongId == song.id,
-                    isLiked = song.id in state.likedSongIds,
-                    onLikeClick = { onLikeClick(song) },
-                )
+            if (isExpanded) {
+                items(
+                    items = detail.hotSongs.chunked(2),
+                    key = { pair -> "artist-song-pair-${pair.first().id}" },
+                ) { pair ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        val song0 = pair[0]
+                        val index0 = detail.hotSongs.indexOf(song0)
+                        SongRow(
+                            song = song0,
+                            onClick = { onSongClick(song0, detail.hotSongs) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 8.dp)
+                                .testTag("artist-song-$index0"),
+                            index = index0 + 1,
+                            isPlaying = state.nowPlayingSongId == song0.id,
+                            isLiked = song0.id in state.likedSongIds,
+                            onLikeClick = { onLikeClick(song0) },
+                        )
+                        if (pair.size > 1) {
+                            val song1 = pair[1]
+                            val index1 = detail.hotSongs.indexOf(song1)
+                            SongRow(
+                                song = song1,
+                                onClick = { onSongClick(song1, detail.hotSongs) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(horizontal = 8.dp)
+                                    .testTag("artist-song-$index1"),
+                                index = index1 + 1,
+                                isPlaying = state.nowPlayingSongId == song1.id,
+                                isLiked = song1.id in state.likedSongIds,
+                                onLikeClick = { onLikeClick(song1) },
+                            )
+                        } else {
+                            Spacer(Modifier.weight(1f))
+                        }
+                    }
+                }
+            } else {
+                itemsIndexed(
+                    items = detail.hotSongs,
+                    key = { _, song -> song.id },
+                ) { index, song ->
+                    SongRow(
+                        song = song,
+                        onClick = { onSongClick(song, detail.hotSongs) },
+                        modifier = Modifier
+                            .padding(horizontal = 8.dp)
+                            .testTag("artist-song-$index"),
+                        index = index + 1,
+                        isPlaying = state.nowPlayingSongId == song.id,
+                        isLiked = song.id in state.likedSongIds,
+                        onLikeClick = { onLikeClick(song) },
+                    )
+                }
             }
             if (detail.albums.isNotEmpty()) {
                 item(key = "albums-header") {
@@ -471,66 +671,138 @@ private fun ArtistHero(
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            modifier = Modifier.size(216.dp),
-            contentAlignment = Alignment.Center,
+    val isWide = LocalWindowWidthClass.current.isAtLeastMedium
+    if (isWide) {
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(horizontal = 28.dp)
+                .testTag("artist-hero"),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(CircleShape)
-                    .background(
-                        Brush.sweepGradient(
-                            listOf(colors.primary, colors.tertiary, colors.secondary, colors.primary),
+                modifier = Modifier.size(196.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                        .background(
+                            Brush.sweepGradient(
+                                listOf(colors.primary, colors.tertiary, colors.secondary, colors.primary),
+                            ),
                         ),
-                    ),
-            )
-            CoverArt(
-                imageUrl = detail.avatarUrl ?: detail.coverUrl,
-                modifier = Modifier.size(200.dp),
-                shape = CircleShape,
-                seed = detail.id.hashCode(),
-                contentDescription = detail.name,
-            )
+                )
+                CoverArt(
+                    imageUrl = detail.avatarUrl ?: detail.coverUrl,
+                    modifier = Modifier.size(180.dp),
+                    shape = CircleShape,
+                    seed = detail.id.hashCode(),
+                    contentDescription = detail.name,
+                    placeholderIcon = Icons.Rounded.Person,
+                )
+            }
+            Spacer(Modifier.width(28.dp))
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.Start,
+            ) {
+                Text(
+                    text = detail.name,
+                    style = MaterialTheme.typography.headlineMediumEmphasized,
+                    color = colors.onSurface,
+                    textAlign = TextAlign.Start,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MetaChip(text = "${detail.albumCount} 张专辑")
+                    MetaChip(text = "${detail.songCount} 首歌曲")
+                    MetaChip(
+                        text = "${formatCount(detail.fansCount)} 粉丝",
+                        containerColor = colors.secondaryContainer,
+                        contentColor = colors.onSecondaryContainer,
+                    )
+                }
+                val brief = detail.briefDescription
+                if (!brief.isNullOrBlank()) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = brief,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.onSurfaceVariant,
+                        textAlign = TextAlign.Start,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
         }
-        Spacer(Modifier.height(18.dp))
-        Text(
-            text = detail.name,
-            style = MaterialTheme.typography.headlineMediumEmphasized,
-            color = colors.onSurface,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 24.dp),
-        )
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            MetaChip(text = "${detail.albumCount} 张专辑")
-            MetaChip(text = "${detail.songCount} 首歌曲")
-            MetaChip(
-                text = "${formatCount(detail.fansCount)} 粉丝",
-                containerColor = colors.secondaryContainer,
-                contentColor = colors.onSecondaryContainer,
-            )
-        }
-        val brief = detail.briefDescription
-        if (!brief.isNullOrBlank()) {
-            Spacer(Modifier.height(14.dp))
+    } else {
+        Column(
+            modifier = modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                modifier = Modifier.size(216.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                        .background(
+                            Brush.sweepGradient(
+                                listOf(colors.primary, colors.tertiary, colors.secondary, colors.primary),
+                            ),
+                        ),
+                )
+                CoverArt(
+                    imageUrl = detail.avatarUrl ?: detail.coverUrl,
+                    modifier = Modifier.size(200.dp),
+                    shape = CircleShape,
+                    seed = detail.id.hashCode(),
+                    contentDescription = detail.name,
+                    placeholderIcon = Icons.Rounded.Person,
+                )
+            }
+            Spacer(Modifier.height(18.dp))
             Text(
-                text = brief,
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.onSurfaceVariant,
+                text = detail.name,
+                style = MaterialTheme.typography.headlineMediumEmphasized,
+                color = colors.onSurface,
                 textAlign = TextAlign.Center,
-                maxLines = 3,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 28.dp),
+                modifier = Modifier.padding(horizontal = 24.dp),
             )
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MetaChip(text = "${detail.albumCount} 张专辑")
+                MetaChip(text = "${detail.songCount} 首歌曲")
+                MetaChip(
+                    text = "${formatCount(detail.fansCount)} 粉丝",
+                    containerColor = colors.secondaryContainer,
+                    contentColor = colors.onSecondaryContainer,
+                )
+            }
+            val brief = detail.briefDescription
+            if (!brief.isNullOrBlank()) {
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    text = brief,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 28.dp),
+                )
+            }
+            Spacer(Modifier.height(18.dp))
         }
-        Spacer(Modifier.height(18.dp))
     }
 }
 
@@ -559,6 +831,7 @@ private fun AlbumTile(
             shape = MaterialTheme.shapes.large,
             seed = album.id.hashCode(),
             contentDescription = album.name,
+            placeholderIcon = Icons.Rounded.Album,
         )
         Spacer(Modifier.height(10.dp))
         Text(
