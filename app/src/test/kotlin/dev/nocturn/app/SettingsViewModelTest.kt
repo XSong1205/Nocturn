@@ -149,6 +149,29 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun openLikedSongsRedirectsToPlaylistWhenFavoriteExists() = runBlocking {
+        val app = RuntimeEnvironment.getApplication() as NocturnApplication
+        val favPlaylist = PlaylistSummary(id = 8888L, name = "我喜欢的音乐", specialType = 5)
+        val profile = AccountProfile(id = 1L, nickname = "User", avatarUrl = null, vipLevel = 0)
+        app.container = object : AppContainer(app) {
+            override val settings = SettingsStore(app)
+            override val repository: MusicRepository = object : FakeMusicRepository() {
+                override suspend fun restoreSession(): AccountProfile? = profile
+                override suspend fun userPlaylists(): List<PlaylistSummary> = listOf(favPlaylist)
+                override suspend fun playlistDetail(id: Long): PlaylistDetail =
+                    PlaylistDetail(id = id, name = "我喜欢的音乐", coverUrl = null)
+                override suspend fun playlistSongs(id: Long, offset: Int, limit: Int): PlaylistSongsPage =
+                    PlaylistSongsPage(songs = emptyList(), total = 0, nextOffset = null)
+            }
+            override val playback: PlaybackEngine = FakePlaybackEngine()
+        }
+        val model = NocturnViewModel(app)
+        model.refreshLibrary().join()
+        model.openLikedSongs()
+        assertEquals(listOf(Screen.Playlist(8888L)), model.navigation.value.stack)
+    }
+
+    @Test
     fun reselectingActiveTabWhenAtRootEmitsReselectEvent() {
         val model = createViewModel()
         assertEquals(AppTab.Home, model.navigation.value.tab)
@@ -328,7 +351,7 @@ class SettingsViewModelTest {
     }
 
 
-    private class FakeMusicRepository : MusicRepository {
+    private open class FakeMusicRepository : MusicRepository {
         override val session: StateFlow<AccountProfile?> = MutableStateFlow(null)
         override suspend fun homeFeed(): HomeFeed = HomeFeed()
         override suspend fun playlistDetail(id: Long): PlaylistDetail = error("Not needed")

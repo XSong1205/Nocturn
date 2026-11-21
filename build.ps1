@@ -148,7 +148,7 @@ $foundApks = @()
 foreach ($t in $targetTypes) {
     $dir = Join-Path $outputBase $t
     if (Test-Path $dir) {
-        $apks = Get-ChildItem -Path $dir -Filter "*.apk" | Sort-Object Length -Descending
+        $apks = Get-ChildItem -Path $dir -Filter "*.apk" | Sort-Object LastWriteTime -Descending
         if ($apks) {
             Write-Host "`n【$($t.ToUpper()) APK 产物目录】: $dir" -ForegroundColor Cyan
             foreach ($apk in $apks) {
@@ -166,8 +166,16 @@ if ($Install) {
     if (Get-Command "adb" -ErrorAction SilentlyContinue) {
         $devices = & adb devices | Select-String -Pattern "([^\s]+)\s+device$"
         if ($devices.Count -gt 0) {
-            # 优先选择当前编译类型的 arm64-v8a 或 universal 包
-            $apkToInstall = $foundApks | Where-Object { $_.Name -like "*arm64-v8a*" } | Select-Object -First 1
+            $deviceAbi = (& adb shell getprop ro.product.cpu.abi 2>$null).Trim()
+            if ($deviceAbi) {
+                Write-Host "[>] 检测到设备架构: $deviceAbi" -ForegroundColor Cyan
+            }
+            # 优先匹配当前设备架构，未匹配则选择 universal 包
+            $apkToInstall = $null
+            if ($deviceAbi) {
+                $sanitizedAbi = $deviceAbi.Replace('-', '_')
+                $apkToInstall = $foundApks | Where-Object { $_.Name -like "*$sanitizedAbi*" } | Select-Object -First 1
+            }
             if (-not $apkToInstall) {
                 $apkToInstall = $foundApks | Where-Object { $_.Name -like "*universal*" } | Select-Object -First 1
             }

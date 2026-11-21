@@ -639,6 +639,21 @@ fun CustomSeedColorDialog(
     onDismiss: () -> Unit,
     onConfirm: (Color) -> Unit,
 ) {
+    CustomSeedColorContent(
+        initialColor = initialColor,
+        onDismiss = onDismiss,
+        onConfirm = onConfirm,
+        asDialog = true,
+    )
+}
+
+@Composable
+fun CustomSeedColorContent(
+    initialColor: Color,
+    onDismiss: () -> Unit,
+    onConfirm: (Color) -> Unit,
+    asDialog: Boolean = false,
+) {
     val presetSeeds = listOf(
         Color(0xFFE53935), // Red
         Color(0xFFD81B60), // Pink
@@ -660,105 +675,125 @@ fun CustomSeedColorDialog(
         mutableStateOf(String.format("%06X", 0xFFFFFF and argb))
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(text = "自定义色彩", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "选择预设种子色彩或输入 HEX 颜色代码：",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(16.dp))
+    val bodyContent = @Composable {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = "选择预设种子色彩或输入 HEX 颜色代码：",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(16.dp))
 
-                // Swatches row
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    presetSeeds.forEach { seed ->
-                        val isChosen = selectedColor == seed
-                        Box(
-                            modifier = Modifier
-                                .size(38.dp)
-                                .clip(CircleShape)
-                                .background(seed)
-                                .clickable {
-                                    selectedColor = seed
-                                    val argb = seed.toArgb()
-                                    hexText = String.format("%06X", 0xFFFFFF and argb)
-                                }
-                                .then(
-                                    if (isChosen) {
-                                        Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                                    } else Modifier,
-                                ),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            if (isChosen) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Check,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp),
-                                )
+            // Swatches row
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                presetSeeds.forEach { seed ->
+                    val isChosen = selectedColor == seed
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(seed)
+                            .clickable {
+                                selectedColor = seed
+                                val argb = seed.toArgb()
+                                hexText = String.format("%06X", 0xFFFFFF and argb)
                             }
+                            .then(
+                                if (isChosen) {
+                                    Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                } else Modifier,
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (isChosen) {
+                            Icon(
+                                imageVector = Icons.Rounded.Check,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp),
+                            )
                         }
                     }
                 }
+            }
 
-                Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(16.dp))
 
-                // Hex input field with preview box
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(selectedColor)
-                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)),
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    OutlinedTextField(
-                        value = hexText,
-                        onValueChange = { input ->
-                            val sanitized = input.removePrefix("#").filter { it.isLetterOrDigit() }.take(6)
-                            hexText = sanitized
-                            if (sanitized.length == 6) {
-                                runCatching {
-                                    val parsed = (sanitized.toLong(16) or 0xFF000000L).toInt()
-                                    selectedColor = Color(parsed)
-                                }
+            // Hex input field with preview box
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(selectedColor)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)),
+                )
+                Spacer(Modifier.width(12.dp))
+                OutlinedTextField(
+                    value = hexText,
+                    onValueChange = { input ->
+                        val sanitized = input.removePrefix("#").filter { it.isLetterOrDigit() }.take(6)
+                        hexText = sanitized
+                        if (sanitized.length == 6) {
+                            runCatching {
+                                val parsed = (sanitized.toLong(16) or 0xFF000000L).toInt()
+                                selectedColor = Color(parsed)
                             }
-                        },
-                        label = { Text("HEX 代码") },
-                        prefix = { Text("#") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        keyboardActions = KeyboardActions(onDone = { onConfirm(selectedColor) }),
-                        modifier = Modifier.weight(1f),
-                    )
+                        }
+                    },
+                    label = { Text("HEX 代码") },
+                    prefix = { Text("#") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { onConfirm(selectedColor) }),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+
+    if (asDialog) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = {
+                Text(text = "自定义色彩", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            },
+            text = bodyContent,
+            confirmButton = {
+                Button(onClick = { onConfirm(selectedColor) }) {
+                    Text("应用")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss) {
+                    Text("取消")
+                }
+            },
+        )
+    } else {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(text = "自定义色彩", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(12.dp))
+            bodyContent()
+            Spacer(Modifier.height(16.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onDismiss) {
+                    Text("取消")
+                }
+                Spacer(Modifier.width(8.dp))
+                Button(onClick = { onConfirm(selectedColor) }) {
+                    Text("应用")
                 }
             }
-        },
-        confirmButton = {
-            Button(onClick = { onConfirm(selectedColor) }) {
-                Text("应用")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("取消")
-            }
-        },
-    )
+        }
+    }
 }
 
 @Preview(name = "个性化 · 浅色", showBackground = true)

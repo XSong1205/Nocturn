@@ -27,20 +27,31 @@ abstract class IncrementAppVersion : DefaultTask() {
                 val bytes = ByteArray(file.length().toInt())
                 file.readFully(bytes)
                 val version = Properties().apply { bytes.inputStream().use { load(it) } }
-                val code = Math.addExact(version.getProperty("versionCode").toInt(), 1)
+                val isCi = System.getenv("CI") != null || project.hasProperty("noIncrement")
+                val code = if (isCi) {
+                    version.getProperty("versionCode").toInt()
+                } else {
+                    Math.addExact(version.getProperty("versionCode").toInt(), 1)
+                }
                 require(code <= 2_100_000_000) { "Android versionCode limit exceeded" }
                 val parts = version.getProperty("versionName").split('.').map { it.toInt() }
                 require(parts.size == 3 && parts.all { it >= 0 }) { "Expected major.minor.patch versionName" }
-                val name = "${parts[0]}.${parts[1]}.${Math.addExact(parts[2], 1)}"
+                val name = if (isCi) {
+                    version.getProperty("versionName")
+                } else {
+                    "${parts[0]}.${parts[1]}.${Math.addExact(parts[2], 1)}"
+                }
                 val content = "versionCode=$code\nversionName=$name\n"
-                file.seek(0)
-                file.write(content.toByteArray(Charsets.UTF_8))
-                file.setLength(file.filePointer)
+                if (!isCi) {
+                    file.seek(0)
+                    file.write(content.toByteArray(Charsets.UTF_8))
+                    file.setLength(file.filePointer)
+                }
                 snapshotFile.get().asFile.apply {
                     parentFile.mkdirs()
                     writeText(content)
                 }
-                logger.lifecycle("App version: $name ($code)")
+                logger.lifecycle("App version${if (isCi) " (CI/noIncrement)" else ""}: $name ($code)")
             }
         }
     }

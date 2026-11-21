@@ -78,8 +78,15 @@ fun FreeListenDialog(
             )
         },
         title = {
+            val titleText = remember(rights?.title) {
+                val t = rights?.title?.trim().orEmpty()
+                when {
+                    t.isEmpty() || t.contains("看视频") || t.contains("免费听") -> "免费听"
+                    else -> t
+                }
+            }
             Text(
-                text = rights?.title?.ifBlank { "免费听时长" } ?: "免费听时长",
+                text = titleText,
                 style = MaterialTheme.typography.headlineSmall,
                 textAlign = TextAlign.Center,
             )
@@ -100,7 +107,7 @@ fun FreeListenDialog(
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = if (currentRemainingMs > 0) "剩余可用时长" else "免费听时长",
+                            text = if (currentRemainingMs > 0) "剩余可用时长" else "免费听",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -223,7 +230,16 @@ fun FreeListenDialog(
                     text = if (rights?.upperLimit == true) {
                         "今日已达上限"
                     } else {
-                        rights?.actionTitle?.ifBlank { "领免费听时长" } ?: "领免费听时长"
+                        val action = rights?.actionTitle?.trim().orEmpty()
+                        when {
+                            action.isEmpty() ||
+                                action == "领免费听时长" ||
+                                action == "领取30分钟" ||
+                                action == "点击领取30分钟免费听" ||
+                                action.contains("30分钟") -> "领取 30 分钟"
+                            action.contains("看视频") -> "免费听"
+                            else -> action
+                        }
                     },
                 )
             }

@@ -561,7 +561,16 @@ private fun LibraryRoute(model: NocturnViewModel) {
         state = library,
         onLoginClick = model::startLogin,
         onLogout = model::logout,
-        onLikedSongsClick = dropUnlessResumed { model.openLikedSongs() },
+        onLikedSongsClick = dropUnlessResumed {
+            val favorite = library.playlists.firstOrNull {
+                it.specialType == 5 || it.name == "我喜欢的音乐" || it.name.endsWith("喜欢的音乐") || it.name.contains("喜欢")
+            }
+            if (favorite != null) {
+                model.openPlaylist(favorite.id)
+            } else {
+                model.openLikedSongs()
+            }
+        },
         onPlaylistClick = rememberResumedNavigation(model::openPlaylist),
         onHeartbeatClick = model::startHeartbeatMode,
         onRecentSongsClick = dropUnlessResumed { model.openRecentSongs() },

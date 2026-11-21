@@ -48,7 +48,7 @@ class LocalApiRuntime private constructor(private val context: Application) {
         }
         return scope.async {
             try {
-                check(Application.getProcessName() == context.packageName) {
+                check(isMainProcess(context)) {
                     "LocalAPI must be started in the application's main process."
                 }
                 mutableState.value = LocalApiRuntimeState.Preparing
@@ -178,6 +178,33 @@ class LocalApiRuntime private constructor(private val context: Application) {
             }
         }
         return digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
+    }
+
+    private fun isMainProcess(context: Context): Boolean {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            return Application.getProcessName() == context.packageName
+        }
+        val currentProcessName = runCatching {
+            val activityThread = Class.forName("android.app.ActivityThread")
+            val currentProcessNameMethod = activityThread.getDeclaredMethod("currentProcessName")
+            currentProcessNameMethod.invoke(null) as? String
+        }.getOrNull() ?: runCatching {
+            File("/proc/self/cmdline").inputStream().use { stream ->
+                val bytes = ByteArray(256)
+                val len = stream.read(bytes)
+                if (len > 0) {
+                    var nullIndex = 0
+                    while (nullIndex < len && bytes[nullIndex] != 0.toByte()) nullIndex++
+                    String(bytes, 0, nullIndex, Charsets.US_ASCII)
+                } else null
+            }
+        }.getOrNull() ?: runCatching {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+            val pid = android.os.Process.myPid()
+            am?.runningAppProcesses?.firstOrNull { it.pid == pid }?.processName
+        }.getOrNull()
+
+        return currentProcessName == null || currentProcessName == context.packageName
     }
 
     companion object {

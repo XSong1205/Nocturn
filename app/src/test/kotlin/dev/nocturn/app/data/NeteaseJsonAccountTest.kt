@@ -213,15 +213,15 @@ class NeteaseJsonAccountTest {
             {
               "code": 200,
               "data": {
-                "title": "免费听时长剩余",
-                "vipInfoContent": "已解锁今日免费听歌时长",
+                "title": "免费听时长",
+                "vipInfoContent": "已解锁免费听歌时长",
                 "status": "已解锁",
                 "rightsEndTime": 1731110000000,
                 "rightsRemainingTime": 1800000,
                 "rightsCoverToday": true,
                 "rightsUpperLimit": false,
                 "cardContent": {
-                  "actionTitle": "领取30分钟"
+                  "actionTitle": "领取 30 分钟"
                 }
               }
             }
@@ -233,9 +233,9 @@ class NeteaseJsonAccountTest {
         assertTrue(rights.coverToday)
         assertFalse(rights.upperLimit)
         assertEquals("已解锁", rights.status)
-        assertEquals("免费听时长剩余", rights.title)
-        assertEquals("已解锁今日免费听歌时长", rights.vipInfoContent)
-        assertEquals("领取30分钟", rights.actionTitle)
+        assertEquals("免费听", rights.title)
+        assertEquals("已解锁免费听歌时长", rights.vipInfoContent)
+        assertEquals("领取 30 分钟", rights.actionTitle)
         assertTrue(rights.isUnlocked)
     }
 
@@ -248,7 +248,30 @@ class NeteaseJsonAccountTest {
         assertFalse(rights.coverToday)
         assertFalse(rights.upperLimit)
         assertFalse(rights.isUnlocked)
-        assertEquals("领取30分钟", rights.actionTitle)
+        assertEquals("免费听", rights.title)
+        assertEquals("领取 30 分钟", rights.actionTitle)
+    }
+
+    @Test
+    fun parseFreeListenRightsNormalizesWatchVideoCopy() {
+        val payload = json(
+            """
+            {
+              "code": 200,
+              "data": {
+                "title": "看视频 免费听VIP歌曲",
+                "vipInfoContent": "看视频免费听歌，每日可领",
+                "cardContent": {
+                  "actionTitle": "点击领取30分钟免费听"
+                }
+              }
+            }
+            """.trimIndent(),
+        )
+        val rights = NeteaseJson.parseFreeListenRights(payload)
+        assertEquals("免费听", rights.title)
+        assertEquals("免费听，每日可领", rights.vipInfoContent)
+        assertEquals("领取 30 分钟", rights.actionTitle)
     }
 
     @Test
@@ -259,7 +282,7 @@ class NeteaseJsonAccountTest {
               "code": 200,
               "data": {
                 "gainFlag": true,
-                "showContent": "恭喜获得30分钟免费听",
+                "showContent": "已获得 30 分钟免费听",
                 "rightsUpperLimit": false,
                 "gainRightsDuration": 1800000
               }
@@ -268,7 +291,7 @@ class NeteaseJsonAccountTest {
         )
         val successResult = NeteaseJson.parseFreeListenClaim(successPayload)
         assertTrue(successResult.success)
-        assertEquals("恭喜获得30分钟免费听", successResult.message)
+        assertEquals("已获得 30 分钟免费听", successResult.message)
         assertEquals(1800000L, successResult.durationMs)
         assertFalse(successResult.upperLimit)
 
@@ -298,14 +321,14 @@ class NeteaseJsonAccountTest {
             """
             {
               "code": 200,
-              "level": 6,
-              "listenSongs": 2518,
+              "level": 9,
+              "listenSongs": 0,
               "profile": {
                 "userId": 10074058552,
-                "nickname": "XSong0507",
-                "follows": 7,
-                "followeds": 2,
-                "playlistCount": 1
+                "nickname": "账号信息获取失败",
+                "follows": 233,
+                "followeds": 233,
+                "playlistCount": 233
               }
             }
             """.trimIndent(),
@@ -316,7 +339,7 @@ class NeteaseJsonAccountTest {
               "code": 200,
               "data": {
                 "totalDuration": 910800,
-                "hours": 253
+                "hours": 233
               }
             }
             """.trimIndent(),
@@ -325,12 +348,12 @@ class NeteaseJsonAccountTest {
             detailBody = userDetail,
             listenTotalBody = listenTotal,
         )
-        assertEquals(1, stats.playlistCount)
-        assertEquals(7, stats.followingCount)
-        assertEquals(2, stats.followerCount)
-        assertEquals(6, stats.level)
-        assertEquals(2518L, stats.listenSongs)
-        assertEquals(253, stats.listenHours)
+        assertEquals(233, stats.playlistCount)
+        assertEquals(233, stats.followingCount)
+        assertEquals(233, stats.followerCount)
+        assertEquals(9, stats.level)
+        assertEquals(0L, stats.listenSongs)
+        assertEquals(233, stats.listenHours)
     }
 
     @Test

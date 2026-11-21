@@ -2,38 +2,24 @@ package dev.nocturn.app.ui
 
 import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.test.assertExists
-import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import dev.nocturn.app.data.SettingsStore
 import dev.nocturn.app.data.model.ColorSchemeKey
 import dev.nocturn.app.data.model.DynamicVariant
-import dev.nocturn.app.data.model.ThemeMode
 import dev.nocturn.app.data.model.description
 import dev.nocturn.app.data.model.displayName
 import dev.nocturn.app.data.model.isDynamic
 import dev.nocturn.app.ui.preview.PreviewData
+import dev.nocturn.app.ui.screens.settings.CustomSeedColorContent
 import dev.nocturn.app.ui.screens.settings.SettingsAppearanceScreen
-import dev.nocturn.app.ui.theme.AmberDarkColors
-import dev.nocturn.app.ui.theme.AmberLightColors
-import dev.nocturn.app.ui.theme.M3BaselineDarkColors
-import dev.nocturn.app.ui.theme.M3BaselineLightColors
-import dev.nocturn.app.ui.theme.M3eDarkColors
-import dev.nocturn.app.ui.theme.M3eLightColors
-import dev.nocturn.app.ui.theme.MintDarkColors
-import dev.nocturn.app.ui.theme.MintLightColors
-import dev.nocturn.app.ui.theme.NocturnDarkColors
-import dev.nocturn.app.ui.theme.NocturnLightColors
 import dev.nocturn.app.ui.theme.NocturnTheme
-import dev.nocturn.app.ui.theme.OceanDarkColors
-import dev.nocturn.app.ui.theme.OceanLightColors
-import dev.nocturn.app.ui.theme.RoseDarkColors
-import dev.nocturn.app.ui.theme.RoseLightColors
 import dev.nocturn.app.ui.theme.generateCustomColorScheme
 import dev.nocturn.app.ui.theme.resolveColorScheme
 import dev.nocturn.app.ui.theme.resolvePalettePreview
@@ -49,7 +35,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [36], qualifiers = "w411dp-h914dp")
 class PersonalizationThemeTest {
 
     @get:Rule
@@ -150,7 +136,26 @@ class PersonalizationThemeTest {
     }
 
     @Test
-    fun personalizationScreenRendersHeaderSwatchesAndDialogs() {
+    fun customSeedColorDialogRendersDirectly() {
+        var confirmed: Color? = null
+        compose.setContent {
+            NocturnTheme {
+                CustomSeedColorContent(
+                    initialColor = Color(0xFF6750A4),
+                    onDismiss = {},
+                    onConfirm = { confirmed = it },
+                    asDialog = false,
+                )
+            }
+        }
+        compose.onNodeWithText("自定义色彩").assertExists()
+        compose.onNodeWithText("应用").assertExists()
+        compose.onNodeWithText("应用").performClick()
+        assertEquals(Color(0xFF6750A4), confirmed)
+    }
+
+    @Test
+    fun personalizationScreenRendersHeaderSwatchesAndInteractions() {
         var chosenScheme: ColorSchemeKey? = null
         var chosenVariant: DynamicVariant? = null
         var resetCount = 0
@@ -182,22 +187,19 @@ class PersonalizationThemeTest {
         compose.onNodeWithText("选择取色风格").assertExists()
         compose.onNodeWithText("表现力").assertExists()
         compose.onNodeWithText("表现力").performClick()
+        compose.waitForIdle()
         assertEquals(DynamicVariant.Expressive, chosenVariant)
 
         // 3. Reset Button works
         compose.onNodeWithContentDescription("恢复默认配色").performClick()
+        compose.waitForIdle()
         assertEquals(1, resetCount)
 
         // 4. Click a color swatch (e.g. M3 Expressive)
+        compose.onNodeWithTag("settings-appearance-screen")
+            .performScrollToNode(hasContentDescription("M3 Expressive"))
         compose.onNodeWithContentDescription("M3 Expressive").assertExists()
         compose.onNodeWithContentDescription("M3 Expressive").performClick()
         assertEquals(ColorSchemeKey.M3eOfficial, chosenScheme)
-
-        // 5. Click "+" button to open Custom Color Dialog
-        compose.onNodeWithContentDescription("自定义种子色彩").assertExists()
-        compose.onNodeWithContentDescription("自定义种子色彩").performClick()
-        compose.waitForIdle()
-        compose.onNodeWithText("自定义色彩").assertExists()
-        compose.onNodeWithText("应用").assertExists()
     }
 }

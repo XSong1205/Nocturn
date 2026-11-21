@@ -295,6 +295,13 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun openLikedSongs() {
+        val favorite = mutableLibrary.value.playlists.firstOrNull {
+            it.specialType == 5 || it.name == "我喜欢的音乐" || it.name.endsWith("喜欢的音乐") || it.name.contains("喜欢")
+        }
+        if (favorite != null) {
+            openPlaylist(favorite.id)
+            return
+        }
         if (mutableNavigation.value.stack.lastOrNull() == Screen.LikedSongs) return
         mutableNavigation.update { it.copy(stack = it.stack + Screen.LikedSongs) }
         loadLikedSongs()
@@ -781,9 +788,9 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
     // Library and account
     // ---------------------------------------------------------------------------------------
 
-    fun refreshLibrary() {
+    fun refreshLibrary(): Job {
         libraryRequest?.cancel()
-        libraryRequest = viewModelScope.launch {
+        val job = viewModelScope.launch {
             libraryLoaded = true
             mutableLibrary.update { it.copy(loading = it.profile == null && !it.loggedIn, error = null) }
             try {
@@ -832,6 +839,8 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
                 mutableLibrary.update { it.copy(loading = false, error = error.userMessage()) }
             }
         }
+        libraryRequest = job
+        return job
     }
 
     fun startLogin() {

@@ -12,6 +12,57 @@
 #include <unistd.h>
 #include <vector>
 
+#if defined(__x86_64__) || defined(_M_X64)
+#include <setjmp.h>
+#include <signal.h>
+
+extern "C" {
+    // libnode exports base64_stream_encode_init(state, flags)
+    void base64_stream_encode_init(void* state, int flags);
+}
+
+namespace {
+sigjmp_buf g_avx2_jmp;
+
+void avx2_sigill_handler(int) {
+    siglongjmp(g_avx2_jmp, 1);
+}
+
+bool test_avx2_supported() {
+    struct sigaction sa{}, old_sa{};
+    sa.sa_handler = avx2_sigill_handler;
+    sigemptyset(&sa.sa_mask);
+    if (sigaction(SIGILL, &sa, &old_sa) != 0) {
+        return false;
+    }
+    bool supported = false;
+    if (sigsetjmp(g_avx2_jmp, 1) == 0) {
+        // Test an AVX2 instruction: vpaddb %ymm0, %ymm0, %ymm0
+        __asm__ __volatile__(".byte 0xc5, 0xfd, 0xfc, 0xc0" ::: "ymm0");
+        supported = true;
+    } else {
+        supported = false;
+    }
+    sigaction(SIGILL, &old_sa, nullptr);
+    return supported;
+}
+
+void sanitize_x86_instruction_set() {
+    if (!test_avx2_supported()) {
+        __android_log_write(ANDROID_LOG_WARN, "NocturnLocalApi",
+            "AVX2 instruction execution trapped with SIGILL on this CPU/kernel; falling back to SSSE3 / westmere.");
+        // Force simdutf to use westmere (SSE4.2/SSSE3) instead of haswell/icelake (AVX2/AVX-512)
+        setenv("SIMDUTF_FORCE_IMPLEMENTATION", "westmere", 1);
+        // Disable AVX/AVX2 in OpenSSL as well to prevent any subsequent SIGILL
+        setenv("OPENSSL_ia32cap", "~0x20000000:~0x20", 1);
+        // Force libbase64 in Node.js to use SSSE3 (0x10)
+        char dummy[64]{};
+        base64_stream_encode_init(dummy, 0x10);
+    }
+}
+} // namespace
+#endif
+
 namespace {
 constexpr const char* kTag = "NocturnLocalApi";
 std::atomic<bool> started{false};
@@ -127,6 +178,9 @@ Java_dev_nocturn_localapi_NodeNative_start(
     char* arguments[] = {storage.data(), storage.data() + executable.size() + 1, nullptr};
 
     __android_log_write(ANDROID_LOG_INFO, kTag, "Starting embedded Node.js runtime.");
+#if defined(__x86_64__) || defined(_M_X64)
+    sanitize_x86_instruction_set();
+#endif
     const int result = node::Start(2, arguments);
     // node::Start must never be re-entered, even after a clean JS shutdown.
     __android_log_print(ANDROID_LOG_WARN, kTag, "Embedded Node.js exited with status %d.", result);

@@ -279,6 +279,30 @@ class AppNavigationTest {
     }
 
     @Test
+    fun pushingNewScreenAfterInterruptedRightEdgeBackGestureRendersNewScreenOnTop() {
+        startHost()
+        pushAlbum()
+        compose.mainClock.autoAdvance = false
+        try {
+            // Step 1: Start right-edge back and interrupt/cancel it
+            beginGesture(BackEventCompat.EDGE_RIGHT)
+            dragTo(0.5f, BackEventCompat.EDGE_RIGHT)
+            compose.runOnIdle { dispatcher.dispatchOnBackCancelled() }
+            advanceFrames(30)
+            assertEquals("Album 1 smoothly restored to resting 0", 0f, bounds().left, 0.5f)
+            compose.onNodeWithTag("album-page").assertIsDisplayed()
+
+            // Step 2: Now push another screen onto the stack from the restored screen
+            compose.runOnIdle { navigation = navigation.copy(stack = navigation.stack + Screen.Album(2)) }
+            advanceFrames(30)
+            compose.onNodeWithTag("album-page").assertIsDisplayed()
+            assertEquals("Album 2 smoothly rendered at resting 0", 0f, bounds().left, 0.5f)
+        } finally {
+            finishGestureTest()
+        }
+    }
+
+    @Test
     fun gestureProgressDoesNotRecomposeTheRoutedPage() {
         startHost()
         pushAlbum()

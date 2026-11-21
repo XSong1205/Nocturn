@@ -263,9 +263,9 @@ data class FreeListenRights(
     val coverToday: Boolean = false,
     val upperLimit: Boolean = false,
     val status: String = "",
-    val title: String = "免费听时长剩余",
+    val title: String = "免费听",
     val vipInfoContent: String = "",
-    val actionTitle: String = "领取30分钟",
+    val actionTitle: String = "领取 30 分钟",
 ) {
     val isUnlocked: Boolean get() = remainingMs > 0
 }

@@ -870,9 +870,25 @@ internal object NeteaseJson {
         val coverToday = data.bool("rightsCoverToday") ?: false
         val upperLimit = data.bool("rightsUpperLimit") ?: false
         val status = data.string("status") ?: data.content("status") ?: ""
-        val title = data.string("title") ?: "免费听时长剩余"
-        val vipInfoContent = data.string("vipInfoContent") ?: ""
-        val actionTitle = data.obj("cardContent")?.string("actionTitle") ?: "领取30分钟"
+        val rawTitle = data.string("title")?.trim().orEmpty()
+        val title = when {
+            rawTitle.isEmpty() -> "免费听"
+            rawTitle.contains("看视频") -> "免费听"
+            rawTitle.contains("免费听") -> "免费听"
+            else -> rawTitle
+        }
+        val vipInfoContent = (data.string("vipInfoContent") ?: "")
+            .replace("看视频免费听歌", "免费听")
+            .replace("看视频免费听", "免费听")
+        val rawActionTitle = data.obj("cardContent")?.string("actionTitle")?.trim().orEmpty()
+        val actionTitle = when {
+            rawActionTitle.isEmpty() ||
+                rawActionTitle == "领取30分钟" ||
+                rawActionTitle == "点击领取30分钟免费听" ||
+                rawActionTitle.contains("30分钟") -> "领取 30 分钟"
+            rawActionTitle.contains("看视频") -> "免费听"
+            else -> rawActionTitle
+        }
         return FreeListenRights(
             remainingMs = remainingMs.coerceAtLeast(0L),
             endTimeMs = endTimeMs.coerceAtLeast(0L),
@@ -888,10 +904,12 @@ internal object NeteaseJson {
     fun parseFreeListenClaim(body: JsonObject): FreeListenClaimResult {
         val data = body.obj("data") ?: body
         val gainFlag = data.bool("gainFlag") ?: (body.int("code") == 200)
-        val showContent = data.string("showContent")
+        val showContent = (data.string("showContent")
             ?: data.content("showContent")
             ?: body.string("message")
-            ?: (if (gainFlag) "领取成功" else "领取失败")
+            ?: (if (gainFlag) "领取成功" else "领取失败"))
+            .replace("看视频免费听歌", "免费听")
+            .replace("看视频免费听", "免费听")
         val gainRightsDuration = data.long("gainRightsDuration") ?: 0L
         val upperLimit = data.bool("rightsUpperLimit") ?: false
         return FreeListenClaimResult(

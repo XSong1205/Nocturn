@@ -114,7 +114,7 @@ class MediaSessionPlaybackEngine(context: Context) : PlaybackEngine {
                         }
                     }
                 },
-                appContext.mainExecutor,
+                androidx.core.content.ContextCompat.getMainExecutor(appContext),
             )
             continuation.invokeOnCancellation { MediaController.releaseFuture(future) }
         }

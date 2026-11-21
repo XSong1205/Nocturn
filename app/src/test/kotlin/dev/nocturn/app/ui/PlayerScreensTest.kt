@@ -412,6 +412,19 @@ class PlayerScreensTest {
         capture("player-lyrics-dark.png")
     }
 
+    @Test
+    fun capturePlayerPausedScreenshotForReview() {
+        compose.setContent {
+            NocturnTheme(themeMode = ThemeMode.Dark) {
+                PlayerScreen(state = PreviewData.playerState.copy(playing = false))
+            }
+        }
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.waitForIdle()
+        capture("player-cover-paused-dark.png")
+    }
+
     private fun capture(name: String) {
         val dir = File("build/screenshots").apply { mkdirs() }
         val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()

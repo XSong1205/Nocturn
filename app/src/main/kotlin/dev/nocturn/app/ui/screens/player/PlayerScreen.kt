@@ -631,30 +631,37 @@ private fun PlayerSmoothStage(
         val miniHeaderHeight = smallCoverSide + 8.dp
 
         // 封面模式下的居中大封面与详情规格
-        val largeDetailsHeight = 64.dp
-        val maxCoverHeight = (availableHeight - largeDetailsHeight - 24.dp).coerceAtLeast(120.dp)
-        val largeCoverSide = minOf(availableWidth - 8.dp, maxCoverHeight, 360.dp).coerceAtLeast(140.dp)
+        val largeDetailsHeight = 56.dp
+        val largeCoverSide = minOf(availableWidth - 16.dp, availableHeight - 128.dp, 360.dp).coerceAtLeast(140.dp)
         val largeCoverX = ((availableWidth - largeCoverSide) / 2).coerceAtLeast(0.dp)
-        val largeCoverY = (((maxCoverHeight - largeCoverSide) / 2)).coerceAtLeast(4.dp)
+
+        val totalContentHeight = largeCoverSide + largeDetailsHeight
+        val remainingVertical = (availableHeight - totalContentHeight).coerceAtLeast(0.dp)
+        val middleGap = (remainingVertical * 0.18f).coerceIn(16.dp, 22.dp)
+        val verticalRest = (remainingVertical - middleGap).coerceAtLeast(0.dp)
+        val topGap = (verticalRest * 0.46f).coerceAtLeast(8.dp)
+
+        val largeCoverY = topGap
         val largeCorner = 24.dp
 
         val minScale = (smallCoverSide / largeCoverSide).coerceIn(0.01f, 1f)
 
-        val largeDetailsX = 4.dp
-        val largeDetailsY = largeCoverY + largeCoverSide + 14.dp
-        val largeDetailsWidth = (availableWidth - 8.dp).coerceAtLeast(0.dp)
+        val largeDetailsX = largeCoverX
+        val largeDetailsY = largeCoverY + largeCoverSide + middleGap
+        val largeDetailsWidth = largeCoverSide
 
         val smallDetailsX = smallCoverX + smallCoverSide + 12.dp
         val smallDetailsY = smallCoverY
         val smallDetailsWidth = (availableWidth - smallDetailsX - 4.dp).coerceAtLeast(0.dp)
 
         // 预计算像素值以供 graphicsLayer 零重组插值使用
-        val smallCoverXPx = with(density) { smallCoverX.toPx() }
-        val smallCoverYPx = with(density) { smallCoverY.toPx() }
-        val largeCoverXPx = with(density) { largeCoverX.toPx() }
-        val largeCoverYPx = with(density) { largeCoverY.toPx() }
+        val smallCenterXPx = with(density) { (smallCoverX + smallCoverSide / 2).toPx() }
+        val smallCenterYPx = with(density) { (smallCoverY + smallCoverSide / 2).toPx() }
+        val largeCenterXPx = with(density) { (largeCoverX + largeCoverSide / 2).toPx() }
+        val largeCenterYPx = with(density) { (largeCoverY + largeCoverSide / 2).toPx() }
+        val largeCoverSideHalfPx = with(density) { (largeCoverSide / 2).toPx() }
         val largeCornerPx = with(density) { largeCorner.toPx() }
-        val smallCornerCompensatedPx = with(density) { (smallCorner / minScale).toPx() }
+        val smallCornerPx = with(density) { smallCorner.toPx() }
         val largeElevationPx = with(density) { 16.dp.toPx() }
         val smallElevationPx = with(density) { 4.dp.toPx() }
         val largeDetailsTransYPx = with(density) { 24.dp.toPx() }
@@ -735,6 +742,7 @@ private fun PlayerSmoothStage(
                 modifier = Modifier
                     .offset(x = largeDetailsX, y = largeDetailsY)
                     .width(largeDetailsWidth)
+                    .height(largeDetailsHeight)
                     .graphicsLayer {
                         val p = progressAnimatable.value
                         alpha = (1f - p * 2.2f).coerceIn(0f, 1f)
@@ -744,7 +752,7 @@ private fun PlayerSmoothStage(
             ) {
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Text(
                         text = song.name,
@@ -829,17 +837,22 @@ private fun PlayerSmoothStage(
 
                     scaleX = s
                     scaleY = s
-                    transformOrigin = TransformOrigin(0f, 0f)
+                    transformOrigin = TransformOrigin(0.5f, 0.5f)
 
-                    translationX = androidx.compose.ui.util.lerp(largeCoverXPx, smallCoverXPx, p)
-                    translationY = androidx.compose.ui.util.lerp(largeCoverYPx, smallCoverYPx, p)
+                    val curCenterX = androidx.compose.ui.util.lerp(largeCenterXPx, smallCenterXPx, p)
+                    val curCenterY = androidx.compose.ui.util.lerp(largeCenterYPx, smallCenterYPx, p)
+                    translationX = curCenterX - largeCoverSideHalfPx
+                    translationY = curCenterY - largeCoverSideHalfPx
 
-                    val corner = androidx.compose.ui.util.lerp(largeCornerPx, smallCornerCompensatedPx, p)
-                    shape = RoundedCornerShape(corner)
+                    val visualCorner = androidx.compose.ui.util.lerp(largeCornerPx * currentPlayScale, smallCornerPx, p)
+                    val shapeCorner = (visualCorner / s).coerceAtLeast(0f)
+                    shape = RoundedCornerShape(shapeCorner)
                     clip = true
 
-                    shadowElevation = androidx.compose.ui.util.lerp(largeElevationPx, smallElevationPx, p)
+                    val targetElevation = if (playing) largeElevationPx else largeElevationPx * 0.5f
+                    shadowElevation = androidx.compose.ui.util.lerp(targetElevation, smallElevationPx, p)
                     spotShadowColor = shadowColor
+                    ambientShadowColor = shadowColor
                 }
                 .clickable {
                     haptics.tap()
