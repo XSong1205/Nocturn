@@ -14,6 +14,9 @@ abstract class IncrementAppVersion : DefaultTask() {
     @get:OutputFile
     abstract val snapshotFile: RegularFileProperty
 
+    @get:Input
+    abstract val ciEnabled: Property<Boolean>
+
     init {
         outputs.upToDateWhen { false }
         outputs.cacheIf { false }
@@ -27,7 +30,7 @@ abstract class IncrementAppVersion : DefaultTask() {
                 val bytes = ByteArray(file.length().toInt())
                 file.readFully(bytes)
                 val version = Properties().apply { bytes.inputStream().use { load(it) } }
-                val isCi = System.getenv("CI") != null || project.hasProperty("noIncrement")
+                val isCi = ciEnabled.get()
                 val code = if (isCi) {
                     version.getProperty("versionCode").toInt()
                 } else {
@@ -60,6 +63,7 @@ abstract class IncrementAppVersion : DefaultTask() {
 val incrementAppVersion = tasks.register<IncrementAppVersion>("incrementAppVersion") {
     versionFile.set(layout.projectDirectory.file("version.properties"))
     snapshotFile.set(layout.buildDirectory.file("generated/app-version/version.properties"))
+    ciEnabled.set(providers.environmentVariable("CI").isPresent.or(providers.gradleProperty("noIncrement").isPresent))
 }
 
 androidComponents {

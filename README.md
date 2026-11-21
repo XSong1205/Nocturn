@@ -1,111 +1,208 @@
-# Nocturn · LocalAPI
+# Nocturn (夜曲)
 
-Nocturn 提供可嵌入 Android 的网易云音乐 LocalAPI，包含本机 Node 服务、Android 运行时、Kotlin Multiplatform 客户端，以及一个 Material 3 Expressive 的网易云音乐第三方客户端。
+<p align="center">
+  <strong>私有、现代、离线优先的网易云音乐第三方客户端</strong><br>
+  深度遵循 Material Design 3 Expressive 设计规范 · 专为极致听歌体验打造
+</p>
 
-没有复制 SPlayer 实现；独立编写 JNI、Android 生命周期管理、本机 HTTP 服务和 Kotlin 客户端，使用上游 Node.js Mobile 与 API Enhanced 作为依赖。
+<p align="center">
+  <img src="https://img.shields.io/badge/Android-10%2B%20(API%2029%2B)-3DDC84?style=flat&logo=android&logoColor=white" alt="Android Version" />
+  <img src="https://img.shields.io/badge/Kotlin-2.4-7F52FF?style=flat&logo=kotlin&logoColor=white" alt="Kotlin" />
+  <img src="https://img.shields.io/badge/Jetpack%20Compose-Material%203%20Expressive-4285F4?style=flat&logo=jetpackcompose&logoColor=white" alt="Jetpack Compose" />
+  <img src="https://img.shields.io/badge/Navigation-Navigation%203-00C853?style=flat" alt="Navigation 3" />
+  <img src="https://img.shields.io/badge/Media-Jetpack%20Media3%20(ExoPlayer)-FF6F00?style=flat" alt="Jetpack Media3" />
+  <img src="https://img.shields.io/badge/Architecture-Offline--First%20%7C%20Embedded%20Node-0288D1?style=flat" alt="Embedded Node" />
+</p>
 
-## 当前模块
+---
 
-| 模块 | 职责 |
-| --- | --- |
-| `app` | Material 3 Expressive 网易云音乐第三方客户端：发现 / 搜索 / 歌单 / 专辑 / 歌手、全屏播放器与同步歌词、二维码登录、Media3 后台播放；详见 [应用说明](app/README.md) |
-| `local-api-node` | 内置 API Enhanced **4.41.1**，63 个端点白名单，Node 18+ 兼容单文件打包 |
-| `local-api-android` | Kotlin/JNI 启动 Node、本机随机端口、就绪与鉴权检测、资源校验、运行状态 |
-| `local-api` | KMP HTTP 客户端、Android 启动工厂、共享契约测试 |
+## 📖 项目简介
+
+**Nocturn** 是一款高颜值、流体动画、离线优先的网易云音乐客户端。应用深度融合 Google **Material Design 3 Expressive** 设计语言与 **Apple Music 风格的流体动力学歌词引擎**，提供从手机、折叠屏、平板到桌面大屏的自适应交互体验。
+
+传统第三方客户端通常依赖远程自建的反向代理服务或粗暴的网页爬虫，不仅存在隐私泄露风险，而且经常因服务下线而失效。Nocturn 采用革命性的**本地内嵌架构**：通过原生 JNI 进程内托管轻量级 Node.js Mobile 运行时，在设备本地（`127.0.0.1` 环回接口）直接提供标准、安全、低延迟的网易云 API 支撑。
+
+> ⚠️ **免责声明**：本应用为开源第三方网易云音乐客户端，仅供技术研究与交流使用，与网易云音乐官方无关联。应用不提供音源转存、不破解 VIP 权限，登录凭据与音源访问遵循网易云音乐官方服务协议。
+
+---
+
+## ✨ 核心特色
+
+### 🎨 Material Design 3 Expressive 极致美学
+- **专属调色盘**：精心配制的夜色系色彩语义（深色以夜空茄紫 `#100D14` 为底，搭配珊瑚橙 Coral `#FFB4A8`、荧光青柠 Lime `#CDF56E` 与天空浅蓝 Sky Cyan `#7BD8FF`），同时完整支持 Android 12+ 基于系统壁纸的 Monet 动态取色。
+- **物理弹簧动效**：接入 `MaterialExpressiveTheme` 与 `MotionScheme.expressive()`，全界面交互均具备弹性势能反馈与大圆角层次过渡（`NocturnShapes`）。
+- **原生预测性返回**：全面采用 AndroidX **Navigation 3 (`NavDisplay`)**，原生接入 Android 14+ 双侧边缘滑动手势预测返回（Predictive Back），页面缩放跟随手势平滑变形，取消手势即刻无缝回弹。
+
+### 🎵 Apple Music 风格流体歌词引擎
+- **动力学弹性跟随**：内置 Accompanist Lyrics UI，采用 580ms Apple Music 流体缓动曲线（`CubicBezierEasing(0.25f, 0.1f, 0.25f, 1f)`）与高阻尼连贯弹簧链，换行过渡顺滑自然。
+- **逐字毫秒对齐**：原生支持 YRC 逐字高亮时间轴与普通 LRC 逐行平滑回退，保持阅读视口居中锚定。
+- **单调时钟与跳变防护**：Media3 采样与渲染帧使用统一的硬件纳秒时钟（`elapsedRealtimeNanos`），消除高亮闪回；进度条倒带快退或选句跳播时自动旁路弹簧链，杜绝负向位移碰撞。
+- **视距高斯模糊**：Android 12+ 基于硬件加速渲染非当前行景深距离模糊，手动滚动浏览时瞬间唤醒焦点。
+- **双语与音译支持**：支持原文、译文与罗马音译一键切换，优雅双行对齐。
+
+### 📱 全形态自适应布局 (Adaptive & Multi-Form-Factor)
+针对不同屏幕宽度（Window Width Class）提供专门打造的视觉编排：
+- **手机形态 (Compact < 600dp)**：单手操作优化的底部导航栏（`ShortNavigationBar`）、浮动迷你播放器（`MiniPlayer`）与可向上手势拖拽展开的全屏播放器浮层。
+- **折叠屏与平板 (Medium 600–839dp / Expanded ≥ 840dp)**：左侧自适应导航轨（`NavigationRail`），大屏专属两栏双屏分栏（如左侧黑胶唱片 / 右侧双语歌词）、多列网格歌单。
+- **桌面形态 (Desktop Scaffold)**：提供大屏工作区专属的 `DesktopScaffold` 布局体系，包含左侧可折叠功能侧栏（`DesktopSidebar`）、全宽常驻底部控制栏（`DesktopPlayerBar`）与右侧抽屉式歌词面板（`DesktopLyricsPanel`）。
+
+### 🔊 现代系统级音频体验 & Lyricon 词幕集成
+- **Google Jetpack Media3 标准**：基于 `MediaSessionService` 与 `ExoPlayer` 构建后台音频引擎，深度打通系统锁屏、通知栏媒体控制、耳机线控与音频焦点管理。
+- **Lyricon 词幕状态栏歌词**：无缝对接 `io.github.proify.lyricon:provider` 协议，将播放进度、逐字歌词与翻译实时投射到系统状态栏（搭配 LSPosed / 词幕模块体验更佳）。
+
+### 🔒 硬件级安全与离线优先架构
+- **设备端内嵌 Node.js 服务**：将 LocalAPI 作为内部服务运行在应用沙盒内，完全杜绝第三方代理劫持。
+- **高等级安全会话存储**：支持二维码扫码登录与验证码登录，Session Cookie 经由 **AndroidKeyStore (AES-GCM)** 硬件级隔离加密保存，不上传任何中间服务器。
+
+---
+
+## 🏛️ 系统架构
+
+Nocturn 采用模块化与离线优先的设计思路，客户端通过标准 HTTP/JSON 与本地内嵌服务通信：
 
 ```text
-宿主应用
-         ↓
-local-api（Ktor）
-         ↓ Bearer / HTTP 127.0.0.1
-local-api-android（Node.js Mobile / JNI）
-         ↓
-local-api-node（API Enhanced）→ 网易云在线服务
+┌────────────────────────────────────────────────────────────────────────┐
+│                        Nocturn 客户端 (:app)                            │
+│   Jetpack Compose · Material 3 Expressive · Navigation 3 · Media3      │
+│   发现 / 搜索 / 歌单 / 专辑 / 歌手 / 每日推荐 / 播放器 / 流体歌词 / 词幕   │
+└────────────────────────────────────┬───────────────────────────────────┘
+                                     │
+                                     ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                  Kotlin Multiplatform 客户端 (:local-api)               │
+│                   基于 Ktor 的强类型客户端封装                          │
+│        数据模型归一化 · 歌单分页游标 · 歌词解析 (YRC/LRC) · 统一异常包装   │
+└────────────────────────────────────┬───────────────────────────────────┘
+                                     │ Bearer Token / HTTP 127.0.0.1 (Loopback)
+                                     ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│               Android 原生运行时编排 (:local-api-android)               │
+│   JNI C++ 桥接 · 进程内 Node.js Mobile VM · 随机端口与健康巡检 · 权限约束 │
+└────────────────────────────────────┬───────────────────────────────────┘
+                                     │
+                                     ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                   内置服务运行包 (:local-api-node)                      │
+│      API Enhanced 4.41.1 · 63+ 端点白名单 · Android 沙盒数据存储适配    │
+└────────────────────────────────────┬───────────────────────────────────┘
+                                     │ HTTPS
+                                     ▼
+                                网易云音乐线上服务
 ```
 
-`host` JVM 目标用于运行共享客户端测试，不代表增加桌面客户端。
+### 模块分工
 
-## 构建
+| 模块 | 职责与定位 |
+| --- | --- |
+| **`:app`** | **Nocturn 客户端核心层**。负责所有 UI 界面、M3 Expressive 设计规范实现、Navigation 3 路由管理、ExoPlayer 音频回放控制、流体歌词渲染、词幕同步与硬件加密凭据管理。 |
+| **`:local-api`** | **Kotlin Multiplatform 客户端**。提供多平台通用的类型化 API、网易云数据 JSON 归一化清洗、歌单游标分页、YRC 歌词解析引擎及契约测试。 |
+| **`:local-api-android`** | **Android 平台原生桥接**。使用 C++ JNI 加载并管理官方 Node.js Mobile 运行库（`libnode.so`），负责进程内生命周期、本地随机端口调度与网络安全隔离。 |
+| **`:local-api-node`** | **内置 API 服务**。集成上游 API Enhanced 并裁剪至 63 个经过白名单审查的核心端点，处理 Android 沙盒路径适配与单文件打包。 |
 
-需要 JDK 21、Node.js 18+ / npm、Android SDK 37、NDK `28.2.13676358`、CMake `3.22.1`。Android 最低 API 29，当前支持 `arm64-v8a` 和 `x86_64`。Gradle 由 wrapper 固定为 9.8.2，Android Gradle Plugin 9.5.0，Kotlin 2.4.21。
+---
 
-在 `local.properties` 中配置本机 Android SDK 路径，或设置 `ANDROID_HOME`。该文件不应提交版本控制。
+## 📱 界面与功能一览
+
+Nocturn 具备完整的网易云日常听歌与曲库管理能力：
+
+- 🧭 **发现音乐**：动态问候语、编辑精选 Hero 轮播（`HorizontalCenteredHeroCarousel`）、分类推荐歌单横向画廊、热门榜单卡片，以及登录用户的私人专属每日推荐。
+- 🔍 **双态搜索**：支持搜索栏折叠与全屏展开双态过渡（`TopSearchBar` ↔ `ExpandedFullScreenSearchBar`），提供热搜榜、实时输入建议、历史记录，单曲 / 歌单 / 专辑 / 歌手多维度分页聚合检索。
+- 📑 **歌单与专辑**：沉浸式大封面 Hero 头部，支持一键播放全部、歌单收藏与取消、分批次触底分页加载。
+- 👤 **个人资料库**：我的喜欢、创建与收藏的歌单、最近播放足迹，以及账号二维码极速登录。
+- 🎧 **播放体验**：
+  - 封面与流体歌词双模式一键切换；
+  - 动态波浪进度条（`LinearWavyProgressIndicator`），支持任意精度拖动试听；
+  - 播放模式自由切换（单曲循环、列表循环、随机播放）；
+  - 底部抽屉式播放队列管理（`PlayerQueueSheet`）。
+- ⚙️ **个性化偏好**：深色 / 浅色 / 跟随系统主题、标准～Hi-Res 极致无损音质设定、状态栏歌词集成开关与存储空间管理。
+
+---
+
+## 🛠️ 构建与开发
+
+### 环境要求
+- **JDK**：JDK 21（推荐 Eclipse Temurin 21）
+- **Android SDK**：Compile SDK `37`，Target SDK `36`，Min SDK `29`（Android 10+）
+- **NDK**：`28.2.13676358`
+- **CMake**：`3.22.1`
+- **Node.js**：Node 18+ (LTS) 与 `npm`
+- **Gradle**：固定为 Gradle `9.8.2`，搭配 AGP `9.5.0` 与 Kotlin `2.4.21`
+
+### 编译运行
+
+在项目根目录下通过 PowerShell 执行构建：
 
 ```powershell
-.\gradlew.bat :local-api:assemble :local-api:hostTest :local-api-android:assembleDebug :local-api-android:lintDebug
+# 1. 编译 Debug APK
+.\gradlew.bat :app:assembleDebug
+
+# 2. 运行单元测试与 Android Lint 静态分析
+.\gradlew.bat :app:testDebugUnitTest :app:lintDebug
+
+# 3. 通过 ADB 安装到连接的设备
+adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-首次构建自动执行锁定依赖的 `npm ci`，下载并校验官方 Node.js Mobile Android 运行库，并打包 API 资产和第三方许可证。下载与生成文件保存在已忽略的缓存／build 目录。
+> **构建提示**：
+> - 首次编译时，Gradle 会自动执行 `npm ci` 并下载官方验证过的 Node.js Mobile 原生库解压至缓存目录。
+> - 应用版本维护在 `app/version.properties` 中。调用完整打包命令（如 `assembleRelease`）时，构建脚本会自动递增 `versionCode` 与 `versionName` 的 patch 版本。
 
-应用版本保存在 `app/version.properties`。使用完整任务名执行应用的 `assemble*`、`bundle*`、`install*`、`package*` 或 `build`（含 `buildNeeded` / `buildDependents`）时，每次 Gradle 调用将 `versionCode` 加 1、`versionName` 的 patch 加 1（例如 `0.1.9` → `0.1.10`）；同次调用的多个变体共用一个版本。单独测试、Lint、IDE 同步及 dry-run 不递增。版本在生成打包清单前预留，后续构建失败也保留已用编号；`clean` 不重置计数。需要改起点时编辑该文件，跨机器构建需同步它。
+### 自动化构建发布 (CI/CD)
 
-原生模块 AAR：`local-api-android/build/outputs/aar/local-api-android-debug.aar`。接入应用时优先使用项目依赖 `implementation(project(":local-api"))`，让 Gradle 同时解析 Kotlin、Ktor、运行时模块及其依赖；单独复制 AAR 不包含这些 Maven 依赖。
+仓库配置了完善的 GitHub Actions 工作流（[`.github/workflows/release.yml`](.github/workflows/release.yml)）。每次合并至 `main` 分支时，CI 自动读取版本号、编译 Release APK 并发布为对应的 GitHub Release。
 
-## Android 接入
+---
+
+## 🧩 LocalAPI 模块说明
+
+虽然 Nocturn 首先是一个面向最终用户的网易云音乐客户端，但其内部解耦的 `local-api` 系列模块亦可作为独立的离线 API 组件库使用：
+
+### Android 原生端接入示例
 
 ```kotlin
 import dev.nocturn.localapi.client.createLocalApi
+import dev.nocturn.localapi.client.*
 
-// 在应用主进程的协程中调用；内部准备与启动均在后台线程执行。
+// 在应用协程作用域内调用（内部会自动在后台准备并拉起 Node VM）
 val api = createLocalApi(applicationContext)
-val health = api.health()
-val results = api.searchSongs("Nocturne", limit = 20)
-val detail = api.songDetail(listOf(347230L))
-val lyrics = api.lyrics(347230L)
-val urlResult = api.songUrl(347230L)
 
-// 释放这个客户端的 HTTP 资源；不会停止进程内的 Node VM。
+// 基础健康检查与检索
+val health = api.health()
+val searchResults = api.searchSongs("Nocturne", limit = 20)
+val songDetail = api.songDetail(listOf(347230L))
+
+// 获取逐字歌词 (YRC 优先，LRC 回退，包含翻译与罗马音)
+val lyrics = api.songLyrics(1824020871L)
+
+// 释放客户端 HTTP 资源
 api.close()
 ```
 
-新增扩展方法位于 `dev.nocturn.localapi.client`，可按需导入：
+### 运行时限制
+- **内存页对齐**：内置 Node.js Mobile 18.20.4 二进制文件采用 **4 KB ELF 对齐**，支持主流 `arm64-v8a` 与 `x86_64` 架构设备（启动前会自动核验页大小）。
+- **进程单例**：Node 虚拟机在每个 Android 应用进程生命周期内仅允许初始化一次。
+- **回环网络安全**：原生 AAR 强制启用严苛的网络安全配置，明文 HTTP 流量严格限定在 `127.0.0.1` 环回接口。
 
-```kotlin
-import dev.nocturn.localapi.client.*
+---
 
-val urls = api.songUrls(listOf(347230L, 4278232L), AudioQuality.Dolby)
-val searchPage = api.searchSongPage("Nocturne", ApiPage(limit = 30, offset = 0))
-val playlistPage = api.playlistSongPage(24381616L, ApiPage(limit = 50, offset = 0))
-val lyrics = api.songLyrics(1824020871L) // YRC 优先、LRC 回退、翻译／罗马音
-// playlistPage.nextOffset 指向下一批 trackIds；不能依赖详情中的 tracks 预览。
-```
+## 🧪 自动化测试与工程质量
 
-底层 API 返回 `JsonObject` 保留上游业务字段，调用方仍需判断 `code` 及播放地址是否为 `null`。新增类型化方法提供歌曲字段归一化、歌单分页、歌词解析、二维码状态映射和会话恢复；这类方法会将上游业务失败转为 `MusicServiceException`，而不是返回空列表。账号 Cookie 由宿主应用安全保存，客户端不会自行持久化。
+Nocturn 坚持高度确定性与全覆盖的工程质量标准：
 
-```kotlin
-val runtime = dev.nocturn.localapi.LocalApiRuntime.get(applicationContext)
-runtime.state.collect { state -> /* Idle / Preparing / Starting / Ready / Failed */ }
-```
+- **客户端测试**：包含 160+ 项 Robolectric 与 Compose UI 测试，全量覆盖网易云 JSON 归一化清洗、歌单分页游标、加密密钥存储、播放调度与全部页面交互。
+- **宿主视觉截图套件 (`ScreenshotGalleryTest`)**：在主机端利用 Robolectric 确定性渲染并输出 30 余张高精度界面截图（包括手机深浅主题、平板双栏视图、桌面三栏布局与中英日多语言流体歌词）。
+- **LocalAPI 契约检验**：通过 `npm test` 与在线 Smoke 对照脚本对 18 类公开接口进行回归校验，保证字段与上游服务契约一致。
 
-并发调用 `start()` 共用一次启动，取消某个调用方不会取消应用级启动。Node 每进程只能启动一次；进入原生运行时后退出或启动超时，需重新启动应用进程。进入 Node 前发生的资源准备错误可以重试。
+相关技术细节与深度设计规范可参阅 [`docs/`](docs/) 目录下的文档：
+- [API 参考与契约对照](docs/API_REFERENCE.md)
+- [Accompanist 歌词引擎与时钟设计](docs/LYRICS_UI.md)
+- [Lyricon 词幕状态栏集成说明](docs/LYRICON.md)
+- [Navigation 3 路由与预测返回设计](docs/NAVIGATION.md)
+- [Android 内嵌 Node.js 运行时规格](docs/NODE_RUNTIME.md)
 
-库 Manifest 合并 `INTERNET` 权限和网络安全配置，明文 HTTP 仅允许 `127.0.0.1`。如果宿主已有 `android:networkSecurityConfig`，需在宿主配置中合并该精确本机域规则，并通过 Manifest merger 明确使用宿主配置；不要全局开启明文流量。
+---
 
-## 验证
+## 📄 开源许可证
 
-```powershell
-cd local-api-node
-npm.cmd ci
-npm.cmd test
-$env:NOCTURN_REFERENCE_API = 'https://ncmapi.rpixel.online'
-npm.cmd run smoke
-```
-
-在线 smoke 测试覆盖 18 类公开接口、19 个场景：在搜索、歌曲、歌词与播放地址之外，新增分类歌单、精品歌单及其下一页游标、歌手全部歌曲分页。不会登录真实账号或修改账号数据；上游 HTTP 请求附带时间戳避开缓存。上一轮对照时参考服务为 `4.36.2`，本次 Docs 重抓已升至 `4.41.1`；内置依赖为 `4.41.1`，同版本号仍需核对模块及响应。
-
-- 本轮 Node **24.19.0**：35 项离线测试通过，新增歌单维护、收藏库、游标、元数据与单次提交回归；bundle 仍以 Node 18 为构建目标。
-- Kotlin 共享客户端：40 项测试通过，包含模型、分页、登录状态、歌词及新增接口契约。
-- Android 客户端：120 项 JVM / Robolectric 测试通过，覆盖网易云 JSON 归一化、歌单分页、歌词、加密会话、播放映射与全部屏幕交互；`ScreenshotGalleryTest` 在宿主机渲染 13 张界面截图到 `app/build/screenshots/`。
-- 无线 ADB 真机（Redmi / Android 17 API 37、`arm64-v8a`、4 KB 页）验证：内置 Node 运行时启动、首页实时数据、热榜搜索、音源播放、锁屏 / 系统媒体通知与后台播放均正常；同时定位并修复了上游在 Android 上读取 `/tmp/anonymous_token` 导致启动失败的问题（打包适配层改用 `NOCTURN_DATA_DIR`）。
-- 本轮 18 类公开接口、19 个场景的本地／参考服务共 38 项在线契约检查通过，包括精品歌单真实下一页游标。分类歌单 `order=new` 当前可以返回合法空页，按列表与分页字段核对。此前已验证实际游客会话及设备标识／密钥持久化一致性；本轮账号写操作仅执行隔离测试。
-- 本轮 `:local-api:assemble`、`:app:compileDebugKotlin` 与 `:local-api-android:lintDebug` 通过。新增 LocalAPI 接口未执行设备端验证。
-- 原生 JNI：两个 ABI 已编译与链接；Android AAR 和设备测试 APK 可构建。
-- 设备测试位于 `local-api-android/src/androidTest`，覆盖并发启动、实际健康检查与鉴权，需要连接 4 KB 页 Android 设备后执行 `:local-api-android:connectedDebugAndroidTest`。本次无线设备只做了应用层端到端验证；该 instrumented 任务首次运行需要从 Google Maven 下载 UTP 依赖，受当前网络 TLS 握手失败影响未完成。
-
-## 当前运行时边界
-
-内置运行库使用官方 Node.js Mobile **18.20.4** 预编译包，支持 `arm64-v8a` / `x86_64`。两个 `libnode.so` 均为 **4 KB ELF 对齐**；启动前会检测设备页大小，并在 16 KB 设备上明确失败。本项目不再以 16 KB 设备兼容为目标。
-
-API 在手机本地运行，在线音乐请求仍需网络。就绪文件、Token 和缓存保存在应用私有目录；Token 不写入就绪文件或日志。请求协议、端点及依赖许可证见 [Node 层文档](local-api-node/README.md)，原生库版本、SHA-256 与兼容性见 [运行时文档](docs/NODE_RUNTIME.md)。
-
-部署服务文档的查阅记录、现有封装差异与后续补齐项见 [API 文档对照](docs/API_REFERENCE.md)。2026-11-01 重抓发现的 42 个新文档路径、音质及搜索契约变化见 [Docs 重抓记录](docs/DOCS_REFRESH_2026-11-01.md)。
+本项目核心代码基于 **MIT License** 开放源码。
+引用的第三方开源组件与协议说明参见各模块目录及许可清单文件。
