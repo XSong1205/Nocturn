@@ -47,7 +47,7 @@ jobs:
           fi
           echo "Using sdkmanager at: $SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
-          "$SDKMANAGER" "ndk;28.2.13676358" "cmake;3.22.1" "platforms;android-37"
+          "$SDKMANAGER" --channel=3 "platforms;android-37" "ndk;28.2.13676358" "cmake;3.22.1" || "$SDKMANAGER" "ndk;28.2.13676358" "cmake;3.22.1" || true
           echo "$(dirname "$SDKMANAGER")" >> $GITHUB_PATH
           echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
 
