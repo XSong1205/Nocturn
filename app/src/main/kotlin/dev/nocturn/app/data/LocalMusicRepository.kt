@@ -100,8 +100,14 @@ class LocalMusicRepository(private val context: Context) : MusicRepository {
                 // 2) From homepage block HOMEPAGE_BLOCK_MGC_PLAYLIST
                 val recommendedList = playlists.getOrElse { emptyList() }
                 val radarFromPlaylists = recommendedList.firstOrNull { it.name.contains("雷达") }
-                val radarPlaylist = radarFromPlaylists
+                val rawRadar = radarFromPlaylists
                     ?: homepageBlocks?.let { NeteaseJson.parseHomepageRadarPlaylists(it) }?.firstOrNull()
+                // When anonymous, do not attempt to load dynamic/auth-dependent remote covers.
+                val radarPlaylist = if (!loggedIn && rawRadar != null) {
+                    rawRadar.copy(coverUrl = null)
+                } else {
+                    rawRadar
+                }
 
                 // Degrade block by block, but never show an empty home page as "success".
                 val attempted = listOfNotNull(

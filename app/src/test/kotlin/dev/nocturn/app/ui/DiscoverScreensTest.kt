@@ -25,6 +25,7 @@ import dev.nocturn.app.ui.state.HomeUiState
 import dev.nocturn.app.ui.state.PlaylistUiState
 import dev.nocturn.app.ui.theme.NocturnTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -202,6 +203,28 @@ class DiscoverScreensTest {
         compose.runOnIdle {
             assertEquals(PreviewData.radarPlaylist.id, clickedPlaylist)
             assertTrue(roamingClicked)
+        }
+    }
+
+    @Test
+    fun homeRadarWhenAnonymousPromptsLoginAndUsesFallback() {
+        var accountClicked = false
+        var clickedPlaylist: Long? = null
+        setScreen {
+            HomeScreen(
+                state = PreviewData.homeStateAnonymous.copy(
+                    radarPlaylist = PreviewData.radarPlaylist.copy(coverUrl = "https://example.test/radar.jpg"),
+                ),
+                onAccountClick = { accountClicked = true },
+                onPlaylistClick = { clickedPlaylist = it },
+            )
+        }
+
+        compose.onNodeWithTag("home-hero-radar").assertExists().performClick()
+
+        compose.runOnIdle {
+            assertTrue(accountClicked)
+            assertNull(clickedPlaylist)
         }
     }
 

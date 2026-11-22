@@ -490,10 +490,10 @@ private fun HomeHeroRow(
         val radar = state.radarPlaylist
         item(key = "radar") {
             HeroCard(
-                title = radar?.name ?: "雷达歌单",
+                title = radar?.name ?: "时光雷达",
                 subtitle = radar?.description?.takeIf { it.isNotBlank() }
                     ?: if (state.isLoggedIn) "根据你的口味实时推荐" else "登录解锁专属雷达",
-                imageUrl = radar?.coverUrl,
+                imageUrl = if (state.isLoggedIn) radar?.coverUrl else null,
                 seed = (radar?.id ?: 20_242L).hashCode(),
                 onClick = {
                     if (state.isLoggedIn) {
