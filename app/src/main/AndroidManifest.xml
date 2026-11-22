@@ -16,7 +16,8 @@
         android:allowBackup="false"
         android:enableOnBackInvokedCallback="true"
         tools:targetApi="33"
-        android:icon="@drawable/ic_nocturn"
+        android:icon="@mipmap/ic_nocturn"
+        android:roundIcon="@mipmap/ic_nocturn_round"
         android:label="Nocturn"
         android:supportsRtl="true"
         android:theme="@style/Theme.Nocturn">

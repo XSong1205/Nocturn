@@ -34,7 +34,7 @@ class PlaybackService : MediaSessionService() {
         // Must be configured before the session starts publishing playback state.
         setMediaNotificationProvider(
             DefaultMediaNotificationProvider(this).apply {
-                setSmallIcon(R.drawable.ic_nocturn)
+                setSmallIcon(R.drawable.ic_stat_nocturn)
             },
         )
 

@@ -1,6 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Nocturn 标志（背景与前景合成，固定配色） -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#244C40" android:pathData="M0,0h108v108h-108z" />
-    <path android:fillColor="#E3EBCB" android:pathData="M72,27a30,30 0,1 0,9 46a27,27 0,0 1,-9 -46" />
-    <path android:fillColor="#E3EBCB" android:pathData="M80,24l2,5l5,2l-5,2l-2,5l-2,-5l-5,-2l5,-2z" />
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#1D1838"
+        android:pathData="M0,0h108v108h-108z" />
+    <!-- 新月 -->
+    <path
+        android:fillColor="#ECE6FF"
+        android:strokeColor="#ECE6FF"
+        android:strokeWidth="1.92"
+        android:strokeLineJoin="round"
+        android:pathData="M52.55,33.2A21.6,21.6 0 1,0 73.6,58.93A16.8,16.8 0 1,1 52.55,33.2Z" />
+    <!-- 八分音符 -->
+    <path
+        android:fillColor="#B9AEFF"
+        android:pathData="M52.92,55.68A5.12,4 -24 1,0 62.28,51.52A5.12,4 -24 1,0 52.92,55.68Z" />
+    <path
+        android:strokeColor="#B9AEFF"
+        android:strokeWidth="3.36"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M61,52L61,34.4C65,35.2 68.6,37.6 67.8,43.2" />
 </vector>
