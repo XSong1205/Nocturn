@@ -127,7 +127,7 @@ fun HomeScreen(
     onFreeListenClick: () -> Unit = {},
     reselectFlow: kotlinx.coroutines.flow.Flow<Unit>? = null,
 ) {
-    if (state.loading && !state.hasContent) {
+    if ((state.loading || state.refreshing) && !state.hasContent) {
         CenteredStatus(modifier) { ScreenLoading(label = "正在加载") }
         return
     }

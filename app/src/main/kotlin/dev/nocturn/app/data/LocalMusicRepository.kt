@@ -118,11 +118,34 @@ class LocalMusicRepository(private val context: Context) : MusicRepository {
                         daily?.exceptionOrNull(),
                     ).first()
                 }
+
+                val chartList = charts.getOrElse { emptyList() }
+                val dailyList = daily?.getOrElse { emptyList() } ?: emptyList()
+                val songList = songs.getOrElse { emptyList() }
+
+                val hasAnyContent = recommendedList.isNotEmpty() ||
+                    chartList.isNotEmpty() ||
+                    dailyList.isNotEmpty() ||
+                    songList.isNotEmpty() ||
+                    radarPlaylist != null
+
+                if (!hasAnyContent) {
+                    val firstFailure = listOfNotNull(
+                        playlists.exceptionOrNull(),
+                        charts.exceptionOrNull(),
+                        songs.exceptionOrNull(),
+                        daily?.exceptionOrNull(),
+                    ).firstOrNull()
+                    if (firstFailure != null) {
+                        throw firstFailure
+                    }
+                }
+
                 HomeFeed(
                     playlists = recommendedList,
-                    charts = charts.getOrElse { emptyList() },
-                    dailySongs = daily?.getOrElse { emptyList() } ?: emptyList(),
-                    personalizedSongs = songs.getOrElse { emptyList() },
+                    charts = chartList,
+                    dailySongs = dailyList,
+                    personalizedSongs = songList,
                     radarPlaylist = radarPlaylist,
                     isLoggedIn = loggedIn,
                 )

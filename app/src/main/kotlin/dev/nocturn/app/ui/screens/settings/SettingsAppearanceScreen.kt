@@ -23,9 +23,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -70,6 +72,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.nocturn.app.data.model.ColorSchemeKey
 import dev.nocturn.app.data.model.DynamicVariant
 import dev.nocturn.app.data.model.ThemeMode
@@ -223,7 +226,9 @@ fun SettingsAppearanceScreen(
                                     },
                                     shape = CircleShape,
                                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                                    modifier = Modifier.height(36.dp),
+                                    modifier = Modifier
+                                        .height(36.dp)
+                                        .testTag("settings-dynamic-variant-chip"),
                                 ) {
                                     Text(
                                         text = state.dynamicVariant.displayName(),
@@ -241,7 +246,9 @@ fun SettingsAppearanceScreen(
                                         onResetColorScheme()
                                     },
                                     shape = CircleShape,
-                                    modifier = Modifier.size(36.dp),
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .testTag("settings-reset-colors"),
                                 ) {
                                     Icon(
                                         imageVector = Icons.Rounded.RestartAlt,
@@ -278,14 +285,15 @@ fun SettingsAppearanceScreen(
                                         customSeed = state.customSeedColor,
                                         dark = dark,
                                         context = context,
+                                        dynamicVariant = state.dynamicVariant,
                                     )
 
                                     ColorPaletteSwatch(
                                         preview = previewColors,
                                         isSelected = isSelected,
                                         badge = when (key) {
-                                            ColorSchemeKey.M3eDynamic -> ColorSwatchBadge.Eyedropper
-                                            ColorSchemeKey.M3Dynamic -> ColorSwatchBadge.Wallpaper
+                                            ColorSchemeKey.M3eDynamic -> ColorSwatchBadge.M3E
+                                            ColorSchemeKey.M3Dynamic -> ColorSwatchBadge.M3
                                             else -> ColorSwatchBadge.None
                                         },
                                         contentDescription = "${key.displayName()}${if (isSelected) "，已选择" else ""}",
@@ -304,6 +312,7 @@ fun SettingsAppearanceScreen(
                                         customSeed = state.customSeedColor,
                                         dark = dark,
                                         context = context,
+                                        dynamicVariant = state.dynamicVariant,
                                     )
                                     ColorPaletteSwatch(
                                         preview = customPreview,
@@ -425,7 +434,7 @@ fun SettingsAppearanceScreen(
                 Text(text = "选择取色风格", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             },
             text = {
-                Column {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     DynamicVariant.entries.forEach { variant ->
                         Row(
                             modifier = Modifier
@@ -440,7 +449,8 @@ fun SettingsAppearanceScreen(
                                         showVariantDialog = false
                                     },
                                 )
-                                .padding(vertical = 10.dp, horizontal = 4.dp),
+                                .padding(vertical = 10.dp, horizontal = 4.dp)
+                                .testTag("settings-variant-${variant.name.lowercase()}"),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             RadioButton(
@@ -492,7 +502,7 @@ fun SettingsAppearanceScreen(
 // Circular Color Palette Swatch Component
 // -------------------------------------------------------------------------------------------------
 
-enum class ColorSwatchBadge { None, Eyedropper, Wallpaper }
+enum class ColorSwatchBadge { None, M3E, M3, Eyedropper, Wallpaper }
 
 @Composable
 fun ColorPaletteSwatch(
@@ -574,27 +584,30 @@ fun ColorPaletteSwatch(
             }
         }
 
-        // Badge at bottom-end if dynamic
+        // Badge at bottom-end if dynamic: displays M3E or M3 clearly
         if (badge != ColorSwatchBadge.None) {
+            val badgeText = when (badge) {
+                ColorSwatchBadge.M3E, ColorSwatchBadge.Eyedropper -> "M3E"
+                ColorSwatchBadge.M3, ColorSwatchBadge.Wallpaper -> "M3"
+                ColorSwatchBadge.None -> ""
+            }
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .size(18.dp)
-                    .clip(CircleShape)
+                    .clip(RoundedCornerShape(6.dp))
                     .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                    .border(1.dp, MaterialTheme.colorScheme.surface, CircleShape),
+                    .border(1.2.dp, MaterialTheme.colorScheme.surface, RoundedCornerShape(6.dp))
+                    .padding(horizontal = 3.5.dp, vertical = 1.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                val icon = if (badge == ColorSwatchBadge.Eyedropper) {
-                    Icons.Rounded.Colorize
-                } else {
-                    Icons.Rounded.Wallpaper
-                }
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(11.dp),
+                Text(
+                    text = badgeText,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 0.sp,
+                    ),
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
         }

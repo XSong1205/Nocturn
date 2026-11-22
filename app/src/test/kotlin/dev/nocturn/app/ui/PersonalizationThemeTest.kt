@@ -21,6 +21,7 @@ import dev.nocturn.app.ui.screens.settings.CustomSeedColorContent
 import dev.nocturn.app.ui.screens.settings.SettingsAppearanceScreen
 import dev.nocturn.app.ui.theme.NocturnTheme
 import dev.nocturn.app.ui.theme.generateCustomColorScheme
+import dev.nocturn.app.ui.theme.generateM3eDynamicColorScheme
 import dev.nocturn.app.ui.theme.resolveColorScheme
 import dev.nocturn.app.ui.theme.resolvePalettePreview
 import org.junit.Assert.assertEquals
@@ -201,5 +202,132 @@ class PersonalizationThemeTest {
         compose.onNodeWithContentDescription("M3 Expressive").assertExists()
         compose.onNodeWithContentDescription("M3 Expressive").performClick()
         assertEquals(ColorSchemeKey.M3eOfficial, chosenScheme)
+    }
+
+    @Test
+    fun m3eAndM3BadgesAreDisplayedOnDynamicSwatches() {
+        val state = PreviewData.settingsState.copy(
+            colorSchemeKey = ColorSchemeKey.M3eDynamic,
+        )
+        compose.setContent {
+            NocturnTheme {
+                SettingsAppearanceScreen(
+                    state = state,
+                    onColorSchemeChange = { _, _ -> },
+                    onDynamicVariantChange = {},
+                    onResetColorScheme = {},
+                )
+            }
+        }
+        compose.waitForIdle()
+
+        compose.onNodeWithText("M3E").assertExists()
+        compose.onNodeWithText("M3").assertExists()
+    }
+
+    @Test
+    fun m3eDynamicGeneratesDistinctExpressiveColors() {
+        val seed = Color(0xFF6750A4)
+        val expressiveLight = generateM3eDynamicColorScheme(seed, dark = false, DynamicVariant.Expressive)
+        val tonalSpotLight = generateM3eDynamicColorScheme(seed, dark = false, DynamicVariant.TonalSpot)
+
+        assertTrue(expressiveLight.secondary != tonalSpotLight.secondary)
+        assertTrue(expressiveLight.tertiary != tonalSpotLight.tertiary)
+    }
+
+    @Test
+    fun resolveColorSchemeReactsToDynamicVariantAcrossSchemes() {
+        val context = RuntimeEnvironment.getApplication()
+
+        // 1. M3eDynamic reacts to variant
+        val m3eExpressive = resolveColorScheme(
+            key = ColorSchemeKey.M3eDynamic,
+            dark = false,
+            customSeed = 0xFF6750A4L,
+            dynamicVariant = DynamicVariant.Expressive,
+            context = context,
+        )
+        val m3eMonochrome = resolveColorScheme(
+            key = ColorSchemeKey.M3eDynamic,
+            dark = false,
+            customSeed = 0xFF6750A4L,
+            dynamicVariant = DynamicVariant.Monochrome,
+            context = context,
+        )
+        assertTrue(m3eExpressive.primary != m3eMonochrome.primary)
+
+        // 2. M3Dynamic reacts to variant
+        val m3TonalSpot = resolveColorScheme(
+            key = ColorSchemeKey.M3Dynamic,
+            dark = false,
+            customSeed = 0xFF6750A4L,
+            dynamicVariant = DynamicVariant.TonalSpot,
+            context = context,
+        )
+        val m3Monochrome = resolveColorScheme(
+            key = ColorSchemeKey.M3Dynamic,
+            dark = false,
+            customSeed = 0xFF6750A4L,
+            dynamicVariant = DynamicVariant.Monochrome,
+            context = context,
+        )
+        assertTrue(m3TonalSpot.primary != m3Monochrome.primary)
+
+        // 3. Preset (Amber) reacts to variant
+        val amberExpressive = resolveColorScheme(
+            key = ColorSchemeKey.Amber,
+            dark = false,
+            customSeed = 0xFF6750A4L,
+            dynamicVariant = DynamicVariant.Expressive,
+            context = context,
+        )
+        val amberMonochrome = resolveColorScheme(
+            key = ColorSchemeKey.Amber,
+            dark = false,
+            customSeed = 0xFF6750A4L,
+            dynamicVariant = DynamicVariant.Monochrome,
+            context = context,
+        )
+        assertTrue(amberExpressive.primary != amberMonochrome.primary)
+
+        // 4. Custom reacts to variant
+        val customVibrant = resolveColorScheme(
+            key = ColorSchemeKey.Custom,
+            dark = false,
+            customSeed = 0xFF2196F3L,
+            dynamicVariant = DynamicVariant.Vibrant,
+            context = context,
+        )
+        val customMonochrome = resolveColorScheme(
+            key = ColorSchemeKey.Custom,
+            dark = false,
+            customSeed = 0xFF2196F3L,
+            dynamicVariant = DynamicVariant.Monochrome,
+            context = context,
+        )
+        assertTrue(customVibrant.primary != customMonochrome.primary)
+    }
+
+    @Test
+    fun palettePreviewsUpdateWhenDynamicVariantChanges() {
+        val context = RuntimeEnvironment.getApplication()
+
+        val previewExpressive = resolvePalettePreview(
+            key = ColorSchemeKey.M3eDynamic,
+            customSeed = 0xFF6750A4L,
+            dark = false,
+            context = context,
+            dynamicVariant = DynamicVariant.Expressive,
+        )
+        val previewMonochrome = resolvePalettePreview(
+            key = ColorSchemeKey.M3eDynamic,
+            customSeed = 0xFF6750A4L,
+            dark = false,
+            context = context,
+            dynamicVariant = DynamicVariant.Monochrome,
+        )
+
+        assertTrue(previewExpressive.primary != previewMonochrome.primary)
+        assertEquals(Color.Black, previewMonochrome.primary)
     }
 }

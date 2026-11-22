@@ -37,31 +37,71 @@ fun resolveColorScheme(
     isEditMode: Boolean = false,
 ): ColorScheme = when (key) {
     ColorSchemeKey.M3eDynamic -> {
-        if (isDynamicColorSupported() && !isEditMode) {
+        val seed = if (isDynamicColorSupported() && !isEditMode) {
             runCatching {
-                if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-            }.getOrElse { if (dark) M3eDarkColors else M3eLightColors }
-        } else {
-            if (dark) M3eDarkColors else M3eLightColors
-        }
+                (if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)).primary
+            }.getOrNull()
+        } else null
+        generateM3eDynamicColorScheme(seed ?: Color(0xFF4F378B), dark, dynamicVariant)
     }
     ColorSchemeKey.M3Dynamic -> {
-        if (isDynamicColorSupported() && !isEditMode) {
+        val seed = if (isDynamicColorSupported() && !isEditMode) {
             runCatching {
-                if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-            }.getOrElse { if (dark) M3BaselineDarkColors else M3BaselineLightColors }
+                (if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)).primary
+            }.getOrNull()
+        } else null
+        generateM3DynamicColorScheme(seed ?: Color(0xFF6750A4), dark, dynamicVariant)
+    }
+    ColorSchemeKey.Custom -> generateCustomColorScheme(Color(customSeed), dark, dynamicVariant)
+    ColorSchemeKey.M3eOfficial -> {
+        if (dynamicVariant == DynamicVariant.Expressive) {
+            if (dark) M3eDarkColors else M3eLightColors
         } else {
-            if (dark) M3BaselineDarkColors else M3BaselineLightColors
+            generateM3eDynamicColorScheme(presetSeedColor(key), dark, dynamicVariant)
         }
     }
-    ColorSchemeKey.M3eOfficial -> if (dark) M3eDarkColors else M3eLightColors
-    ColorSchemeKey.M3Baseline -> if (dark) M3BaselineDarkColors else M3BaselineLightColors
-    ColorSchemeKey.Amber -> if (dark) AmberDarkColors else AmberLightColors
-    ColorSchemeKey.Ocean -> if (dark) OceanDarkColors else OceanLightColors
-    ColorSchemeKey.Mint -> if (dark) MintDarkColors else MintLightColors
-    ColorSchemeKey.Rose -> if (dark) RoseDarkColors else RoseLightColors
-    ColorSchemeKey.NocturnClassic -> if (dark) NocturnDarkColors else NocturnLightColors
-    ColorSchemeKey.Custom -> generateCustomColorScheme(Color(customSeed), dark)
+    ColorSchemeKey.M3Baseline -> {
+        if (dynamicVariant == DynamicVariant.TonalSpot || dynamicVariant == DynamicVariant.Expressive) {
+            if (dark) M3BaselineDarkColors else M3BaselineLightColors
+        } else {
+            generateM3DynamicColorScheme(presetSeedColor(key), dark, dynamicVariant)
+        }
+    }
+    ColorSchemeKey.Amber -> {
+        if (dynamicVariant == DynamicVariant.Expressive) {
+            if (dark) AmberDarkColors else AmberLightColors
+        } else {
+            generateM3eDynamicColorScheme(presetSeedColor(key), dark, dynamicVariant)
+        }
+    }
+    ColorSchemeKey.Ocean -> {
+        if (dynamicVariant == DynamicVariant.Expressive) {
+            if (dark) OceanDarkColors else OceanLightColors
+        } else {
+            generateM3eDynamicColorScheme(presetSeedColor(key), dark, dynamicVariant)
+        }
+    }
+    ColorSchemeKey.Mint -> {
+        if (dynamicVariant == DynamicVariant.Expressive) {
+            if (dark) MintDarkColors else MintLightColors
+        } else {
+            generateM3eDynamicColorScheme(presetSeedColor(key), dark, dynamicVariant)
+        }
+    }
+    ColorSchemeKey.Rose -> {
+        if (dynamicVariant == DynamicVariant.Expressive) {
+            if (dark) RoseDarkColors else RoseLightColors
+        } else {
+            generateM3eDynamicColorScheme(presetSeedColor(key), dark, dynamicVariant)
+        }
+    }
+    ColorSchemeKey.NocturnClassic -> {
+        if (dynamicVariant == DynamicVariant.Expressive) {
+            if (dark) NocturnDarkColors else NocturnLightColors
+        } else {
+            generateM3eDynamicColorScheme(presetSeedColor(key), dark, dynamicVariant)
+        }
+    }
 }
 
 @Composable

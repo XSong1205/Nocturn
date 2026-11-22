@@ -105,8 +105,8 @@ class LocalApiRuntime private constructor(private val context: Application) {
     private fun isHealthy(port: Int): Boolean = runCatching {
         val connection = URI("http://127.0.0.1:$port/health").toURL().openConnection() as HttpURLConnection
         try {
-            connection.connectTimeout = 500
-            connection.readTimeout = 500
+            connection.connectTimeout = 1_500
+            connection.readTimeout = 1_500
             connection.instanceFollowRedirects = false
             if (connection.responseCode != 200) return false
             val body = connection.inputStream.bufferedReader().use { it.readText() }
@@ -122,8 +122,8 @@ class LocalApiRuntime private constructor(private val context: Application) {
     private fun hasValidCredential(port: Int, token: String): Boolean = runCatching {
         val connection = URI("http://127.0.0.1:$port/api/search").toURL().openConnection() as HttpURLConnection
         try {
-            connection.connectTimeout = 500
-            connection.readTimeout = 500
+            connection.connectTimeout = 1_500
+            connection.readTimeout = 1_500
             connection.instanceFollowRedirects = false
             connection.requestMethod = "POST"
             connection.setRequestProperty("Authorization", "Bearer $token")

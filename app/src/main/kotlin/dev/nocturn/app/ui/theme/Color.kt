@@ -390,59 +390,336 @@ val RoseDarkColors: ColorScheme = darkColorScheme(
 )
 
 // -------------------------------------------------------------------------------------------------
+// Color Science & HSL Utilities for Expressive Dynamic Palettes
+// -------------------------------------------------------------------------------------------------
+
+fun colorToHsl(color: Color): FloatArray {
+    val r = color.red
+    val g = color.green
+    val b = color.blue
+    val max = maxOf(r, g, b)
+    val min = minOf(r, g, b)
+    val delta = max - min
+
+    var h = 0f
+    if (delta != 0f) {
+        h = when (max) {
+            r -> ((g - b) / delta) % 6f
+            g -> ((b - r) / delta) + 2f
+            else -> ((r - g) / delta) + 4f
+        } * 60f
+        if (h < 0f) h += 360f
+    }
+
+    val l = (max + min) / 2f
+    val s = if (delta == 0f) 0f else delta / (1f - kotlin.math.abs(2f * l - 1f))
+
+    return floatArrayOf(h, s.coerceIn(0f, 1f), l.coerceIn(0f, 1f))
+}
+
+fun hslToColor(h: Float, s: Float, l: Float, alpha: Float = 1f): Color {
+    val hNorm = ((h % 360f) + 360f) % 360f
+    val sClamped = s.coerceIn(0f, 1f)
+    val lClamped = l.coerceIn(0f, 1f)
+    val c = (1f - kotlin.math.abs(2f * lClamped - 1f)) * sClamped
+    val x = c * (1f - kotlin.math.abs((hNorm / 60f) % 2f - 1f))
+    val m = lClamped - c / 2f
+
+    val (rPrime, gPrime, bPrime) = when ((hNorm / 60f).toInt()) {
+        0 -> Triple(c, x, 0f)
+        1 -> Triple(x, c, 0f)
+        2 -> Triple(0f, c, x)
+        3 -> Triple(0f, x, c)
+        4 -> Triple(x, 0f, c)
+        else -> Triple(c, 0f, x)
+    }
+
+    return Color(
+        red = (rPrime + m).coerceIn(0f, 1f),
+        green = (gPrime + m).coerceIn(0f, 1f),
+        blue = (bPrime + m).coerceIn(0f, 1f),
+        alpha = alpha,
+    )
+}
+
+/**
+ * Generates an authentic Material 3 Expressive (M3E) Dynamic ColorScheme from a dynamic seed color
+ * (such as wallpaper extraction).
+ *
+ * Compared to standard Material 3 (TonalSpot):
+ * - Expressive primary has boosted chroma and vibrancy.
+ * - Secondary features an expressive rotated hue (+60° by default) providing lively contrast for secondary actions.
+ * - Tertiary introduces M3 Expressive's signature playful, high-chroma triadic/complementary accent (+160° by default).
+ * - Surfaces and containers are warmly tinted with subtle seed undertones for rich, cohesive depth.
+ */
+fun generateM3eDynamicColorScheme(
+    seedColor: Color,
+    dark: Boolean,
+    variant: DynamicVariant = DynamicVariant.Expressive,
+): ColorScheme {
+    val (h, s, _) = colorToHsl(seedColor)
+
+    if (variant == DynamicVariant.Monochrome) {
+        return if (dark) {
+            darkColorScheme(
+                primary = Color.White,
+                onPrimary = Color.Black,
+                primaryContainer = Color(0xFF383838),
+                onPrimaryContainer = Color.White,
+                inversePrimary = Color(0xFF1B1B1B),
+                secondary = Color(0xFFE2E2E2),
+                onSecondary = Color(0xFF1B1B1B),
+                secondaryContainer = Color(0xFF2E2E2E),
+                onSecondaryContainer = Color(0xFFE2E2E2),
+                tertiary = Color(0xFFC6C6C6),
+                onTertiary = Color(0xFF1B1B1B),
+                tertiaryContainer = Color(0xFF242424),
+                onTertiaryContainer = Color(0xFFC6C6C6),
+                background = Color(0xFF121212),
+                onBackground = Color(0xFFE2E2E2),
+                surface = Color(0xFF121212),
+                onSurface = Color(0xFFE2E2E2),
+                surfaceVariant = Color(0xFF242424),
+                onSurfaceVariant = Color(0xFFC6C6C6),
+                surfaceContainerLowest = Color(0xFF0A0A0A),
+                surfaceContainerLow = Color(0xFF181818),
+                surfaceContainer = Color(0xFF1E1E1E),
+                surfaceContainerHigh = Color(0xFF262626),
+                surfaceContainerHighest = Color(0xFF303030),
+                outline = Color(0xFF8E8E8E),
+                outlineVariant = Color(0xFF484848),
+            )
+        } else {
+            lightColorScheme(
+                primary = Color.Black,
+                onPrimary = Color.White,
+                primaryContainer = Color(0xFFE2E2E2),
+                onPrimaryContainer = Color.Black,
+                inversePrimary = Color.White,
+                secondary = Color(0xFF424242),
+                onSecondary = Color.White,
+                secondaryContainer = Color(0xFFECECEC),
+                onSecondaryContainer = Color(0xFF1B1B1B),
+                tertiary = Color(0xFF5E5E5E),
+                onTertiary = Color.White,
+                tertiaryContainer = Color(0xFFE0E0E0),
+                onTertiaryContainer = Color(0xFF1B1B1B),
+                background = Color.White,
+                onBackground = Color(0xFF1B1B1B),
+                surface = Color.White,
+                onSurface = Color(0xFF1B1B1B),
+                surfaceVariant = Color(0xFFE7E7E7),
+                onSurfaceVariant = Color(0xFF484848),
+                surfaceContainerLowest = Color.White,
+                surfaceContainerLow = Color(0xFFF7F7F7),
+                surfaceContainer = Color(0xFFF1F1F1),
+                surfaceContainerHigh = Color(0xFFEAEAEA),
+                surfaceContainerHighest = Color(0xFFE2E2E2),
+                outline = Color(0xFF757575),
+                outlineVariant = Color(0xFFC6C6C6),
+            )
+        }
+    }
+
+    val (secondaryShift, tertiaryShift, chromaScale, surfaceSat) = when (variant) {
+        DynamicVariant.Expressive -> listOf(60f, 160f, 1.15f, 0.08f)
+        DynamicVariant.Vibrant -> listOf(25f, 120f, 1.40f, 0.12f)
+        DynamicVariant.FruitSalad -> listOf(-55f, 145f, 1.25f, 0.09f)
+        DynamicVariant.Content -> listOf(12f, 28f, 0.95f, 0.06f)
+        DynamicVariant.TonalSpot -> listOf(0f, 60f, 0.70f, 0.04f)
+        DynamicVariant.Monochrome -> listOf(0f, 0f, 0.0f, 0.0f)
+    }
+
+    val primarySat = (maxOf(s, 0.60f) * chromaScale).coerceIn(0f, 1f)
+    val secondarySat = (maxOf(s * 0.55f, 0.35f) * chromaScale).coerceIn(0f, 1f)
+    val tertiarySat = (maxOf(s, 0.65f) * chromaScale).coerceIn(0f, 1f)
+
+    val hSecondary = (h + secondaryShift + 360f) % 360f
+    val hTertiary = (h + tertiaryShift + 360f) % 360f
+
+    return if (dark) {
+        darkColorScheme(
+            primary = hslToColor(h, primarySat, 0.80f),
+            onPrimary = hslToColor(h, primarySat, 0.16f),
+            primaryContainer = hslToColor(h, primarySat, 0.28f),
+            onPrimaryContainer = hslToColor(h, (primarySat * 0.75f).coerceIn(0f, 1f), 0.90f),
+            inversePrimary = hslToColor(h, primarySat, 0.40f),
+            secondary = hslToColor(hSecondary, secondarySat, 0.78f),
+            onSecondary = hslToColor(hSecondary, secondarySat, 0.18f),
+            secondaryContainer = hslToColor(hSecondary, secondarySat, 0.30f),
+            onSecondaryContainer = hslToColor(hSecondary, secondarySat, 0.90f),
+            tertiary = hslToColor(hTertiary, tertiarySat, 0.80f),
+            onTertiary = hslToColor(hTertiary, tertiarySat, 0.16f),
+            tertiaryContainer = hslToColor(hTertiary, tertiarySat, 0.30f),
+            onTertiaryContainer = hslToColor(hTertiary, tertiarySat, 0.90f),
+            background = hslToColor(h, surfaceSat, 0.06f),
+            onBackground = hslToColor(h, surfaceSat, 0.92f),
+            surface = hslToColor(h, surfaceSat, 0.06f),
+            onSurface = hslToColor(h, surfaceSat, 0.92f),
+            surfaceVariant = hslToColor(h, (surfaceSat * 1.5f).coerceIn(0f, 1f), 0.25f),
+            onSurfaceVariant = hslToColor(h, surfaceSat, 0.78f),
+            surfaceContainerLowest = hslToColor(h, surfaceSat, 0.04f),
+            surfaceContainerLow = hslToColor(h, surfaceSat, 0.08f),
+            surfaceContainer = hslToColor(h, surfaceSat, 0.12f),
+            surfaceContainerHigh = hslToColor(h, surfaceSat, 0.16f),
+            surfaceContainerHighest = hslToColor(h, surfaceSat, 0.20f),
+            outline = hslToColor(h, surfaceSat, 0.55f),
+            outlineVariant = hslToColor(h, (surfaceSat * 1.5f).coerceIn(0f, 1f), 0.30f),
+        )
+    } else {
+        lightColorScheme(
+            primary = hslToColor(h, primarySat, 0.40f),
+            onPrimary = Color.White,
+            primaryContainer = hslToColor(h, (primarySat * 0.70f).coerceIn(0f, 1f), 0.88f),
+            onPrimaryContainer = hslToColor(h, primarySat, 0.12f),
+            inversePrimary = hslToColor(h, primarySat, 0.80f),
+            secondary = hslToColor(hSecondary, secondarySat, 0.44f),
+            onSecondary = Color.White,
+            secondaryContainer = hslToColor(hSecondary, secondarySat, 0.88f),
+            onSecondaryContainer = hslToColor(hSecondary, secondarySat, 0.14f),
+            tertiary = hslToColor(hTertiary, tertiarySat, 0.42f),
+            onTertiary = Color.White,
+            tertiaryContainer = hslToColor(hTertiary, (tertiarySat * 0.75f).coerceIn(0f, 1f), 0.86f),
+            onTertiaryContainer = hslToColor(hTertiary, tertiarySat, 0.12f),
+            background = hslToColor(h, surfaceSat, 0.98f),
+            onBackground = hslToColor(h, surfaceSat, 0.12f),
+            surface = hslToColor(h, surfaceSat, 0.98f),
+            onSurface = hslToColor(h, surfaceSat, 0.12f),
+            surfaceVariant = hslToColor(h, (surfaceSat * 1.5f).coerceIn(0f, 1f), 0.90f),
+            onSurfaceVariant = hslToColor(h, surfaceSat, 0.30f),
+            surfaceContainerLowest = Color.White,
+            surfaceContainerLow = hslToColor(h, surfaceSat, 0.96f),
+            surfaceContainer = hslToColor(h, surfaceSat, 0.93f),
+            surfaceContainerHigh = hslToColor(h, surfaceSat, 0.90f),
+            surfaceContainerHighest = hslToColor(h, surfaceSat, 0.86f),
+            outline = hslToColor(h, surfaceSat, 0.50f),
+            outlineVariant = hslToColor(h, (surfaceSat * 1.5f).coerceIn(0f, 1f), 0.80f),
+        )
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Standard Material 3 (M3) Dynamic ColorScheme Generator
+// -------------------------------------------------------------------------------------------------
+
+/**
+ * Generates a standard Material 3 Dynamic ColorScheme from a seed color.
+ * Standard Material 3 maintains lower, calmer secondary chroma and tighter hue relationships.
+ */
+fun generateM3DynamicColorScheme(
+    seedColor: Color,
+    dark: Boolean,
+    variant: DynamicVariant = DynamicVariant.TonalSpot,
+): ColorScheme {
+    val (h, s, _) = colorToHsl(seedColor)
+
+    if (variant == DynamicVariant.Monochrome) {
+        return generateM3eDynamicColorScheme(seedColor, dark, DynamicVariant.Monochrome)
+    }
+
+    val (secondaryShift, tertiaryShift, chromaScale, surfaceSat) = when (variant) {
+        DynamicVariant.TonalSpot -> listOf(0f, 60f, 0.70f, 0.04f)
+        DynamicVariant.Content -> listOf(8f, 20f, 0.85f, 0.05f)
+        DynamicVariant.Expressive -> listOf(45f, 120f, 1.0f, 0.06f)
+        DynamicVariant.Vibrant -> listOf(20f, 90f, 1.20f, 0.08f)
+        DynamicVariant.FruitSalad -> listOf(-45f, 120f, 1.05f, 0.06f)
+        DynamicVariant.Monochrome -> listOf(0f, 0f, 0.0f, 0.0f)
+    }
+
+    val primarySat = (maxOf(s, 0.50f) * chromaScale).coerceIn(0f, 1f)
+    val secondarySat = (s * 0.35f * chromaScale).coerceIn(0f, 0.70f)
+    val tertiarySat = (maxOf(s * 0.50f, 0.40f) * chromaScale).coerceIn(0f, 0.85f)
+
+    val hSecondary = (h + secondaryShift + 360f) % 360f
+    val hTertiary = (h + tertiaryShift + 360f) % 360f
+
+    return if (dark) {
+        darkColorScheme(
+            primary = hslToColor(h, primarySat, 0.80f),
+            onPrimary = hslToColor(h, primarySat, 0.16f),
+            primaryContainer = hslToColor(h, primarySat, 0.28f),
+            onPrimaryContainer = hslToColor(h, (primarySat * 0.75f).coerceIn(0f, 1f), 0.90f),
+            inversePrimary = hslToColor(h, primarySat, 0.40f),
+            secondary = hslToColor(hSecondary, secondarySat, 0.78f),
+            onSecondary = hslToColor(hSecondary, secondarySat, 0.18f),
+            secondaryContainer = hslToColor(hSecondary, secondarySat, 0.30f),
+            onSecondaryContainer = hslToColor(hSecondary, secondarySat, 0.90f),
+            tertiary = hslToColor(hTertiary, tertiarySat, 0.80f),
+            onTertiary = hslToColor(hTertiary, tertiarySat, 0.16f),
+            tertiaryContainer = hslToColor(hTertiary, tertiarySat, 0.30f),
+            onTertiaryContainer = hslToColor(hTertiary, tertiarySat, 0.90f),
+            background = hslToColor(h, surfaceSat, 0.06f),
+            onBackground = hslToColor(h, surfaceSat, 0.92f),
+            surface = hslToColor(h, surfaceSat, 0.06f),
+            onSurface = hslToColor(h, surfaceSat, 0.92f),
+            surfaceVariant = hslToColor(h, (surfaceSat * 1.5f).coerceIn(0f, 1f), 0.25f),
+            onSurfaceVariant = hslToColor(h, surfaceSat, 0.78f),
+            surfaceContainerLowest = hslToColor(h, surfaceSat, 0.04f),
+            surfaceContainerLow = hslToColor(h, surfaceSat, 0.08f),
+            surfaceContainer = hslToColor(h, surfaceSat, 0.12f),
+            surfaceContainerHigh = hslToColor(h, surfaceSat, 0.16f),
+            surfaceContainerHighest = hslToColor(h, surfaceSat, 0.20f),
+            outline = hslToColor(h, surfaceSat, 0.55f),
+            outlineVariant = hslToColor(h, (surfaceSat * 1.5f).coerceIn(0f, 1f), 0.30f),
+        )
+    } else {
+        lightColorScheme(
+            primary = hslToColor(h, primarySat, 0.40f),
+            onPrimary = Color.White,
+            primaryContainer = hslToColor(h, (primarySat * 0.70f).coerceIn(0f, 1f), 0.88f),
+            onPrimaryContainer = hslToColor(h, primarySat, 0.12f),
+            inversePrimary = hslToColor(h, primarySat, 0.80f),
+            secondary = hslToColor(hSecondary, secondarySat, 0.44f),
+            onSecondary = Color.White,
+            secondaryContainer = hslToColor(hSecondary, secondarySat, 0.88f),
+            onSecondaryContainer = hslToColor(hSecondary, secondarySat, 0.14f),
+            tertiary = hslToColor(hTertiary, tertiarySat, 0.42f),
+            onTertiary = Color.White,
+            tertiaryContainer = hslToColor(hTertiary, (tertiarySat * 0.75f).coerceIn(0f, 1f), 0.86f),
+            onTertiaryContainer = hslToColor(hTertiary, tertiarySat, 0.12f),
+            background = hslToColor(h, surfaceSat, 0.98f),
+            onBackground = hslToColor(h, surfaceSat, 0.12f),
+            surface = hslToColor(h, surfaceSat, 0.98f),
+            onSurface = hslToColor(h, surfaceSat, 0.12f),
+            surfaceVariant = hslToColor(h, (surfaceSat * 1.5f).coerceIn(0f, 1f), 0.90f),
+            onSurfaceVariant = hslToColor(h, surfaceSat, 0.30f),
+            surfaceContainerLowest = Color.White,
+            surfaceContainerLow = hslToColor(h, surfaceSat, 0.96f),
+            surfaceContainer = hslToColor(h, surfaceSat, 0.93f),
+            surfaceContainerHigh = hslToColor(h, surfaceSat, 0.90f),
+            surfaceContainerHighest = hslToColor(h, surfaceSat, 0.86f),
+            outline = hslToColor(h, surfaceSat, 0.50f),
+            outlineVariant = hslToColor(h, (surfaceSat * 1.5f).coerceIn(0f, 1f), 0.80f),
+        )
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Seed Color Extraction for Presets
+// -------------------------------------------------------------------------------------------------
+
+fun presetSeedColor(key: ColorSchemeKey): Color = when (key) {
+    ColorSchemeKey.M3eDynamic, ColorSchemeKey.M3eOfficial -> Color(0xFF4F378B)
+    ColorSchemeKey.M3Dynamic, ColorSchemeKey.M3Baseline -> Color(0xFF6750A4)
+    ColorSchemeKey.Amber -> Color(0xFFFFBA27)
+    ColorSchemeKey.Ocean -> Color(0xFF0288D1)
+    ColorSchemeKey.Mint -> Color(0xFF2E7D32)
+    ColorSchemeKey.Rose -> Color(0xFFE91E63)
+    ColorSchemeKey.NocturnClassic -> CoralDeep
+    ColorSchemeKey.Custom -> Color(0xFF6750A4)
+}
+
+// -------------------------------------------------------------------------------------------------
 // Custom Color Scheme Generator (from Seed Color)
 // -------------------------------------------------------------------------------------------------
 
-fun generateCustomColorScheme(seedColor: Color, dark: Boolean): ColorScheme {
-    val r = seedColor.red
-    val g = seedColor.green
-    val b = seedColor.blue
-    return if (dark) {
-        val prim = Color(
-            red = (r + 0.35f).coerceAtMost(1f),
-            green = (g + 0.35f).coerceAtMost(1f),
-            blue = (b + 0.35f).coerceAtMost(1f),
-        )
-        val primContainer = Color(
-            red = (r * 0.45f).coerceIn(0f, 1f),
-            green = (g * 0.45f).coerceIn(0f, 1f),
-            blue = (b * 0.45f).coerceIn(0f, 1f),
-        )
-        darkColorScheme(
-            primary = prim,
-            onPrimary = Color(0xFF1F0E35),
-            primaryContainer = primContainer,
-            onPrimaryContainer = Color(0xFFEADDFF),
-            secondary = Color(0xFFCCC2DC),
-            tertiary = Color(0xFFEFB8C8),
-            surface = Color(0xFF141218),
-            onSurface = Color(0xFFE6E0E9),
-            surfaceContainerLow = Color(0xFF1D1B20),
-            surfaceContainer = Color(0xFF211F24),
-            surfaceContainerHigh = Color(0xFF2C292F),
-            surfaceContainerHighest = Color(0xFF37343A),
-        )
-    } else {
-        val primContainer = Color(
-            red = (r * 0.3f + 0.7f).coerceIn(0f, 1f),
-            green = (g * 0.3f + 0.7f).coerceIn(0f, 1f),
-            blue = (b * 0.3f + 0.7f).coerceIn(0f, 1f),
-        )
-        lightColorScheme(
-            primary = seedColor,
-            onPrimary = Color.White,
-            primaryContainer = primContainer,
-            onPrimaryContainer = Color(0xFF21005D),
-            secondary = Color(0xFF625B71),
-            tertiary = Color(0xFF7D5260),
-            surface = Color(0xFFFEF7FF),
-            onSurface = Color(0xFF1D1B20),
-            surfaceContainerLow = Color(0xFFF7F2FA),
-            surfaceContainer = Color(0xFFF3EDF7),
-            surfaceContainerHigh = Color(0xFFECE6F0),
-            surfaceContainerHighest = Color(0xFFE6E0E9),
-        )
-    }
+fun generateCustomColorScheme(
+    seedColor: Color,
+    dark: Boolean,
+    variant: DynamicVariant = DynamicVariant.Expressive,
+): ColorScheme {
+    val scheme = generateM3eDynamicColorScheme(seedColor, dark, variant)
+    return if (dark || variant == DynamicVariant.Monochrome) scheme else scheme.copy(primary = seedColor)
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -461,111 +738,108 @@ fun resolvePalettePreview(
     customSeed: Long,
     dark: Boolean,
     context: Context?,
+    dynamicVariant: DynamicVariant = DynamicVariant.Expressive,
 ): PalettePreviewColors = when (key) {
     ColorSchemeKey.M3eDynamic -> {
-        if (context != null && isDynamicColorSupported()) {
+        val seed = if (context != null && isDynamicColorSupported()) {
             runCatching {
-                val scheme = if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-                PalettePreviewColors(
-                    primary = scheme.primary,
-                    secondary = scheme.secondary,
-                    tertiary = scheme.tertiary,
-                    surface = scheme.surface,
-                )
-            }.getOrElse {
-                PalettePreviewColors(
-                    primary = Color(0xFF6750A4),
-                    secondary = Color(0xFF625B71),
-                    tertiary = Color(0xFF7D5260),
-                    surface = Color(0xFFFEF7FF),
-                )
-            }
-        } else {
-            PalettePreviewColors(
-                primary = Color(0xFF6750A4),
-                secondary = Color(0xFF625B71),
-                tertiary = Color(0xFF7D5260),
-                surface = Color(0xFFFEF7FF),
-            )
-        }
-    }
-    ColorSchemeKey.M3Dynamic -> {
-        if (context != null && isDynamicColorSupported()) {
-            runCatching {
-                val scheme = if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-                PalettePreviewColors(
-                    primary = scheme.primary,
-                    secondary = scheme.secondaryContainer,
-                    tertiary = scheme.tertiary,
-                    surface = scheme.surface,
-                )
-            }.getOrElse {
-                PalettePreviewColors(
-                    primary = Color(0xFF6750A4),
-                    secondary = Color(0xFFE8DEF8),
-                    tertiary = Color(0xFF7D5260),
-                    surface = Color(0xFFFEF7FF),
-                )
-            }
-        } else {
-            PalettePreviewColors(
-                primary = Color(0xFF6750A4),
-                secondary = Color(0xFFE8DEF8),
-                tertiary = Color(0xFF7D5260),
-                surface = Color(0xFFFEF7FF),
-            )
-        }
-    }
-    ColorSchemeKey.M3eOfficial -> PalettePreviewColors(
-        primary = Color(0xFF4F378B),
-        secondary = Color(0xFF4A4458),
-        tertiary = Color(0xFF633B48),
-        surface = Color(0xFFFEF7FF),
-    )
-    ColorSchemeKey.M3Baseline -> PalettePreviewColors(
-        primary = Color(0xFF6750A4),
-        secondary = Color(0xFF625B71),
-        tertiary = Color(0xFF7D5260),
-        surface = Color(0xFFFEF7FF),
-    )
-    ColorSchemeKey.Amber -> PalettePreviewColors(
-        primary = Color(0xFFFFBA27),
-        secondary = Color(0xFFD8C5A0),
-        tertiary = Color(0xFFB0CFA9),
-        surface = Color(0xFFFFF8F2),
-    )
-    ColorSchemeKey.Ocean -> PalettePreviewColors(
-        primary = Color(0xFF0288D1),
-        secondary = Color(0xFF81D4FA),
-        tertiary = Color(0xFFCFC0E7),
-        surface = Color(0xFFF7F9FD),
-    )
-    ColorSchemeKey.Mint -> PalettePreviewColors(
-        primary = Color(0xFF2E7D32),
-        secondary = Color(0xFF8BD898),
-        tertiary = Color(0xFFA1CED8),
-        surface = Color(0xFFF6FBF3),
-    )
-    ColorSchemeKey.Rose -> PalettePreviewColors(
-        primary = Color(0xFFE91E63),
-        secondary = Color(0xFFFFAFD0),
-        tertiary = Color(0xFFF1BC95),
-        surface = Color(0xFFFFF8F8),
-    )
-    ColorSchemeKey.NocturnClassic -> PalettePreviewColors(
-        primary = CoralDeep,
-        secondary = Color(0xFF4C6B00),
-        tertiary = Color(0xFF006788),
-        surface = Color(0xFFFFF8F4),
-    )
-    ColorSchemeKey.Custom -> {
-        val seed = Color(customSeed)
-        val scheme = generateCustomColorScheme(seed, dark = false)
+                (if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)).primary
+            }.getOrNull()
+        } else null
+        val scheme = generateM3eDynamicColorScheme(seed ?: Color(0xFF4F378B), dark, dynamicVariant)
         PalettePreviewColors(
             primary = scheme.primary,
             secondary = scheme.secondary,
             tertiary = scheme.tertiary,
             surface = scheme.surface,
         )
+    }
+    ColorSchemeKey.M3Dynamic -> {
+        val seed = if (context != null && isDynamicColorSupported()) {
+            runCatching {
+                (if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)).primary
+            }.getOrNull()
+        } else null
+        val scheme = generateM3DynamicColorScheme(seed ?: Color(0xFF6750A4), dark, dynamicVariant)
+        PalettePreviewColors(
+            primary = scheme.primary,
+            secondary = scheme.secondary,
+            tertiary = scheme.tertiary,
+            surface = scheme.surface,
+        )
+    }
+    ColorSchemeKey.Custom -> {
+        val seed = Color(customSeed)
+        val scheme = generateCustomColorScheme(seed, dark, dynamicVariant)
+        PalettePreviewColors(
+            primary = scheme.primary,
+            secondary = scheme.secondary,
+            tertiary = scheme.tertiary,
+            surface = scheme.surface,
+        )
+    }
+    else -> {
+        if (dynamicVariant == DynamicVariant.Expressive) {
+            when (key) {
+                ColorSchemeKey.M3eOfficial -> PalettePreviewColors(
+                    primary = Color(0xFF4F378B),
+                    secondary = Color(0xFF4A4458),
+                    tertiary = Color(0xFF633B48),
+                    surface = Color(0xFFFEF7FF),
+                )
+                ColorSchemeKey.M3Baseline -> PalettePreviewColors(
+                    primary = Color(0xFF6750A4),
+                    secondary = Color(0xFF625B71),
+                    tertiary = Color(0xFF7D5260),
+                    surface = Color(0xFFFEF7FF),
+                )
+                ColorSchemeKey.Amber -> PalettePreviewColors(
+                    primary = Color(0xFFFFBA27),
+                    secondary = Color(0xFFD8C5A0),
+                    tertiary = Color(0xFFB0CFA9),
+                    surface = Color(0xFFFFF8F2),
+                )
+                ColorSchemeKey.Ocean -> PalettePreviewColors(
+                    primary = Color(0xFF0288D1),
+                    secondary = Color(0xFF81D4FA),
+                    tertiary = Color(0xFFCFC0E7),
+                    surface = Color(0xFFF7F9FD),
+                )
+                ColorSchemeKey.Mint -> PalettePreviewColors(
+                    primary = Color(0xFF2E7D32),
+                    secondary = Color(0xFF8BD898),
+                    tertiary = Color(0xFFA1CED8),
+                    surface = Color(0xFFF6FBF3),
+                )
+                ColorSchemeKey.Rose -> PalettePreviewColors(
+                    primary = Color(0xFFE91E63),
+                    secondary = Color(0xFFFFAFD0),
+                    tertiary = Color(0xFFF1BC95),
+                    surface = Color(0xFFFFF8F8),
+                )
+                ColorSchemeKey.NocturnClassic -> PalettePreviewColors(
+                    primary = CoralDeep,
+                    secondary = Color(0xFF4C6B00),
+                    tertiary = Color(0xFF006788),
+                    surface = Color(0xFFFFF8F4),
+                )
+                ColorSchemeKey.M3eDynamic,
+                ColorSchemeKey.M3Dynamic,
+                ColorSchemeKey.Custom -> PalettePreviewColors(
+                    primary = Color(0xFF4F378B),
+                    secondary = Color(0xFF4A4458),
+                    tertiary = Color(0xFF633B48),
+                    surface = Color(0xFFFEF7FF),
+                )
+            }
+        } else {
+            val scheme = generateM3eDynamicColorScheme(presetSeedColor(key), dark, dynamicVariant)
+            PalettePreviewColors(
+                primary = scheme.primary,
+                secondary = scheme.secondary,
+                tertiary = scheme.tertiary,
+                surface = scheme.surface,
+            )
+        }
     }
 }

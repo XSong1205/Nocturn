@@ -176,6 +176,7 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
     private var codeCooldown: Job? = null
     private var codeAvailableAt = 0L
     private var libraryRequest: Job? = null
+    private var homeRequest: Job? = null
     private var homeLoaded = false
     private var libraryLoaded = false
 
@@ -395,12 +396,21 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
     // ---------------------------------------------------------------------------------------
 
     fun loadHome(refresh: Boolean = false) {
-        viewModelScope.launch {
+        val existing = homeRequest
+        if (existing != null && existing.isActive) {
+            if (!refresh && !mutableHome.value.hasContent) {
+                return
+            }
+            if (refresh) {
+                existing.cancel()
+            }
+        }
+        val job = viewModelScope.launch {
             homeLoaded = true
             mutableHome.update {
                 it.copy(
-                    loading = !it.hasContent && !refresh,
-                    refreshing = refresh,
+                    loading = !it.hasContent,
+                    refreshing = refresh && it.hasContent,
                     error = null,
                 )
             }
@@ -415,6 +425,7 @@ class NocturnViewModel(application: Application) : AndroidViewModel(application)
                 }
             }
         }
+        homeRequest = job
     }
 
     fun refreshHome() = loadHome(refresh = true)

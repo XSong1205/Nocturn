@@ -323,6 +323,42 @@ class DiscoverScreensTest {
     }
 
     @Test
+    fun homeLoadingWithoutContentShowsLoadingIndicator() {
+        setScreen {
+            HomeScreen(
+                state = HomeUiState(loading = true, recommendedPlaylists = emptyList()),
+            )
+        }
+
+        compose.onNodeWithText("正在加载").assertExists()
+        compose.onNodeWithText("暂时没有内容").assertDoesNotExist()
+    }
+
+    @Test
+    fun homeRefreshingWithoutContentKeepsShowingLoadingIndicator() {
+        setScreen {
+            HomeScreen(
+                state = HomeUiState(loading = false, refreshing = true, recommendedPlaylists = emptyList()),
+            )
+        }
+
+        compose.onNodeWithText("正在加载").assertExists()
+        compose.onNodeWithText("暂时没有内容").assertDoesNotExist()
+    }
+
+    @Test
+    fun homeEmptyWithoutContentAndNotLoadingShowsEmptyState() {
+        setScreen {
+            HomeScreen(
+                state = HomeUiState(loading = false, refreshing = false, recommendedPlaylists = emptyList()),
+            )
+        }
+
+        compose.onNodeWithText("暂时没有内容").assertExists()
+        compose.onNodeWithText("正在加载").assertDoesNotExist()
+    }
+
+    @Test
     fun homeErrorStateShowsRetryAndInvokesRefresh() {
         var refreshCount = 0
         setScreen {
