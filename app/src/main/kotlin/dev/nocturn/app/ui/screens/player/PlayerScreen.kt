@@ -117,8 +117,10 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.util.lerp
-import dev.nocturn.app.data.model.Song
+import dev.nocturn.app.data.model.ColorSchemeKey
+import dev.nocturn.app.data.model.DynamicVariant
 import dev.nocturn.app.data.model.LyricLine
+import dev.nocturn.app.data.model.Song
 import dev.nocturn.app.data.model.ThemeMode
 import dev.nocturn.app.playback.RepeatMode
 import dev.nocturn.app.ui.adaptive.LocalWindowWidthClass
@@ -173,6 +175,8 @@ fun PlayerScreen(
     onQueueSongClick: (Int) -> Unit = {},
     initialLyricsVisible: Boolean = false,
     sheetDrag: PlayerSheetDrag? = null,
+    artworkColorSchemeKey: ColorSchemeKey = ColorSchemeKey.M3eDynamic,
+    artworkDynamicVariant: DynamicVariant = DynamicVariant.Expressive,
 ) {
     var showLyrics by rememberSaveable { mutableStateOf(initialLyricsVisible) }
     var queueVisible by rememberSaveable { mutableStateOf(false) }
@@ -259,7 +263,11 @@ fun PlayerScreen(
         color = Color.Transparent,
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            PlayerMonetBackdrop(song = song)
+            PlayerMonetBackdrop(
+                song = song,
+                colorSchemeKey = artworkColorSchemeKey,
+                variant = artworkDynamicVariant,
+            )
             Column(
                 modifier = Modifier
                     .fillMaxSize()

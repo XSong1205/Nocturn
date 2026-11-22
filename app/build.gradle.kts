@@ -168,6 +168,8 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.13.0")
     // Material 3 Expressive components in 1.5.0 stable
     implementation("androidx.compose.material3:material3:1.5.0")
+    // HCT tonal palettes and artwork quantization, without an additional UI theme layer.
+    implementation("com.materialkolor:material-color-utilities:6.0.0")
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.1")

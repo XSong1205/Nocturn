@@ -356,6 +356,8 @@ fun NocturnApp(model: NocturnViewModel) {
                             onCyclePlaybackMode = model::cyclePlaybackMode,
                             onQueueSongClick = model::playQueueIndex,
                             sheetDrag = playerSheet,
+                            artworkColorSchemeKey = library.colorSchemeKey,
+                            artworkDynamicVariant = library.dynamicVariant,
                         )
                     },
                 )
