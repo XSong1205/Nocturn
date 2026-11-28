@@ -1,6 +1,6 @@
 # Nocturn · 网易云音乐第三方客户端
 
-使用 Jetpack Compose 与 **Material 3 Expressive** 重写的网易云音乐第三方 Android 客户端。数据全部来自仓库内置的 LocalAPI（API Enhanced 4.36.2，经本机 Node 运行时提供），不抓取网页、不转存音源。最低 Android 10（API 29）。
+使用 Jetpack Compose 与 **Material 3 Expressive** 重写的网易云音乐第三方 Android 客户端。数据全部来自仓库内置的 LocalAPI（API Enhanced 4.36.2，经本机 Node 运行时提供），不抓取网页、不转存音源。最低安装版本为 Android 7.0（API 24）。
 
 > 本应用为第三方客户端，与网易云音乐官方无关联，也不代表官方立场。登录信息提交给网易云音乐，本机仅加密保存会话 Cookie。
 
@@ -65,6 +65,7 @@ adb shell am start -n dev.nocturn.app/.MainActivity
 - 已在无线 ADB 连接的 Redmi 设备（Android 17 / API 37、`arm64-v8a`、4 KB 页）上验证：内置 Node 运行时启动、首页真实数据、搜索、音源播放、锁屏 / 系统媒体通知与后台播放。二维码登录、账号数据全流程与 16 KB 页设备仍需单独验证。
 - 媒体流地址会强制升级为 HTTPS（保持 LocalAPI 仅允许 loopback 明文的网络安全策略）；若个别 CDN 仅支持 HTTP，该曲目会播放失败。
 - 歌词依赖固定发布版 [Accompanist Lyrics UI](https://github.com/6xingyv/accompanist-lyrics-ui) `2.0.0-rc.3`（候选版）与 Lyrics Core `0.5.0`，许可证为 Apache-2.0；构建通过 Maven Central 解析，不拉取可变分支。现有共享解析器保留 YRC 绝对毫秒逐字时间、行时长、译文与音译，UI 层转换为 Accompanist 模型；普通 LRC 使用整句高亮。
+- Android 7.0～9（API 24～28）使用基础 Compose 歌词视图，保留逐字高亮、逐行高亮、译文、音译、点击跳转和自动跟随。Android 10 起使用 Accompanist Lyrics UI。
 - 歌词采用 28 sp 主文 / Material 正文字号译文、视口 38% 阅读锚点、上下边缘渐隐与 540 ms 缓动滚动，配合阻尼弹簧的轻量逐行滞后。Android 12+ 在缓存的歌词行图层启用距离模糊（每行 2 px 增量），当前行清晰，手动浏览时移除焦点模糊；Android 10 / 11 保留透明度与缩放效果。使用 SrcOver 保持深浅色对比，仅保活视口外 24 dp 内容。手动拖动和惯性滚动结束后等待 3.5 秒恢复跟随，也可点“回到当前歌词”立即恢复。
 - 播放器仍以 500 ms 采样；歌词场景保持单个时钟状态，通过 snapshotFlow 接收新采样，避免重建逐帧订阅。缓存歌词转换、排版与滚动参数，使用稳定内容键避免每次采样哈希整首歌词；无障碍文本只在换行时更新。采样与绘制统一使用 elapsedRealtimeNanos，补偿传递延迟并按实际播放速度推进；普通采样校正保持时间单调，避免逐字闪回，只有拖动预览及 Media3 明确的位置跳变（跳转 / 循环 / 换曲）允许回退。暂停、缓冲和进度预览时停止补间，最多向前推算 750 ms。无时间戳或纯音乐显示空态；译文 / 音译取决于上游数据。
 - 2026-11-02 歌词调优：Dock 歌词开关、下方紧凑字幕开关、隐藏音质标、双主题双语排版、时钟身份 / 暂停 / 后退校正与渐进换行均有 Compose 回归。Debug 独立离线采样入口及设备采样限制见 [歌词验证说明](../docs/LYRICS_UI.md)。

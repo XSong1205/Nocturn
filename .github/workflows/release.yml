@@ -105,6 +105,14 @@ jobs:
           path: release-apks/*.apk
           if-no-files-found: error
 
+      - name: Find Release Notes
+        id: notes
+        run: |
+          NOTES_PATH="docs/releases/${TAG_NAME}.md"
+          if [[ -s "$NOTES_PATH" ]]; then
+            echo "path=$NOTES_PATH" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Update Git Tag
         run: |
           git config user.name "github-actions[bot]"
@@ -118,6 +126,7 @@ jobs:
           tag_name: ${{ env.TAG_NAME }}
           name: "Nocturn ${{ env.TAG_NAME }}"
           files: release-apks/*.apk
+          body_path: ${{ steps.notes.outputs.path }}
           generate_release_notes: true
           draft: false
           prerelease: false

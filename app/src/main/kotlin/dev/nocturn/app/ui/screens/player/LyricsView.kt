@@ -87,7 +87,7 @@ internal enum class LyricsStage {
     Content,
 }
 
-/** YRC syllables and LRC lines share Accompanist's prepared renderer and gesture-aware follow. */
+/** Share loading, empty and playback-clock behavior across both lyrics renderers. */
 @Composable
 internal fun LyricsView(
     lyrics: Lyrics,
@@ -135,18 +135,22 @@ internal fun LyricsView(
                 // Hashing Lyrics directly as a composition key walks every word at each player sample.
                 val contentKey = remember(lyrics, songId) { Any() }
                 key(contentKey) {
-                    val synced = remember(lyrics, durationMs) { lyrics.toAccompanistLyrics(durationMs) }
-                    val listState = rememberLyricsLazyListState(
-                        initialFirstVisibleItemIndex = lyrics.indexAt(positionMs).coerceAtLeast(0),
-                    )
                     val position = rememberLyricsPosition(
                         positionMs, durationMs, playing, positionSampledAtNanos,
                         positionDiscontinuity, playbackSpeed, positionOverride,
                     )
-                    LyricsRenderer(
-                        lyrics, synced, listState, position, onLineClick,
-                        showTranslation, showRomanization, Modifier.fillMaxSize(),
-                    )
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                        LegacyLyricsView(lyrics, position, onLineClick, showTranslation, showRomanization)
+                    } else {
+                        val synced = remember(lyrics, durationMs) { lyrics.toAccompanistLyrics(durationMs) }
+                        val listState = rememberLyricsLazyListState(
+                            initialFirstVisibleItemIndex = lyrics.indexAt(positionMs).coerceAtLeast(0),
+                        )
+                        LyricsRenderer(
+                            lyrics, synced, listState, position, onLineClick,
+                            showTranslation, showRomanization, Modifier.fillMaxSize(),
+                        )
+                    }
                 }
             }
         }

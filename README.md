@@ -3,7 +3,7 @@
 遵循 Material Design 3 Expressive 设计规范的网易云音乐 Android 客户端，内置本地 Node.js 运行时作为离线优先的 API 服务层。
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Android-10%2B%20(API%2029%2B)-3DDC84?style=flat&logo=android&logoColor=white" alt="Android Version" />
+  <img src="https://img.shields.io/badge/Android-API%2024%2B-3DDC84?style=flat&logo=android&logoColor=white" alt="Android Version" />
   <img src="https://img.shields.io/badge/Kotlin-2.4-7F52FF?style=flat&logo=kotlin&logoColor=white" alt="Kotlin" />
   <img src="https://img.shields.io/badge/Compose-Material%203%20Expressive-4285F4?style=flat&logo=jetpackcompose&logoColor=white" alt="Compose" />
   <img src="https://img.shields.io/badge/Navigation-Navigation%203-00C853?style=flat" alt="Navigation 3" />
@@ -12,6 +12,8 @@
 </p>
 
 ---
+
+> **Android 兼容性**：最低安装版本为 Android 7.0（API 24）。Android 7.0～9 使用基础 Compose 歌词视图。Android 10 起使用 Accompanist Lyrics UI。
 
 ## 简介
 
